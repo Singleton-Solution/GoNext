@@ -1,0 +1,8 @@
+go 1.24
+
+use (
+	./apps/api
+	./apps/worker
+	./cli/gonext
+	./packages/go
+)
