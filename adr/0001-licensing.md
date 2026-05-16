@@ -32,7 +32,7 @@ A three-tier license stack:
 3. **First-party plugins and themes** (`/plugins/*`, `/themes/*` that ship in this repository) are licensed under **FSL-1.1-Apache-2.0** (same as core).
 4. **Documentation, design docs, ADRs, proposals** (`/docs`, `/adr`) are licensed under **Creative Commons Attribution 4.0 International (CC-BY-4.0)**.
 
-All contributors must sign a **Contributor License Agreement** assigning copyright in their contributions to Singleton-Solution. See ADR 0002.
+All contributors must sign off every commit via the **Developer Certificate of Origin** (DCO). A formal Contributor License Agreement is deferred to v1.0+ pending a commercial dual-licensing requirement the FSL terms cannot satisfy. See ADR 0002 for the full rationale.
 
 ## Consequences
 
@@ -42,13 +42,13 @@ All contributors must sign a **Contributor License Agreement** assigning copyrig
 - After 2 years, each file becomes Apache 2.0 — the project ages into a fully OSI-approved open-source codebase. The community is not locked out forever.
 - Plugin authors face zero license friction when importing the SDK. The ecosystem can grow.
 - Singleton-Solution can sell commercial licenses to enterprises that need the code under different terms.
-- The CLA gives Singleton-Solution flexibility to dual-license, change license terms with notice, and enforce.
+- The DCO trail gives a durable, auditable record of every contributor's attestation, embedded in git history itself rather than depending on a third-party service.
 
 ### Negative
 
 - FSL is **not OSI-approved as "open source"**. A subset of the free-software community will reject the project on this basis alone. We accept that loss — that subset is not our target customer.
 - Some companies have policies against using non-OSI licenses, even source-available ones. They will not adopt until files start converting to Apache 2.0.
-- The CLA adds friction to first-time contributors. Mitigated by automation (CLA-bot signs on PR).
+- Without a CLA, Singleton-Solution cannot relicense contributor code to non-FSL commercial terms without re-getting permission from each contributor. ADR 0002 explains why this tradeoff is acceptable for v1 and reversible later.
 - Singleton-Solution must maintain the rolling conversion (file-by-file) and publish a tool that shows which files are Apache 2.0 vs FSL.
 
 ### Neutral / accepted tradeoffs

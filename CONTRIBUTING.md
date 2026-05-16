@@ -21,8 +21,44 @@ Thank you for considering a contribution. GoNext is community-driven and we need
 5. Update relevant docs/ADRs if you change architecture.
 6. Run linters and tests locally (see project README in each subpackage once code exists).
 7. Open a PR against `main`. Reference the issue you're closing: `Closes #123`.
-8. Sign the CLA when the bot prompts on your first PR. This is required for the project to maintain licensing flexibility (see [`LICENSE`](./LICENSE)).
+8. **Sign off your commits** (see [DCO sign-off](#dco-sign-off) below). The CI check will fail otherwise.
 9. Address review comments. Squash + rebase if asked. Maintainers will merge.
+
+## DCO sign-off
+
+GoNext uses the **Developer Certificate of Origin** (DCO). Every commit you submit must include a `Signed-off-by:` line in its message, attesting that you have the right to submit the code under the project's license. There is no separate document to sign — the trailer in the commit message is the whole mechanism. See [ADR 0002](./adr/0002-dco-requirement.md) for the rationale.
+
+The easiest way: pass `-s` to `git commit`:
+
+```bash
+git commit -s -m "feat(api): add /api/v1/posts endpoint"
+```
+
+This appends a line like the following to your commit message:
+
+```
+Signed-off-by: Your Real Name <your.email@example.com>
+```
+
+Use the **real name** and **email** configured in `git config user.name` and `git config user.email`. Anonymous or pseudonymous commits are not accepted.
+
+If you forget to sign off:
+
+```bash
+# Most recent commit only:
+git commit --amend --signoff --no-edit
+
+# Last N commits:
+git rebase HEAD~N --signoff
+
+# All commits on your branch since main:
+git rebase origin/main --signoff
+
+# Then force-push (only your branch, never main):
+git push --force-with-lease
+```
+
+A required CI check at `.github/workflows/dco.yml` blocks merge until every commit on your PR is signed off.
 
 ## Commit messages
 

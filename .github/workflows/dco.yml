@@ -1,0 +1,96 @@
+name: DCO
+
+# Verifies every commit in a PR carries a `Signed-off-by:` trailer.
+# This is the Developer Certificate of Origin check.
+# Contributors attest their right to submit the code by adding the line.
+#
+# To add a sign-off to a new commit:    git commit -s -m "..."
+# To add to the last commit:            git commit --amend --signoff
+# To add to all commits in a branch:    git rebase HEAD~N --signoff
+#
+# See: https://developercertificate.org/
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  dco-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Verify Signed-off-by on every commit
+        id: check
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          COMMITS=$(git rev-list "$BASE_SHA..$HEAD_SHA")
+
+          if [ -z "$COMMITS" ]; then
+            echo "No new commits to check."
+            exit 0
+          fi
+
+          MISSING=""
+          for sha in $COMMITS; do
+            # Skip merge commits (have more than one parent)
+            PARENT_COUNT=$(git cat-file -p "$sha" | grep -c '^parent ' || true)
+            if [ "$PARENT_COUNT" -gt 1 ]; then
+              continue
+            fi
+            BODY=$(git log -1 --format="%B" "$sha")
+            if ! echo "$BODY" | grep -qE "^Signed-off-by: .+ <.+@.+>$"; then
+              SUBJECT=$(git log -1 --format="%s" "$sha")
+              MISSING="${MISSING}\n  - ${sha:0:7}  ${SUBJECT}"
+            fi
+          done
+
+          if [ -n "$MISSING" ]; then
+            {
+              echo "## ❌ DCO check failed"
+              echo ""
+              echo "The following commits are missing a \`Signed-off-by:\` line:"
+              echo ""
+              printf '%b' "$MISSING"
+              echo ""
+              echo ""
+              echo "### How to fix"
+              echo ""
+              echo "Add a sign-off to each commit, then force-push the branch:"
+              echo ""
+              echo '```bash'
+              echo "# For the most recent commit only:"
+              echo "git commit --amend --signoff --no-edit"
+              echo ""
+              echo "# For the last N commits in your branch:"
+              echo "git rebase HEAD~N --signoff"
+              echo ""
+              echo "# Or for all commits in this branch (replace 'main' with your base):"
+              echo 'git rebase origin/main --signoff'
+              echo ""
+              echo "# Then force-push:"
+              echo "git push --force-with-lease"
+              echo '```'
+              echo ""
+              echo "Going forward, commit with \`git commit -s\` to add the sign-off automatically."
+              echo ""
+              echo "See [CONTRIBUTING.md](https://github.com/Singleton-Solution/GoNext/blob/main/CONTRIBUTING.md#dco-sign-off) for the full DCO policy."
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            echo "::error::DCO check failed — see the workflow summary for details."
+            exit 1
+          fi
+
+          echo "✅ All commits properly signed off."

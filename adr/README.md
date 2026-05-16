@@ -46,7 +46,15 @@ ADRs are **immutable once accepted**. To change a decision, write a new ADR that
 | #    | Title | Status |
 |------|---|---|
 | 0000 | Template | (template) |
-| 0001 | Licensing | proposed |
-| 0002 | CLA requirement | proposed |
+| 0001 | Licensing — source-available core, permissive SDK | proposed |
+| 0002 | DCO requirement (CLA deferred) | proposed |
 | 0003 | UUID v7 primary keys | proposed |
-| ...  | (more landing soon) | |
+| 0004 | Postgres as primary store | proposed |
+| 0005 | WebAssembly plugin runtime via wazero | proposed |
+| 0006 | Monorepo with Go + pnpm workspaces | proposed |
+| 0007 | Separate Next.js apps for public + admin | proposed |
+| 0008 | JSON block tree storage | proposed |
+| 0009 | Lexical for rich text | proposed |
+| 0010 | Asynq for background jobs | proposed |
+| 0011 | Tag-based cache invalidation via transactional outbox | proposed |
+| 0012 | Plugin capability ABI | proposed |

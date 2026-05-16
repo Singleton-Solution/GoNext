@@ -38,10 +38,12 @@ Rationale for permissive plugin SDK: plugin authors will not invest in
 building on GoNext if the SDK they import is encumbered. Apache 2.0 on the
 SDK signals that plugin code is the author's to license as they choose.
 
-All contributors will be required to sign a Contributor License Agreement
-(CLA) granting Singleton-Solution the right to relicense their contributions.
-This is required to maintain the licensing flexibility above; see
-adr/0002-cla.md once it is committed.
+All contributors must sign off their commits using the Developer Certificate
+of Origin (DCO) by passing `-s` to `git commit`. This attests that each
+contributor has the right to submit their work under the project's license.
+A CI check enforces this on every pull request. See adr/0002-dco-requirement.md
+for the rationale. A formal Contributor License Agreement is deferred to
+v1.0+ pending a clear commercial dual-licensing requirement.
 
 The licensing decision will be finalized before the project accepts external
 code contributions. Until then, treat this software as "source available, all

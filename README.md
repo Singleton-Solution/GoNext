@@ -66,13 +66,13 @@ We need help. See [CONTRIBUTING.md](./CONTRIBUTING.md) for how to pick up an iss
 
 - Browse [open issues](https://github.com/Singleton-Solution/GoNext/issues) filtered by `area:*`, `skill:*`, or `good-first-issue`.
 - Read [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
-- Sign the CLA when you open your first PR (bot will prompt).
+- Sign off your commits with `git commit -s` (the [DCO](https://developercertificate.org/) check enforces this on PRs — see [CONTRIBUTING.md](./CONTRIBUTING.md#dco-sign-off)).
 
 ## License
 
 License is being finalized — see [`LICENSE`](./LICENSE) and the rationale in [`docs/proposals/14-proposals-strategic.md`](./docs/proposals/14-proposals-strategic.md) §S2.
 
-Current direction: **core under a source-available license** (BSL 1.1 or FSL 1.1, converting to Apache 2.0 after a defined period) with the **plugin SDK under Apache 2.0** to keep ecosystem growth unencumbered. CLA required from contributors. This is being finalized in [`adr/0001-licensing.md`](./adr/0001-licensing.md).
+Current direction: **core under FSL-1.1-Apache-2.0** (source-available, converts to Apache 2.0 after 2 years per file) with the **plugin SDK under Apache 2.0** from day 1. Contributors sign off commits via the [DCO](https://developercertificate.org/) (no CLA). See [`adr/0001-licensing.md`](./adr/0001-licensing.md) and [`adr/0002-dco-requirement.md`](./adr/0002-dco-requirement.md).
 
 ## Security
 

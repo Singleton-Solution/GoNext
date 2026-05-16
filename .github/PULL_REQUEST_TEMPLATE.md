@@ -51,9 +51,9 @@ Closes #
 
 <!-- If this changes a public API, plugin ABI, theme contract, REST/GraphQL schema, or DB schema: describe what changes and what existing users need to do. -->
 
-## CLA
+## DCO sign-off
 
-- [ ] I have signed the Contributor License Agreement (the CLA bot will prompt on first PR).
+- [ ] Every commit in this PR has a `Signed-off-by:` trailer (use `git commit -s`). The DCO CI check enforces this; see [CONTRIBUTING.md](../CONTRIBUTING.md#dco-sign-off) if you need help adding sign-offs to existing commits.
 
 ## Reviewer notes
 
