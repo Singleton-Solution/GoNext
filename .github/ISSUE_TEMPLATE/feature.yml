@@ -1,0 +1,69 @@
+name: Feature / Task
+description: An implementation task derived from a design document, or a new feature proposal.
+title: "[FEAT] "
+labels: ["type:feat"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for an implementation task tied to a design doc, or to propose a new feature.
+        For design-level architectural discussion, use the **Design Discussion** template instead.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One paragraph describing what should be built.
+      placeholder: Implement the WASM hook bus dispatcher per doc 02 §5.
+    validations:
+      required: true
+
+  - type: textarea
+    id: design-ref
+    attributes:
+      label: Design reference
+      description: Link to the relevant section of the design docs and/or ADRs.
+      placeholder: |
+        - docs/02-plugin-system.md §5
+        - adr/0008-hook-bus.md
+    validations:
+      required: false
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Concrete, testable conditions for "done".
+      placeholder: |
+        - [ ] `Bus.Do(name, args...)` dispatches to registered handlers in priority order.
+        - [ ] `Bus.Filter(name, value, args...)` chains transforms.
+        - [ ] Unit test coverage ≥ 80% for the package.
+        - [ ] Benchmarks added: p50 dispatch < 100µs with 10 handlers.
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies / blocked by
+      description: Issues that must land first.
+      placeholder: "#42 (WASM runtime skeleton), #51 (capability registry)"
+
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: Complexity estimate
+      options:
+        - "XS — under 1 day"
+        - "S — 1-3 days"
+        - "M — 1 week"
+        - "L — 2-3 weeks"
+        - "XL — 1 month+"
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional notes
+      description: Anything else.

@@ -1,0 +1,25 @@
+# GoNext code ownership
+# Format: <path> <github-username-or-team>
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Catch-all — maintainer reviews everything until subsystem owners are named
+* @tayebmokni
+
+# Subsystem owners (uncomment and assign as the team grows)
+# /apps/api/         @org/backend-maintainers
+# /apps/web/         @org/web-maintainers
+# /apps/admin/       @org/admin-maintainers
+# /apps/worker/      @org/backend-maintainers
+# /packages/go/      @org/backend-maintainers
+# /packages/ts/      @org/web-maintainers
+# /plugins/          @org/plugin-maintainers
+# /themes/           @org/theme-maintainers
+# /docs/             @org/docs-maintainers
+# /adr/              @tayebmokni  # ADRs require maintainer review
+
+# Legal/security require human review by maintainer
+/LICENSE                       @tayebmokni
+/SECURITY.md                   @tayebmokni
+/CODE_OF_CONDUCT.md            @tayebmokni
+/.github/workflows/            @tayebmokni
+/adr/0001-licensing.md         @tayebmokni

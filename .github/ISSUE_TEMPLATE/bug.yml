@@ -1,0 +1,63 @@
+name: Bug report
+description: A defect in shipped code.
+title: "[BUG] "
+labels: ["type:bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For security vulnerabilities, **do not** file a public issue.
+        Use the [private security advisory form](https://github.com/Singleton-Solution/GoNext/security/advisories/new) instead.
+
+  - type: input
+    id: version
+    attributes:
+      label: GoNext version
+      description: Version tag or git SHA.
+      placeholder: v0.1.0 or abc1234
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: |
+        - OS: macOS 14.4
+        - Go version: 1.24.1
+        - Postgres: 16.2
+        - Node: 22.4 (if frontend)
+        - Browser: Chrome 138 (if frontend)
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or stack trace
+      render: shell

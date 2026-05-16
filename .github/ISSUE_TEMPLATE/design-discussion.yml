@@ -1,0 +1,47 @@
+name: Design Discussion
+description: Propose an architectural change, debate a tradeoff, or open a topic that may become an ADR.
+title: "[DESIGN] "
+labels: ["type:design"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for architectural debates and tradeoffs. If the discussion concludes with a decision, the outcome should land in `/adr/` as an ADR.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What gap, conflict, or limitation in the current design needs addressing?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Link to relevant docs, prior decisions, related ADRs.
+      placeholder: |
+        - docs/02-plugin-system.md §6
+        - adr/0008-hook-bus.md
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed direction
+      description: Your preferred solution (if any).
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What else could we do?
+
+  - type: textarea
+    id: tradeoffs
+    attributes:
+      label: Tradeoffs / risks

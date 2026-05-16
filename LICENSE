@@ -1,0 +1,60 @@
+GoNext License — DRAFT / PLACEHOLDER
+=====================================
+
+This LICENSE file is a placeholder while the licensing decision is finalized.
+
+Current direction (subject to confirmation):
+
+  • Core (Go API, admin app, public app, workers, importers):
+    Business Source License 1.1 (BSL 1.1) OR Functional Source License 1.1
+    (FSL 1.1), with conversion to Apache License 2.0 after a defined period
+    (currently leaning toward 2 years for FSL 1.1, or 4 years per-file for
+    BSL 1.1).
+
+  • Plugin SDK and theme SDK (everything under packages/ts/sdk and
+    packages/go/sdk once they exist):
+    Apache License 2.0 from day one. No restrictions on plugin or theme
+    authors.
+
+  • First-party reference plugins and themes (everything under plugins/
+    and themes/):
+    Same license as core (BSL 1.1 / FSL 1.1 with auto-conversion).
+
+  • Documentation, design docs, ADRs, proposals (everything under docs/
+    and adr/):
+    Creative Commons Attribution 4.0 International (CC-BY-4.0).
+
+Rationale for source-available core: this project intends to be financially
+sustainable for its maintainer (Singleton-Solution) via hosted SaaS,
+commercial licensing, and premium first-party plugins. A purely permissive
+license (Apache / MIT) on core would allow hyperscalers to host GoNext as a
+managed service in direct competition with the maintainer, which would
+undermine the funding model that pays for the project's continued
+development. Source-available licenses with delayed open-source conversion
+(BSL, FSL) are the standard solution adopted by HashiCorp Terraform, Sentry,
+CockroachDB, MariaDB MaxScale, Couchbase Server, and others.
+
+Rationale for permissive plugin SDK: plugin authors will not invest in
+building on GoNext if the SDK they import is encumbered. Apache 2.0 on the
+SDK signals that plugin code is the author's to license as they choose.
+
+All contributors will be required to sign a Contributor License Agreement
+(CLA) granting Singleton-Solution the right to relicense their contributions.
+This is required to maintain the licensing flexibility above; see
+adr/0002-cla.md once it is committed.
+
+The licensing decision will be finalized before the project accepts external
+code contributions. Until then, treat this software as "source available, all
+rights reserved by Singleton-Solution" — you may read it, fork it, and
+contribute back, but commercial use, redistribution, and modification rights
+are not yet granted.
+
+For the rationale and full discussion, see:
+  - docs/proposals/14-proposals-strategic.md, proposal S2
+  - adr/0001-licensing.md (when committed)
+
+Copyright (c) 2026 Singleton-Solution. All rights reserved (pending final
+license selection).
+
+Questions: open a discussion at
+https://github.com/Singleton-Solution/GoNext/discussions
