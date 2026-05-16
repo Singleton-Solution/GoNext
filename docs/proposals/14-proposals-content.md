@@ -143,7 +143,7 @@ Phases referenced: **P0** Skeleton (0–2mo), **P1** CMS core (2–5mo), **P2** 
 ### Q04-11: Pasting from Gutenberg's clipboard format
 **Source**: doc 04 §18.11 — explicit support for Gutenberg clipboard?
 
-**Proposal**: **Yes, v1.** Detect Gutenberg's `<!-- wp:* -->` HTML-comment block markup in pasted HTML and convert via the same WP→DoNext import path as bulk migration.
+**Proposal**: **Yes, v1.** Detect Gutenberg's `<!-- wp:* -->` HTML-comment block markup in pasted HTML and convert via the same WP→GoNext import path as bulk migration.
 
 **Reasoning**: Migration is a force multiplier. A user evaluating us against WP will paste from their existing Gutenberg site as a smoke test; if it works, friction drops to zero. The converter already exists for bulk migration (Q04-9); plumbing it into the paste pipeline (§14.1) is a small wrapper. Marketing value alone justifies it.
 
@@ -181,7 +181,7 @@ Phases referenced: **P0** Skeleton (0–2mo), **P1** CMS core (2–5mo), **P2** 
 ### Q05-2: Public marketplace API — federated vs centralised
 **Source**: doc 05 §5.2 — marketplace topology.
 
-**Proposal**: **Centralised in v1, federation hooks deferred to v2.** Single canonical index at `marketplace.donext.dev`; install URLs hard-code that origin. Plugin manifests carry a `update_url` that *may* point elsewhere, leaving a federation seam without committing to one.
+**Proposal**: **Centralised in v1, federation hooks deferred to v2.** Single canonical index at `marketplace.gonext.dev`; install URLs hard-code that origin. Plugin manifests carry a `update_url` that *may* point elsewhere, leaving a federation seam without committing to one.
 
 **Reasoning**: Federation's TLS/identity story (plugin signing roots, mirror discovery, trust delegation) is its own multi-quarter design. Premature for v1; we don't have plugin authors yet. The `update_url` seam costs nothing and means a future federated index is a contract change, not a schema migration. Resolve when: third-party self-hosted marketplaces appear in user demand.
 
@@ -229,7 +229,7 @@ Phases referenced: **P0** Skeleton (0–2mo), **P1** CMS core (2–5mo), **P2** 
 ### Q05-6: CLI bundling
 **Source**: doc 05 §5.6 — single binary or separate CLI artifact.
 
-**Proposal**: **Single binary, subcommand-dispatched** (`donext serve`, `donext migrate`, `donext bench`). One release artifact, one go.mod, one Docker image.
+**Proposal**: **Single binary, subcommand-dispatched** (`gonext serve`, `gonext migrate`, `gonext bench`). One release artifact, one go.mod, one Docker image.
 
 **Reasoning**: The "cleaner" separation is purely aesthetic; in practice the CLI and server share 80% of their code (config loading, DB access, model packages). Two binaries means two release pipelines, two SBOMs, two version-skew matrices. Embedded-tools-as-subcommands is the kubectl/git pattern and works fine. Cross-compilation is one `go build` either way.
 

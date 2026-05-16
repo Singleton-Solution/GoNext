@@ -439,7 +439,7 @@ CREATE TABLE oauth_grants (
 );
 ```
 
-**Token format**: `donext_pat_<43-char-base64url>` (32 bytes). The prefix is purposeful — secret scanners on GitHub/GitLab match it, and we can quickly tell "is this a token?" in support tickets. The `token_prefix` column stores `donext_pat_xxxxxxxx` (first 8 of the body) for showing in the UI ("token starts with xxxxxxxx"). The full token is shown **once** at creation; thereafter only the hash is stored.
+**Token format**: `gonext_pat_<43-char-base64url>` (32 bytes). The prefix is purposeful — secret scanners on GitHub/GitLab match it, and we can quickly tell "is this a token?" in support tickets. The `token_prefix` column stores `gonext_pat_xxxxxxxx` (first 8 of the body) for showing in the UI ("token starts with xxxxxxxx"). The full token is shown **once** at creation; thereafter only the hash is stored.
 
 **Scopes** are a flat list of strings. Same vocabulary as capabilities (see §6) but namespaced: `read:posts`, `write:posts`, `read:users`, `manage:plugins`, etc. The OAuth consent screen explains each scope in human language pulled from the capability registry.
 

@@ -85,8 +85,8 @@ A few guiding biases that show up repeatedly below:
   "code": "wpshim_plugin_route_not_implemented",
   "namespace": "yoast/v1",
   "detected_plugin": "Yoast SEO",
-  "replacement": { "plugin": "donext-seo", "since": "1.0.0", "docs_url": "https://docs.donext.dev/migrate/yoast" },
-  "message": "This route was provided by Yoast SEO in WordPress. Install donext-seo or remove the calling code."
+  "replacement": { "plugin": "gonext-seo", "since": "1.0.0", "docs_url": "https://docs.gonext.dev/migrate/yoast" },
+  "message": "This route was provided by Yoast SEO in WordPress. Install gonext-seo or remove the calling code."
 }
 ```
 
@@ -160,7 +160,7 @@ A few guiding biases that show up repeatedly below:
 
 **Proposal**: Do not migrate 2FA state. Force re-enrollment on first login post-migration. Send a templated email at cutover ("your account is preserved; you'll re-enroll 2FA on next sign-in") and document the rationale in the runbook. Reject this question being re-opened until we ship our own first-party 2FA in core (doc 06).
 
-**Reasoning**: TOTP secrets cross a security boundary — copying them from a foreign plugin's storage format means trusting their key-derivation, their encryption-at-rest decisions, and their migration semantics for backup codes. Each WP 2FA plugin (Wordfence, Two Factor, miniOrange, Duo) has a different format; building five adapters multiplies the surface area where we can leak secrets. Re-enrollment is a 30-second user experience that adds zero security debt to us. The bar to revisit is "we've built core 2FA and want to migrate it from a previous DoNext deploy" — not "a WP user complained."
+**Reasoning**: TOTP secrets cross a security boundary — copying them from a foreign plugin's storage format means trusting their key-derivation, their encryption-at-rest decisions, and their migration semantics for backup codes. Each WP 2FA plugin (Wordfence, Two Factor, miniOrange, Duo) has a different format; building five adapters multiplies the surface area where we can leak secrets. Re-enrollment is a 30-second user experience that adds zero security debt to us. The bar to revisit is "we've built core 2FA and want to migrate it from a previous GoNext deploy" — not "a WP user complained."
 
 **Confidence**: high
 **Reversibility**: cheap
@@ -252,7 +252,7 @@ A few guiding biases that show up repeatedly below:
 ### Q09-3: mTLS between cluster pods
 **Source**: doc 09 §22.3 — off by default; rotation surface unspecified; defer to doc 15.
 
-**Proposal**: Defer the specifics to doc 15 as planned, but commit now to the operator-facing contract: ship a **cert-manager Helm sub-chart** as an opt-in (`donext-mtls`) that issues short-lived (24h) certs to each pod from an in-cluster CA. Off by default. The chart handles rotation; the app reads `MTLS_CERT_PATH` / `MTLS_KEY_PATH` and does HTTPS internally if both are set. No SPIFFE, no SPIRE, no mesh — just cert-manager + an in-app HTTPS toggle.
+**Proposal**: Defer the specifics to doc 15 as planned, but commit now to the operator-facing contract: ship a **cert-manager Helm sub-chart** as an opt-in (`gonext-mtls`) that issues short-lived (24h) certs to each pod from an in-cluster CA. Off by default. The chart handles rotation; the app reads `MTLS_CERT_PATH` / `MTLS_KEY_PATH` and does HTTPS internally if both are set. No SPIFFE, no SPIRE, no mesh — just cert-manager + an in-app HTTPS toggle.
 
 **Reasoning**: mTLS-on-by-default is a self-host trap (operators don't know how to debug it when it breaks). Cert-manager is the lowest-friction path for the operators who actually want mTLS, and it's standard enough that we don't need to invent rotation tooling. Specifics like cipher allowlist and audit logging belong in doc 15; the deployment-side contract (Helm chart, env vars, toggle) belongs here and should be committed.
 
@@ -350,7 +350,7 @@ worker:
 ### Q10-1: Long-term metric store
 **Source**: doc 10 §20.1 — Thanos vs Mimir vs Grafana Cloud vs nothing-for-self-host.
 
-**Proposal**: Two-track answer. (a) **Self-host reference stack**: Grafana Mimir, shipped as an optional Helm sub-chart (`donext-mimir`). Self-hosters who don't enable it get Prometheus's local TSDB with 15-day retention — documented as "good enough for the first year." (b) **SaaS default**: Grafana Cloud free tier for early customers, with a documented "bring your own backend via OTLP" path. Thanos is rejected — Mimir is its successor and the project has more momentum. "Nothing for self-host" is rejected — site owners need at least a quarter of metric retention for capacity planning.
+**Proposal**: Two-track answer. (a) **Self-host reference stack**: Grafana Mimir, shipped as an optional Helm sub-chart (`gonext-mimir`). Self-hosters who don't enable it get Prometheus's local TSDB with 15-day retention — documented as "good enough for the first year." (b) **SaaS default**: Grafana Cloud free tier for early customers, with a documented "bring your own backend via OTLP" path. Thanos is rejected — Mimir is its successor and the project has more momentum. "Nothing for self-host" is rejected — site owners need at least a quarter of metric retention for capacity planning.
 
 **Reasoning**: Mimir is the operationally-modern Thanos and is what Grafana Labs themselves run. Coupling our reference deployment to it gives us a stable target for docs, dashboards, and runbooks. The Grafana Cloud SaaS default piggybacks on a free tier that's sufficient for our typical SaaS customer's first year and pushes the bring-your-own decision to the customer when they outgrow it. The "nothing for self-host" non-answer would push operators to invent their own stacks per-deploy, which fragments the dashboards in §14a.
 
@@ -368,7 +368,7 @@ worker:
 ### Q10-2: Continuous profiling enable-by-default in P6
 **Source**: doc 10 §20.2 — Pyroscope ~free in ops cost; might just ship enabled.
 
-**Proposal**: Off by default in v1; ship Pyroscope wiring as `donext-pyroscope` Helm chart and a single env var (`GONEXT_PROFILING_ENDPOINT`) to enable in-process pprof shipping. Re-evaluate enabling-by-default after a P5 perf review *with a real customer workload*. The trigger to flip the default: 3 separate incidents where the root cause would have been faster to diagnose with continuous profiling than with traces+metrics.
+**Proposal**: Off by default in v1; ship Pyroscope wiring as `gonext-pyroscope` Helm chart and a single env var (`GONEXT_PROFILING_ENDPOINT`) to enable in-process pprof shipping. Re-evaluate enabling-by-default after a P5 perf review *with a real customer workload*. The trigger to flip the default: 3 separate incidents where the root cause would have been faster to diagnose with continuous profiling than with traces+metrics.
 
 **Reasoning**: "Free in ops cost" is the SaaS sales pitch; on self-host, every always-on subsystem is a thing the operator has to understand. Shipping it as an easy-toggle gets us 80% of the value (operators who want it can flip it on) without making a "huh, what's pyroscope?" moment for the median self-hoster. The trigger is concrete and incident-driven, which is the right bar to add an always-on dependency.
 

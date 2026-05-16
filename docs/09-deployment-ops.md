@@ -49,13 +49,13 @@
 
 ### 1.1 Recommended process inventory
 
-We split the runtime into **five process classes**, each independently scalable. Every class is the *same binary* (`donext` for Go; one Next.js standalone build for the two web tiers — see §3) invoked with different flags.
+We split the runtime into **five process classes**, each independently scalable. Every class is the *same binary* (`gonext` for Go; one Next.js standalone build for the two web tiers — see §3) invoked with different flags.
 
 | Class | Binary | Role | Replicas (typical) | Stateful? |
 |---|---|---|---|---|
-| `core-api` | `donext` (mode=api) | HTTP API, GraphQL, WASM plugin host for request-path hooks | 2..N (HPA) | No |
-| `core-worker` | `donext` (mode=worker) | Asynq consumer pool; WASM host for job-path hooks | 2..N (HPA on queue depth) | No |
-| `core-cron` | `donext` (mode=cron) | Asynq Scheduler (cron jobs), leader-elected | 1 active + N standby | No (leader lock in Redis) |
+| `core-api` | `gonext` (mode=api) | HTTP API, GraphQL, WASM plugin host for request-path hooks | 2..N (HPA) | No |
+| `core-worker` | `gonext` (mode=worker) | Asynq consumer pool; WASM host for job-path hooks | 2..N (HPA on queue depth) | No |
+| `core-cron` | `gonext` (mode=cron) | Asynq Scheduler (cron jobs), leader-elected | 1 active + N standby | No (leader lock in Redis) |
 | `public-web` | `node server.js` (Next.js standalone) | SSR/SSG/ISR public renderer | 2..N (HPA) | No (ISR cache is in S3 or local volume) |
 | `admin-web` | `node server.js` (Next.js standalone) | Admin SPA shell (SSR for shell, CSR for app) | 2..N (HPA, much lower fan-out than public) | No |
 
@@ -149,8 +149,8 @@ ingress (1 LB)
 
 **Decision: ONE image per *codebase*, not per process. Two images total.**
 
-1. **`donext-core`** — the Go binary plus runtime assets. Invoked as `donext serve [api|worker|cron|migrate]`.
-2. **`donext-web`** — both Next.js apps as a single multi-target image, selected at runtime by an env var or by the entrypoint command (`yarn workspace public-web start` vs `yarn workspace admin-web start`).
+1. **`gonext-core`** — the Go binary plus runtime assets. Invoked as `gonext serve [api|worker|cron|migrate]`.
+2. **`gonext-web`** — both Next.js apps as a single multi-target image, selected at runtime by an env var or by the entrypoint command (`yarn workspace public-web start` vs `yarn workspace admin-web start`).
 
 Why not one image per process (4–5 images)?
 
@@ -165,7 +165,7 @@ Why not the maximalist split (api, worker, cron, public, admin = 5 images)?
 
 - The marginal pull time saved at scale is real but small (~30MB per Go image variant). It's not worth the CI matrix complexity.
 
-### 2.2 `donext-core` Dockerfile (canonical)
+### 2.2 `gonext-core` Dockerfile (canonical)
 
 ```dockerfile
 # syntax=docker/dockerfile:1.7
@@ -199,27 +199,27 @@ RUN --mount=type=cache,target=/go/pkg/mod \
       -trimpath \
       -tags "netgo,osusergo" \
       -ldflags "-s -w \
-        -X 'donext/internal/build.Version=${VERSION}' \
-        -X 'donext/internal/build.Commit=${COMMIT}' \
-        -X 'donext/internal/build.Date=${BUILD_DATE}'" \
-      -o /out/donext ./cmd/donext
+        -X 'gonext/internal/build.Version=${VERSION}' \
+        -X 'gonext/internal/build.Commit=${COMMIT}' \
+        -X 'gonext/internal/build.Date=${BUILD_DATE}'" \
+      -o /out/gonext ./cmd/gonext
 
 # ---------- Stage 2: runtime ----------
 FROM gcr.io/distroless/static-debian12:nonroot AS runtime
-COPY --from=build /out/donext /donext
+COPY --from=build /out/gonext /gonext
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 USER nonroot:nonroot
 
 # api: 8080, metrics: 9090, internal RPC (future): 9100
 EXPOSE 8080 9090
 
-ENTRYPOINT ["/donext"]
+ENTRYPOINT ["/gonext"]
 CMD ["serve","api"]
 ```
 
 Layer story: Go dependency layer, source layer, build cache mount, distroless `nonroot` user. The image is ~25–30 MB.
 
-### 2.3 `donext-web` Dockerfile (multi-target Next.js)
+### 2.3 `gonext-web` Dockerfile (multi-target Next.js)
 
 ```dockerfile
 # syntax=docker/dockerfile:1.7
@@ -281,18 +281,18 @@ esac
 
 | Tag form | Meaning | Mutability | Use |
 |---|---|---|---|
-| `donext-core:1.4.7` | SemVer release | immutable | production pins |
-| `donext-core:1.4.7-amd64`, `...-arm64` | platform-specific manifest entry | immutable | not normally referenced directly |
-| `donext-core:1.4` | latest patch of 1.4 | mutable | dev/staging convenience |
-| `donext-core:1` | latest minor of 1 | mutable | not for prod |
-| `donext-core:main-<git-sha-short>` | every main commit | immutable | preview environments |
-| `donext-core:pr-1234` | per-PR build | mutable | ephemeral PR envs (deleted on merge) |
-| `donext-core:nightly-2026-05-13` | scheduled nightly | mutable for that day, then frozen | canary |
-| `donext-core:latest` | **not published** | — | we deliberately don't publish this |
+| `gonext-core:1.4.7` | SemVer release | immutable | production pins |
+| `gonext-core:1.4.7-amd64`, `...-arm64` | platform-specific manifest entry | immutable | not normally referenced directly |
+| `gonext-core:1.4` | latest patch of 1.4 | mutable | dev/staging convenience |
+| `gonext-core:1` | latest minor of 1 | mutable | not for prod |
+| `gonext-core:main-<git-sha-short>` | every main commit | immutable | preview environments |
+| `gonext-core:pr-1234` | per-PR build | mutable | ephemeral PR envs (deleted on merge) |
+| `gonext-core:nightly-2026-05-13` | scheduled nightly | mutable for that day, then frozen | canary |
+| `gonext-core:latest` | **not published** | — | we deliberately don't publish this |
 
-Same scheme for `donext-web`.
+Same scheme for `gonext-web`.
 
-A core release and a web release **must share the same SemVer**. `donext-core:1.4.7` and `donext-web:1.4.7` are tested together; mixing minor versions is allowed within a deploy *only* during a controlled rollout (§13.3) and is otherwise unsupported. Internal API compatibility surface is sliced by major version.
+A core release and a web release **must share the same SemVer**. `gonext-core:1.4.7` and `gonext-web:1.4.7` are tested together; mixing minor versions is allowed within a deploy *only* during a controlled rollout (§13.3) and is otherwise unsupported. Internal API compatibility surface is sliced by major version.
 
 ### 2.5 SBOM and signing
 
@@ -311,7 +311,7 @@ Options considered:
 
 - **A1 — Pure-Go React renderer.** Rejected. No production-grade pure-Go React SSR exists. Writing one (RSC, streaming, suspense, hydration mismatches) is years of work.
 - **A2 — Bundle Node into the Go binary** (`pkg`/`nexe`-style). Rejected. Two processes hidden inside one wrapper, two GCs, dishonest packaging.
-- **B — Be honest.** Go is one binary; Next.js apps are separate processes. Self-host needs Node.js or the `donext-web` container.
+- **B — Be honest.** Go is one binary; Next.js apps are separate processes. Self-host needs Node.js or the `gonext-web` container.
 - **C — Pre-rendered HTML embedded via `embed.FS`.** Works for static marketing sites; breaks ISR, preview mode, and personalized RSC. Rejected as default; viable as an opt-in mode.
 - **D — Headless-by-default.** The Go binary IS the CMS, exposing a JSON API. Renderer is the user's problem. We ship Next.js as the default reference renderer, but it's not "the product."
 
@@ -323,10 +323,10 @@ Self-hosters get one-command setup via Docker Compose (§5). Operators who want 
 
 ### 3.2 Static-export mode (the C compromise, opt-in)
 
-When the operator builds the site with `donext static-export`:
+When the operator builds the site with `gonext static-export`:
 
 1. The CLI calls the public-web's `next export` (with `output: 'export'` configured).
-2. The resulting `out/` directory is gzipped and embedded into a freshly compiled `donext` binary via `go:embed`.
+2. The resulting `out/` directory is gzipped and embedded into a freshly compiled `gonext` binary via `go:embed`.
 3. The resulting binary, when run with `serve api --static-mode`, serves the JSON API as normal AND serves the static HTML at routes that resolve in `out/`.
 
 Limitations explicitly documented to the operator:
@@ -378,17 +378,17 @@ spec:
   template:
     spec:
       terminationGracePeriodSeconds: 60
-      serviceAccountName: donext-core
+      serviceAccountName: gonext-core
       containers:
       - name: core
-        image: ghcr.io/donext/donext-core:1.4.7
+        image: ghcr.io/gonext/gonext-core:1.4.7
         args: ["serve","api"]
         ports:
         - { name: http,    containerPort: 8080 }
         - { name: metrics, containerPort: 9090 }
         envFrom:
-        - configMapRef: { name: donext-config }
-        - secretRef:    { name: donext-secrets }
+        - configMapRef: { name: gonext-config }
+        - secretRef:    { name: gonext-secrets }
         resources:
           requests: { cpu: "500m", memory: "512Mi" }
           limits:   { cpu: "2",    memory: "1Gi" }
@@ -396,7 +396,7 @@ spec:
         readinessProbe: { httpGet: { path: /readyz,  port: http }, initialDelaySeconds: 5,  periodSeconds: 5,  failureThreshold: 2 }
         lifecycle:
           preStop:
-            exec: { command: ["/donext","drain","--timeout=45s"] }
+            exec: { command: ["/gonext","drain","--timeout=45s"] }
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
@@ -439,10 +439,10 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
       - name: web
-        image: ghcr.io/donext/donext-web:1.4.7
+        image: ghcr.io/gonext/gonext-web:1.4.7
         env:
         - { name: DONEXT_WEB_APP, value: "public" }      # "admin" for admin-web
-        - { name: NEXT_PUBLIC_API_URL, value: "http://core-api.donext.svc.cluster.local:8080" }
+        - { name: NEXT_PUBLIC_API_URL, value: "http://core-api.gonext.svc.cluster.local:8080" }
         ports: [{ containerPort: 3000 }]
         resources:
           requests: { cpu: "300m", memory: "512Mi" }
@@ -467,7 +467,7 @@ Identical shape to core-api, except:
 
 ### 4.7 core-cron Deployment with leader election
 
-Two replicas, `strategy.type: Recreate` (we want the lease to flip cleanly, not roll). Identical container shape with `args: ["serve","cron"]`, `DONEXT_CRON_LEASE_KEY=donext:cron:leader`, `DONEXT_CRON_LEASE_TTL=15s`. Small resources (`100m/128Mi` request, `500m/256Mi` limit). Liveness only on `/healthz`. See §16 for the leader rationale.
+Two replicas, `strategy.type: Recreate` (we want the lease to flip cleanly, not roll). Identical container shape with `args: ["serve","cron"]`, `DONEXT_CRON_LEASE_KEY=gonext:cron:leader`, `DONEXT_CRON_LEASE_TTL=15s`. Small resources (`100m/128Mi` request, `500m/256Mi` limit). Liveness only on `/healthz`. See §16 for the leader rationale.
 
 ### 4.8 Ingress
 
@@ -475,7 +475,7 @@ Two replicas, `strategy.type: Recreate` (we want the lease to flip cleanly, not 
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: donext
+  name: gonext
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
     nginx.ingress.kubernetes.io/proxy-body-size: "100m"          # match media upload limit
@@ -507,8 +507,8 @@ Note: `/api` is mounted on both hostnames. Same backend, two front doors. CORS a
 Default-deny within the namespace, then allow:
 
 - `web → core-api:8080` from `public-web`, `admin-web`, `core-worker` (ISR webhook back-edge).
-- `{core-api, core-worker, core-cron} → donext-pg:5432`
-- `{core-api, core-worker, core-cron} → donext-redis:6379`
+- `{core-api, core-worker, core-cron} → gonext-pg:5432`
+- `{core-api, core-worker, core-cron} → gonext-redis:6379`
 - DNS egress to `kube-system:53/UDP`.
 - `core-api → public-web:3000` for ISR revalidate webhook.
 
@@ -543,10 +543,10 @@ The single recipe below brings up the entire stack on a laptop or a 4-vCPU VPS:
 ```yaml
 # docker-compose.yml — abbreviated; the full file ships in the repo.
 x-core-env: &core-env
-  DATABASE_URL: postgres://donext:donext@postgres:5432/donext?sslmode=disable
+  DATABASE_URL: postgres://gonext:gonext@postgres:5432/gonext?sslmode=disable
   REDIS_URL:    redis://redis:6379/0
   S3_ENDPOINT:  http://minio:9000
-  S3_BUCKET:    donext-media
+  S3_BUCKET:    gonext-media
   S3_ACCESS_KEY: minioadmin
   S3_SECRET_KEY: minioadmin
   DONEXT_SECRET_KEY: ${DONEXT_SECRET_KEY:?must be set}
@@ -555,9 +555,9 @@ x-core-env: &core-env
 services:
   postgres:
     image: postgres:15-alpine
-    environment: { POSTGRES_USER: donext, POSTGRES_PASSWORD: donext, POSTGRES_DB: donext }
+    environment: { POSTGRES_USER: gonext, POSTGRES_PASSWORD: gonext, POSTGRES_DB: gonext }
     volumes: [pg-data:/var/lib/postgresql/data]
-    healthcheck: { test: ["CMD-SHELL","pg_isready -U donext"], interval: 5s, retries: 10 }
+    healthcheck: { test: ["CMD-SHELL","pg_isready -U gonext"], interval: 5s, retries: 10 }
 
   redis:
     image: redis:7.2-alpine
@@ -573,7 +573,7 @@ services:
     ports: ["9000:9000","9001:9001"]
 
   core-api:
-    image: ghcr.io/donext/donext-core:1.4.7
+    image: ghcr.io/gonext/gonext-core:1.4.7
     command: ["serve","api"]
     environment: { <<: *core-env, DONEXT_MODE: api }
     depends_on:
@@ -582,31 +582,31 @@ services:
     ports: ["8080:8080"]
 
   core-worker:
-    image: ghcr.io/donext/donext-core:1.4.7
+    image: ghcr.io/gonext/gonext-core:1.4.7
     command: ["serve","worker"]
     environment: { <<: *core-env, DONEXT_MODE: worker }
     depends_on: [core-api]
 
   core-cron:
-    image: ghcr.io/donext/donext-core:1.4.7
+    image: ghcr.io/gonext/gonext-core:1.4.7
     command: ["serve","cron"]
     environment: { <<: *core-env, DONEXT_MODE: cron }
     depends_on: [redis]
 
   public-web:
-    image: ghcr.io/donext/donext-web:1.4.7
+    image: ghcr.io/gonext/gonext-web:1.4.7
     environment: { DONEXT_WEB_APP: public, NEXT_PUBLIC_API_URL: http://core-api:8080 }
     ports: ["3000:3000"]
 
   admin-web:
-    image: ghcr.io/donext/donext-web:1.4.7
+    image: ghcr.io/gonext/gonext-web:1.4.7
     environment: { DONEXT_WEB_APP: admin, NEXT_PUBLIC_API_URL: http://core-api:8080 }
     ports: ["3001:3000"]
 
 volumes: { pg-data: , redis-data: , minio-data: }
 ```
 
-A `.env.example` ships with safe defaults and the two REQUIRED variables (`DONEXT_SECRET_KEY`, `DONEXT_PEPPER`). The first-run UX is `cp .env.example .env && donext gen-secrets >> .env && docker compose up -d`.
+A `.env.example` ships with safe defaults and the two REQUIRED variables (`DONEXT_SECRET_KEY`, `DONEXT_PEPPER`). The first-run UX is `cp .env.example .env && gonext gen-secrets >> .env && docker compose up -d`.
 
 ---
 
@@ -617,12 +617,12 @@ Goal: a self-hoster moving from cPanel / Plesk / WP-on-LAMP should be able to in
 ### 6.1 Layout
 
 ```
-/opt/donext/
-  bin/donext                  # the Go binary
+/opt/gonext/
+  bin/gonext                  # the Go binary
   bin/node-v20.x.x-linux-x64/ # bundled Node runtime
   apps/public/                # Next.js standalone output
   apps/admin/                 # Next.js standalone output
-  config/donext.env           # config (mode=0600, owned by donext user)
+  config/gonext.env           # config (mode=0600, owned by gonext user)
   config/Caddyfile            # reverse proxy
   data/                       # local FS media (until S3 configured)
   log/                        # local log files
@@ -632,11 +632,11 @@ Goal: a self-hoster moving from cPanel / Plesk / WP-on-LAMP should be able to in
 
 A single shell script that:
 
-1. Creates the `donext` system user.
+1. Creates the `gonext` system user.
 2. Downloads the platform tarball.
-3. Generates secrets (`DONEXT_SECRET_KEY`, `DONEXT_PEPPER`) into `/opt/donext/config/donext.env`.
+3. Generates secrets (`DONEXT_SECRET_KEY`, `DONEXT_PEPPER`) into `/opt/gonext/config/gonext.env`.
 4. Installs Postgres 15 and Redis 7 via the OS package manager.
-5. Creates the DB, runs `donext migrate`.
+5. Creates the DB, runs `gonext migrate`.
 6. Installs the systemd units (below).
 7. Installs the Caddyfile and reloads Caddy.
 8. Opens 80 and 443 in `ufw` (if present).
@@ -644,20 +644,20 @@ A single shell script that:
 
 ### 6.3 systemd units
 
-`/etc/systemd/system/donext-core-api.service`:
+`/etc/systemd/system/gonext-core-api.service`:
 
 ```ini
 [Unit]
-Description=DoNext core API
+Description=GoNext core API
 After=network-online.target postgresql.service redis-server.service
 
 [Service]
 Type=notify
-User=donext
-Group=donext
-EnvironmentFile=/opt/donext/config/donext.env
+User=gonext
+Group=gonext
+EnvironmentFile=/opt/gonext/config/gonext.env
 Environment=DONEXT_MODE=api
-ExecStart=/opt/donext/bin/donext serve api
+ExecStart=/opt/gonext/bin/gonext serve api
 Restart=always
 RestartSec=5
 KillSignal=SIGTERM
@@ -669,7 +669,7 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/opt/donext/data /opt/donext/log
+ReadWritePaths=/opt/gonext/data /opt/gonext/log
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes
@@ -680,9 +680,9 @@ LockPersonality=yes
 WantedBy=multi-user.target
 ```
 
-`donext-core-worker.service` and `donext-core-cron.service` are identical with `DONEXT_MODE` changed.
+`gonext-core-worker.service` and `gonext-core-cron.service` are identical with `DONEXT_MODE` changed.
 
-The web units (`donext-public-web.service`, `donext-admin-web.service`) use `Type=simple`, `ExecStart=/opt/donext/bin/node-v20/bin/node server.js`, `Environment=DONEXT_WEB_APP=public|admin NODE_ENV=production PORT=3000|3001`, `TimeoutStopSec=30`, and the same hardening directives.
+The web units (`gonext-public-web.service`, `gonext-admin-web.service`) use `Type=simple`, `ExecStart=/opt/gonext/bin/node-v20/bin/node server.js`, `Environment=DONEXT_WEB_APP=public|admin NODE_ENV=production PORT=3000|3001`, `TimeoutStopSec=30`, and the same hardening directives.
 
 ### 6.4 Caddyfile
 
@@ -690,7 +690,7 @@ The web units (`donext-public-web.service`, `donext-admin-web.service`) use `Typ
 example.com {
     encode zstd gzip
     log {
-        output file /opt/donext/log/caddy-access.log
+        output file /opt/gonext/log/caddy-access.log
         format console
     }
 
@@ -733,7 +733,7 @@ Caddy is preferred over Nginx for self-host because of auto-TLS. We document an 
 
 ## 7. Environment variables and config
 
-We use **flat env vars** (12-factor) as the source of truth. A `donext.env.example` ships with every release.
+We use **flat env vars** (12-factor) as the source of truth. A `gonext.env.example` ships with every release.
 
 ### 7.1 The full surface (core / Go binary)
 
@@ -760,18 +760,18 @@ Optional (defaults shown):
 | `DATABASE_MAX_CONNS` / `DATABASE_MIN_CONNS` | `25` / `5` | pgxpool sizing |
 | `DATABASE_RO_URL` | falls back to `DATABASE_URL` | Read replica DSN |
 | `S3_ENDPOINT`, `S3_FORCE_PATH_STYLE`, `S3_PUBLIC_BASE_URL` | — | Endpoint for MinIO/R2; path-style for MinIO; public CDN base |
-| `DONEXT_PLUGIN_DIR` | `/var/lib/donext/plugins` | `.gnplugin` location |
+| `DONEXT_PLUGIN_DIR` | `/var/lib/gonext/plugins` | `.gnplugin` location |
 | `DONEXT_PLUGIN_FUEL_BUDGET` / `DONEXT_PLUGIN_TIMEOUT_MS` | `1000000` / `5000` | wazero limits per hook |
 | `DONEXT_WORKER_QUEUES` | `default=10` | `q1=N,q2=M` |
-| `DONEXT_CRON_LEASE_KEY` / `DONEXT_CRON_LEASE_TTL` | `donext:cron:leader` / `15s` | (§16) |
+| `DONEXT_CRON_LEASE_KEY` / `DONEXT_CRON_LEASE_TTL` | `gonext:cron:leader` / `15s` | (§16) |
 | `DONEXT_ISR_WEBHOOK_URL` | `http://public-web:3000` | |
 | `SMTP_URL`, `SMTP_FROM` | — | Doc 13 |
 | `CDN_PROVIDER`, `CDN_API_TOKEN`, `CDN_ZONE_ID` | `none` | Cloudflare/Fastly/none |
 | `DONEXT_FEATURES` | empty | CSV flag set |
 | `DONEXT_TRUSTED_PROXIES` | empty | CIDRs allowed to set XFF |
-| `DONEXT_STORAGE_LOCAL_PATH` | `/var/lib/donext/media` | Used only when `S3_*` unset |
+| `DONEXT_STORAGE_LOCAL_PATH` | `/var/lib/gonext/media` | Used only when `S3_*` unset |
 
-Each variable's read site is documented inline in `internal/config/config.go`. `donext config dump --redact` prints the resolved set with secrets masked.
+Each variable's read site is documented inline in `internal/config/config.go`. `gonext config dump --redact` prints the resolved set with secrets masked.
 
 ### 7.2 Web-tier vars (Next.js)
 
@@ -779,7 +779,7 @@ Each variable's read site is documented inline in `internal/config/config.go`. `
 
 ### 7.3 Config precedence
 
-`defaults < /etc/donext/config.yaml (optional) < env vars < command-line flags`. YAML is self-host convenience; K8s deployments use env vars only.
+`defaults < /etc/gonext/config.yaml (optional) < env vars < command-line flags`. YAML is self-host convenience; K8s deployments use env vars only.
 
 ---
 
@@ -792,7 +792,7 @@ Each variable's read site is documented inline in `internal/config/config.go`. `
 3. **Outbound API secrets**: `CDN_API_TOKEN`, `SMTP_URL` (contains password). Per-environment.
 4. **Plugin secrets**: declared by a plugin's manifest (`secrets.keys`, doc 02 §2.2), stored in the host's `plugin_secrets` table, served to the plugin WASM via the `secret_get(name)` host call.
 
-Categories 1–3 are *operator* secrets, injected at process boot. Category 4 is *content-data* — they're stored in the application database (encrypted at rest via the cryptographic secret in category 2). The plugin manifest declares **which** secrets the plugin needs; the operator sets the **values** via the admin UI or `donext secret set <plugin> <key> <value>`.
+Categories 1–3 are *operator* secrets, injected at process boot. Category 4 is *content-data* — they're stored in the application database (encrypted at rest via the cryptographic secret in category 2). The plugin manifest declares **which** secrets the plugin needs; the operator sets the **values** via the admin UI or `gonext secret set <plugin> <key> <value>`.
 
 This split matters because:
 
@@ -805,9 +805,9 @@ If we lumped them, every plugin install would require a redeploy.
 
 | Environment | Mechanism |
 |---|---|
-| K8s | `Secret` resources mounted as env vars (via `envFrom: secretRef`). One secret per logical grouping (`donext-pg`, `donext-redis`, `donext-app-keys`). Sealed Secrets, External Secrets, or SOPS for git-ops. |
+| K8s | `Secret` resources mounted as env vars (via `envFrom: secretRef`). One secret per logical grouping (`gonext-pg`, `gonext-redis`, `gonext-app-keys`). Sealed Secrets, External Secrets, or SOPS for git-ops. |
 | Docker Compose | `.env` file with `mode=0600`; `secrets:` section for higher-security production-Compose deployments. |
-| Bare-metal | `/opt/donext/config/donext.env` (mode=0600, owned by `donext:donext`). |
+| Bare-metal | `/opt/gonext/config/gonext.env` (mode=0600, owned by `gonext:gonext`). |
 | Dev | `.env.local` (gitignored). |
 
 We do **not** read secrets from the database during boot — bootstrapping that requires the secret key, which we'd be reading from the database. The cryptographic secret must live outside the DB.
@@ -886,13 +886,13 @@ The advisory lock means: 10 pods can race the migration on boot; one wins, other
 
 Process behavior:
 
-- `donext serve api` runs migrations on boot **by default**.
+- `gonext serve api` runs migrations on boot **by default**.
 - `--no-auto-migrate` disables auto-migration. In that mode, the binary refuses to start if migrations are pending (compares `schema_version_required` from the build to the DB's recorded version).
-- `donext migrate up` runs migrations and exits.
-- `donext migrate down N` runs N down-migrations and exits.
-- `donext migrate version` prints the current version.
+- `gonext migrate up` runs migrations and exits.
+- `gonext migrate down N` runs N down-migrations and exits.
+- `gonext migrate version` prints the current version.
 
-For K8s, the recommended pattern is an **initContainer** running `donext migrate up`. This makes the migration explicit in pod logs and avoids the "ten pods racing the lock" pattern, which is fine but slow.
+For K8s, the recommended pattern is an **initContainer** running `gonext migrate up`. This makes the migration explicit in pod logs and avoids the "ten pods racing the lock" pattern, which is fine but slow.
 
 ### 9.4 Plugin migrations integrate via a separate engine instance
 
@@ -1025,7 +1025,7 @@ Doc 02 §3.4 mentions "5s drain" but doesn't fully specify the policy. Our posit
 
 ### 11.4 Drain command
 
-Operators can pre-drain a pod with `donext drain --timeout=45s`. This:
+Operators can pre-drain a pod with `gonext drain --timeout=45s`. This:
 
 - Hits the local pod's `/internal/drain` endpoint (loopback-only).
 - Sets `readyz` to 503.
@@ -1089,7 +1089,7 @@ K8s `RollingUpdate` with `maxUnavailable: 0, maxSurge: 1`:
 2. New pod runs boot sequence; `/readyz` is 503 until ready.
 3. K8s adds new pod to endpoints when `readinessProbe` passes.
 4. K8s sends `SIGTERM` to one old pod.
-5. Old pod's `preStop` runs `donext drain`; new connections route to new pods.
+5. Old pod's `preStop` runs `gonext drain`; new connections route to new pods.
 6. Repeat until all old pods are replaced.
 
 Total deploy time for 3 → 3 replicas: ~30–60s.
@@ -1235,13 +1235,13 @@ Two replicas of `core-cron`:
 
 ```
 each replica loop:
-  1. SET donext:cron:leader <pod-id> NX EX 15
+  1. SET gonext:cron:leader <pod-id> NX EX 15
      - if OK: I am leader. Start the Asynq Scheduler.
      - else:  I am follower. Don't start Scheduler.
   2. every 5s while leader:
-       EVAL "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('EXPIRE', KEYS[1], 15) else return 0 end" 1 donext:cron:leader <pod-id>
+       EVAL "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('EXPIRE', KEYS[1], 15) else return 0 end" 1 gonext:cron:leader <pod-id>
        - if EXPIRE returns 0: I lost the lease. Stop Scheduler.
-  3. on SIGTERM: DEL donext:cron:leader (only if I'm the holder).
+  3. on SIGTERM: DEL gonext:cron:leader (only if I'm the holder).
 ```
 
 Worst-case missed-cron-window after leader failure: `DONEXT_CRON_LEASE_TTL` = 15s. For a cron job that runs every minute, this means up to one missed iteration. Acceptable.
@@ -1358,14 +1358,14 @@ We **do not** ship multi-tenancy in v1. Operators who need it run per-cluster (o
 
 ### 20.2 Backup is not in the boot path
 
-Backups run from a separate Deployment (`donext-backup`) using a CronJob with the relevant tools — we don't bake backup into the binary. The binary exposes `donext export --to=s3://...` for ad-hoc exports.
+Backups run from a separate Deployment (`gonext-backup`) using a CronJob with the relevant tools — we don't bake backup into the binary. The binary exposes `gonext export --to=s3://...` for ad-hoc exports.
 
 ### 20.3 The cache-invalidations problem on restore
 
 A restored Postgres has stale ISR caches downstream. The recovery procedure (doc 16) requires:
 
 1. Restore Postgres to the desired PITR point.
-2. Run `donext post-restore` which:
+2. Run `gonext post-restore` which:
    - Walks the `cache_invalidations` outbox unprocessed rows and replays them.
    - **Emits a global cache flush to the CDN** (purge everything for the zone).
    - **Forces full ISR regeneration** by invalidating Next.js cache tags wholesale.
@@ -1448,20 +1448,20 @@ The following are unresolved and either need a decision before v1 ships or have 
 ### A.3 The five commands an operator runs
 
 ```
-donext serve api          # the API + WASM host
-donext serve worker       # Asynq consumer
-donext serve cron         # cron scheduler (leader elected)
-donext migrate up         # apply core migrations
-donext drain --timeout=Ns # graceful drain (preStop hook)
+gonext serve api          # the API + WASM host
+gonext serve worker       # Asynq consumer
+gonext serve cron         # cron scheduler (leader elected)
+gonext migrate up         # apply core migrations
+gonext drain --timeout=Ns # graceful drain (preStop hook)
 ```
 
 Plus:
 
 ```
-donext gen-secrets        # generate DONEXT_SECRET_KEY and DONEXT_PEPPER
-donext static-export      # build the static-export bundle (§3.2)
-donext config dump --redact   # print resolved config with secrets masked
-donext secret set <plugin> <key> <value>   # set a plugin secret
+gonext gen-secrets        # generate DONEXT_SECRET_KEY and DONEXT_PEPPER
+gonext static-export      # build the static-export bundle (§3.2)
+gonext config dump --redact   # print resolved config with secrets masked
+gonext secret set <plugin> <key> <value>   # set a plugin secret
 ```
 
 That's the surface.
