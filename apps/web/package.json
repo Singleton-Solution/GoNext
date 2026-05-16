@@ -1,0 +1,13 @@
+{
+  "name": "@gonext/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "GoNext public site renderer. Next.js App Router. SSR/SSG/ISR. Themes mount here. Status: skeleton — issue #1 only adds the workspace entry. Real Next.js setup lands in subsequent issues.",
+  "scripts": {
+    "build": "echo '@gonext/web build: not yet implemented (see issue #6)'",
+    "dev": "echo '@gonext/web dev: not yet implemented (see issue #6)'",
+    "lint": "echo '@gonext/web lint: not yet implemented'",
+    "test": "echo '@gonext/web test: not yet implemented'",
+    "typecheck": "echo '@gonext/web typecheck: not yet implemented'"
+  }
+}
