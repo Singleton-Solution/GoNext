@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"golang.org/x/crypto/argon2"
@@ -132,6 +133,22 @@ func encode(p Params, salt, key []byte) string {
 	)
 }
 
+// Floors used by decode to reject PHC strings that would otherwise reach
+// argon2.IDKey with out-of-range arguments. argon2.IDKey panics on
+// parallelism==0, iterations==0, and very low memory; we reject these in
+// decode so callers always get a clean error rather than a crash.
+//
+// These are validation floors, NOT recommended values. Production hashing
+// uses DefaultParams which is well above all of these.
+const (
+	minDecodeMemory      uint32 = 8       // KiB; argon2 requires >= 8*p, we treat 8 as the floor
+	minDecodeIterations  uint32 = 1       // argon2.IDKey panics on 0
+	minDecodeParallelism uint8  = 1       // argon2.IDKey panics on 0; uint8 already caps at 255
+	minDecodeSaltLen     int    = 8       // RFC 9106 §3.1 minimum salt
+	minDecodeKeyLen      int    = 4       // argon2 minimum tag length
+	maxDecodeMemory      uint32 = 1 << 22 // 4 GiB ceiling: prevents an attacker-supplied m=4294967295 OOMing the verifier
+)
+
 // decode parses an argon2id PHC string. Returns the params, salt, key
 // (the expected hash), or an error sentinel wrapped with a short reason.
 //
@@ -140,6 +157,12 @@ func encode(p Params, salt, key []byte) string {
 // version 19, three named params in m,t,p order, and two base64 blobs.
 // Anything else is ErrMalformedHash. argon2i / argon2d are rejected with
 // ErrUnsupportedAlgorithm.
+//
+// Parameter values are also validated against floors that match what
+// argon2.IDKey will accept without panicking — see the constants above.
+// This is a hard requirement for an auth primitive: a crafted row in
+// users.password_hash (via SQLi, leaked credential, or a bad migration)
+// must NEVER crash the verifier and break login for everyone.
 func decode(encoded string) (Params, []byte, []byte, error) {
 	parts := strings.Split(encoded, "$")
 	if len(parts) != 6 || parts[0] != "" {
@@ -155,9 +178,18 @@ func decode(encoded string) (Params, []byte, []byte, error) {
 		return Params{}, nil, nil, fmt.Errorf("%w: %q", ErrUnsupportedAlgorithm, parts[1])
 	}
 
+	// Strict parse of the version segment. fmt.Sscanf with "v=%d" will
+	// silently accept trailing garbage like "v=19trailing" (it parses 19
+	// and discards the rest). We use scanExact to require that the entire
+	// segment was consumed.
 	var version int
-	if _, err := fmt.Sscanf(parts[2], "v=%d", &version); err != nil {
+	if err := scanExact(parts[2], "v=%d", &version); err != nil {
 		return Params{}, nil, nil, fmt.Errorf("%w: version segment: %w", ErrMalformedHash, err)
+	}
+	// A negative version is malformed (RFC 9106 versions are unsigned),
+	// not "unsupported" — surface it as ErrMalformedHash for clarity.
+	if version < 0 {
+		return Params{}, nil, nil, fmt.Errorf("%w: negative version v=%d", ErrMalformedHash, version)
 	}
 	if version != argon2Version {
 		return Params{}, nil, nil, fmt.Errorf("%w: v=%d", ErrUnsupportedVersion, version)
@@ -166,8 +198,28 @@ func decode(encoded string) (Params, []byte, []byte, error) {
 	var p Params
 	var mem, iter uint32
 	var par uint8
-	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &mem, &iter, &par); err != nil {
+	if err := scanExact(parts[3], "m=%d,t=%d,p=%d", &mem, &iter, &par); err != nil {
 		return Params{}, nil, nil, fmt.Errorf("%w: parameter segment: %w", ErrMalformedHash, err)
+	}
+	// Validate parameter ranges BEFORE returning success. argon2.IDKey
+	// panics on iterations==0, parallelism==0, or memory below 8*p, and
+	// can OOM on absurdly large memory. We must reject all of these here.
+	//
+	// Note: par is uint8, so the [1,255] check reduces to par != 0. uint8
+	// already enforces the upper bound at parse time. We still spell out
+	// the intent for the reader and for future-proofing if the type ever
+	// widens.
+	if mem < minDecodeMemory {
+		return Params{}, nil, nil, fmt.Errorf("%w: memory %d KiB below floor %d", ErrMalformedHash, mem, minDecodeMemory)
+	}
+	if mem > maxDecodeMemory {
+		return Params{}, nil, nil, fmt.Errorf("%w: memory %d KiB above ceiling %d", ErrMalformedHash, mem, maxDecodeMemory)
+	}
+	if iter < minDecodeIterations {
+		return Params{}, nil, nil, fmt.Errorf("%w: iterations %d below floor %d", ErrMalformedHash, iter, minDecodeIterations)
+	}
+	if par < minDecodeParallelism {
+		return Params{}, nil, nil, fmt.Errorf("%w: parallelism %d below floor %d", ErrMalformedHash, par, minDecodeParallelism)
 	}
 	p.Memory, p.Iterations, p.Parallelism = mem, iter, par
 
@@ -175,8 +227,8 @@ func decode(encoded string) (Params, []byte, []byte, error) {
 	if err != nil {
 		return Params{}, nil, nil, fmt.Errorf("%w: salt base64: %w", ErrMalformedHash, err)
 	}
-	if len(salt) == 0 {
-		return Params{}, nil, nil, fmt.Errorf("%w: empty salt", ErrMalformedHash)
+	if len(salt) < minDecodeSaltLen {
+		return Params{}, nil, nil, fmt.Errorf("%w: salt %d bytes below floor %d", ErrMalformedHash, len(salt), minDecodeSaltLen)
 	}
 	p.SaltLen = uint32(len(salt))
 
@@ -184,10 +236,43 @@ func decode(encoded string) (Params, []byte, []byte, error) {
 	if err != nil {
 		return Params{}, nil, nil, fmt.Errorf("%w: hash base64: %w", ErrMalformedHash, err)
 	}
-	if len(key) == 0 {
-		return Params{}, nil, nil, fmt.Errorf("%w: empty hash", ErrMalformedHash)
+	if len(key) < minDecodeKeyLen {
+		return Params{}, nil, nil, fmt.Errorf("%w: hash %d bytes below floor %d", ErrMalformedHash, len(key), minDecodeKeyLen)
 	}
 	p.KeyLen = uint32(len(key))
 
 	return p, salt, key, nil
+}
+
+// scanExact is fmt.Sscanf with the additional constraint that the entire
+// source string must be consumed by the format directives. The stdlib
+// Sscanf silently tolerates trailing characters (e.g. "v=19trailing"
+// parses 19 and discards the rest). For PHC parsing we want strictness:
+// any unexpected suffix is ErrMalformedHash.
+//
+// We implement this by appending "%s" to the format and rejecting any
+// non-empty tail. We use a single tail variable so the caller's arg list
+// stays clean.
+func scanExact(src, format string, args ...any) error {
+	var tail string
+	scanArgs := make([]any, 0, len(args)+1)
+	scanArgs = append(scanArgs, args...)
+	scanArgs = append(scanArgs, &tail)
+	// Sscanf returns the count of successfully-scanned items. We don't
+	// rely on the count; we rely on (a) Sscanf returning no error and
+	// (b) tail being empty (or whitespace-only — Sscanf treats %s as
+	// "next whitespace-delimited token", so if there's no trailing
+	// non-space, %s simply fails to scan and we get io.EOF, which we
+	// treat as "fully consumed").
+	_, err := fmt.Sscanf(src, format+"%s", scanArgs...)
+	if err != nil {
+		// io.EOF from %s means the format directives consumed everything
+		// before we got to %s — that's the success case for us.
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		return err
+	}
+	// %s matched something — trailing garbage.
+	return fmt.Errorf("unexpected trailing input %q", tail)
 }

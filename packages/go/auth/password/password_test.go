@@ -2,6 +2,7 @@ package password
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -124,9 +125,11 @@ func TestVerify_MalformedEncoded(t *testing.T) {
 		{"unsupported-version", "$argon2id$v=16$m=8,t=1,p=1$c2FsdA$aGFzaA", ErrUnsupportedVersion},
 		{"bad-params", "$argon2id$v=19$mem=8,t=1,p=1$c2FsdA$aGFzaA", ErrMalformedHash},
 		{"bad-salt-b64", "$argon2id$v=19$m=8,t=1,p=1$!!!$aGFzaA", ErrMalformedHash},
-		{"bad-hash-b64", "$argon2id$v=19$m=8,t=1,p=1$c2FsdA$!!!", ErrMalformedHash},
+		// salt is 8 bytes ("saltsalt") so we exercise the hash-b64 path
+		// rather than the salt-floor branch.
+		{"bad-hash-b64", "$argon2id$v=19$m=8,t=1,p=1$c2FsdHNhbHQ$!!!", ErrMalformedHash},
 		{"empty-salt", "$argon2id$v=19$m=8,t=1,p=1$$aGFzaA", ErrMalformedHash},
-		{"empty-hash", "$argon2id$v=19$m=8,t=1,p=1$c2FsdA$", ErrMalformedHash},
+		{"empty-hash", "$argon2id$v=19$m=8,t=1,p=1$c2FsdHNhbHQ$", ErrMalformedHash},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -266,6 +269,189 @@ func TestParams_WeakerThan(t *testing.T) {
 				t.Errorf("weakerThan: got %v, want %v", got, c.weaker)
 			}
 		})
+	}
+}
+
+// TestVerify_AdversarialPHC locks the contract that decode() rejects
+// malformed PHC strings BEFORE forwarding to argon2.IDKey. Without these
+// guards, an attacker who can write a row into users.password_hash (via
+// SQLi, leaked credential, or a malicious migration) could crash login
+// for everyone with a string like "$argon2id$v=19$m=8,t=1,p=0$...".
+//
+// Every row in this table represents a regression that would re-introduce
+// a panic or a "looks-malformed-but-parses-cleanly" bug. The whole table
+// runs inside a panic-recover wrapper (TestVerify_NoPanicEvenOnAdversarial
+// below) so that even if a future change does panic, the test fails
+// loudly with the offending input rather than aborting the suite.
+func TestVerify_AdversarialPHC(t *testing.T) {
+	// Valid base64 sample salt (8 bytes "saltsalt") and hash (4 bytes "hash"),
+	// used as filler. These are deliberately at the floor; tests that need a
+	// stronger filler set their own.
+	const (
+		validSaltB64 = "c2FsdHNhbHQ" // base64 of "saltsalt" (8 bytes)
+		validHashB64 = "aGFzaA"      // base64 of "hash" (4 bytes)
+		shortSaltB64 = "c2FsdA"      // base64 of "salt" (4 bytes — below 8-byte floor)
+		shortHashB64 = "YQ"          // base64 of "a" (1 byte — below 4-byte floor)
+	)
+
+	cases := []struct {
+		name    string
+		encoded string
+		want    error
+	}{
+		// p=0 — would panic ("argon2: parallelism degree too low") if forwarded.
+		{
+			name:    "parallelism-zero-panics-without-guard",
+			encoded: "$argon2id$v=19$m=64,t=1,p=0$" + validSaltB64 + "$" + validHashB64,
+			want:    ErrMalformedHash,
+		},
+		// t=0 — would panic ("argon2: number of rounds too small").
+		{
+			name:    "iterations-zero-panics-without-guard",
+			encoded: "$argon2id$v=19$m=64,t=0,p=2$" + validSaltB64 + "$" + validHashB64,
+			want:    ErrMalformedHash,
+		},
+		// m below floor (8 KiB). argon2.IDKey requires m >= 8*p; we reject below 8 unconditionally.
+		{
+			name:    "memory-below-floor",
+			encoded: "$argon2id$v=19$m=4,t=3,p=2$" + validSaltB64 + "$" + validHashB64,
+			want:    ErrMalformedHash,
+		},
+		// m=0 — argon2 happens to handle this without panicking today, but the
+		// contract is still "reject malformed input". Lock it down.
+		{
+			name:    "memory-zero",
+			encoded: "$argon2id$v=19$m=0,t=3,p=2$" + validSaltB64 + "$" + validHashB64,
+			want:    ErrMalformedHash,
+		},
+		// m above ceiling — would OOM the verifier. uint32 max is the worst case.
+		{
+			name:    "memory-above-ceiling",
+			encoded: "$argon2id$v=19$m=4294967295,t=3,p=2$" + validSaltB64 + "$" + validHashB64,
+			want:    ErrMalformedHash,
+		},
+		// Trailing garbage in version segment — fmt.Sscanf silently accepted
+		// this before scanExact() was added.
+		{
+			name:    "version-trailing-garbage",
+			encoded: "$argon2id$v=19trailing$m=64,t=1,p=2$" + validSaltB64 + "$" + validHashB64,
+			want:    ErrMalformedHash,
+		},
+		// Trailing garbage in params segment — same Sscanf footgun.
+		{
+			name:    "params-trailing-garbage",
+			encoded: "$argon2id$v=19$m=64,t=1,p=2,extra=junk$" + validSaltB64 + "$" + validHashB64,
+			want:    ErrMalformedHash,
+		},
+		// Negative version is malformed, not "unsupported" (cosmetic fix
+		// noted by the reviewer).
+		{
+			name:    "version-negative-is-malformed-not-unsupported",
+			encoded: "$argon2id$v=-1$m=64,t=1,p=2$" + validSaltB64 + "$" + validHashB64,
+			want:    ErrMalformedHash,
+		},
+		// Salt below 8-byte floor — argon2 produces a result here but the
+		// salt offers negligible collision resistance. Reject as malformed.
+		{
+			name:    "salt-below-floor",
+			encoded: "$argon2id$v=19$m=64,t=1,p=2$" + shortSaltB64 + "$" + validHashB64,
+			want:    ErrMalformedHash,
+		},
+		// Hash output below 4-byte floor.
+		{
+			name:    "hash-below-floor",
+			encoded: "$argon2id$v=19$m=64,t=1,p=2$" + validSaltB64 + "$" + shortHashB64,
+			want:    ErrMalformedHash,
+		},
+	}
+
+	for _, c := range cases {
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			// Run under a panic-recover so a regression that re-introduces
+			// the panic fails THIS test with a useful message, rather than
+			// crashing the whole `go test` binary.
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("verify panicked on adversarial PHC %q: %v", c.encoded, r)
+				}
+			}()
+
+			ok, needsRehash, err := Verify("anything", c.encoded, []byte("pepper"))
+			if err == nil {
+				t.Fatalf("verify: want error, got nil (ok=%v, needsRehash=%v) for %q", ok, needsRehash, c.encoded)
+			}
+			if !errors.Is(err, c.want) {
+				t.Fatalf("verify: got error %v, want errors.Is(%v) for %q", err, c.want, c.encoded)
+			}
+			if ok || needsRehash {
+				t.Fatalf("verify: on adversarial input want ok=false needsRehash=false, got ok=%v needsRehash=%v", ok, needsRehash)
+			}
+		})
+	}
+}
+
+// TestVerify_NoPanic_AdversarialFuzz is a small belt-and-braces fuzz of
+// the PHC shape: it generates a handful of weird-but-syntactically-plausible
+// PHC strings and asserts that NONE of them panic. The exact error returned
+// doesn't matter; what matters is "no panic, returns cleanly".
+//
+// This complements TestVerify_AdversarialPHC by catching shape-level
+// regressions (segment count, separator choice) that the table-driven test
+// doesn't enumerate.
+func TestVerify_NoPanic_AdversarialFuzz(t *testing.T) {
+	inputs := []string{
+		// Empty and short.
+		"",
+		"$",
+		"$$$$$",
+		"$$$$$$",
+		// Wrong algo with degenerate params.
+		"$argon2x$v=19$m=0,t=0,p=0$$",
+		// Boundary values around the panic conditions.
+		"$argon2id$v=19$m=1,t=1,p=1$c2FsdHNhbHQ$aGFzaA", // mem below floor
+		"$argon2id$v=19$m=7,t=1,p=1$c2FsdHNhbHQ$aGFzaA", // mem one below floor
+		"$argon2id$v=19$m=8,t=1,p=2$c2FsdHNhbHQ$aGFzaA", // mem at floor but well below 8*p
+		// Garbage in every numeric position.
+		"$argon2id$vNN$m=NN,t=NN,p=NN$c2FsdHNhbHQ$aGFzaA",
+		"$argon2id$v=$m=,t=,p=$c2FsdHNhbHQ$aGFzaA",
+		// Negative numbers in params (would underflow uint32/uint8).
+		"$argon2id$v=19$m=-1,t=-1,p=-1$c2FsdHNhbHQ$aGFzaA",
+		// Very large numbers (uint32 overflow territory).
+		"$argon2id$v=99999999999999999999$m=64,t=1,p=2$c2FsdHNhbHQ$aGFzaA",
+		// Non-ASCII version.
+		"$argon2id$v=１９$m=64,t=1,p=2$c2FsdHNhbHQ$aGFzaA",
+	}
+
+	for i, in := range inputs {
+		in := in
+		t.Run(fmt.Sprintf("input-%d", i), func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("Verify panicked on %q: %v", in, r)
+				}
+			}()
+			// Result doesn't matter — only the absence of a panic does.
+			ok, needsRehash, err := Verify("anything", in, []byte("pepper"))
+			// Make some weak assertions just to use the values and to lock
+			// down "weird inputs never report a successful match".
+			if ok {
+				t.Errorf("Verify returned ok=true for adversarial %q (err=%v, rehash=%v)", in, err, needsRehash)
+			}
+		})
+	}
+
+	// Sanity check: there IS a valid PHC string that round-trips. Without
+	// this the test above could be passing because EVERY input falls into
+	// the recover path. (It doesn't — the previous assertions enforce
+	// ok=false, not panic — but defense in depth.)
+	encoded, err := hashWithParams("p", []byte("pepper"), testParams)
+	if err != nil {
+		t.Fatalf("hashWithParams: %v", err)
+	}
+	ok, _, err := Verify("p", encoded, []byte("pepper"))
+	if err != nil || !ok {
+		t.Fatalf("control case: Verify on valid PHC returned ok=%v err=%v", ok, err)
 	}
 }
 
