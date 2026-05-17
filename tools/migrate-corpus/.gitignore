@@ -1,0 +1,7 @@
+# Build artifacts
+/gonext-corpus
+/migrate-corpus
+
+# Generated corpora
+/corpus/
+/out/
