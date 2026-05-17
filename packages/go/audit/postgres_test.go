@@ -132,6 +132,72 @@ func TestPostgresStore_Emit_ActorKindSystem(t *testing.T) {
 	}
 }
 
+func TestPostgresStore_Emit_HonorsValidActorKindOverride(t *testing.T) {
+	// Caller can promote a no-actor event to "system" via metadata.
+	// This is the documented override path; it must keep working.
+	q := &fakeQuerier{insertReturnID: "1"}
+	s := NewPostgresStoreWithQuerier(q)
+	err := s.Emit(context.Background(), Event{
+		EventType: "internal.cron.tick",
+		Metadata:  map[string]any{"actor_kind": "system"},
+	})
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	if q.lastArgs[2] != "system" {
+		t.Errorf("actor_kind: got %v want system", q.lastArgs[2])
+	}
+}
+
+func TestPostgresStore_Emit_RejectsUnknownActorKindOverride(t *testing.T) {
+	// A plugin author who passes an arbitrary string into the
+	// Metadata["actor_kind"] slot must NOT be able to write it into
+	// the column. Reject with ErrInvalidEvent.
+	q := &fakeQuerier{insertReturnID: "1"}
+	s := NewPostgresStoreWithQuerier(q)
+	err := s.Emit(context.Background(), Event{
+		EventType: "plugin.x.y",
+		Metadata:  map[string]any{"actor_kind": "root"},
+	})
+	if !errors.Is(err, ErrInvalidEvent) {
+		t.Errorf("expected ErrInvalidEvent, got %v", err)
+	}
+	if q.lastSQL != "" {
+		t.Errorf("INSERT should not have been issued for invalid actor_kind, got SQL: %s", q.lastSQL)
+	}
+}
+
+func TestPostgresStore_Emit_RejectsEmptyOverrideAsFallbackToSystem(t *testing.T) {
+	// An empty string in the override slot is not "user-supplied
+	// garbage" — it's effectively no override. The store falls back
+	// to "system" rather than erroring.
+	q := &fakeQuerier{insertReturnID: "1"}
+	s := NewPostgresStoreWithQuerier(q)
+	err := s.Emit(context.Background(), Event{
+		EventType: "internal.x",
+		Metadata:  map[string]any{"actor_kind": ""},
+	})
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	if q.lastArgs[2] != "system" {
+		t.Errorf("actor_kind: got %v want system", q.lastArgs[2])
+	}
+}
+
+func TestIsValidActorKind(t *testing.T) {
+	for _, ok := range []string{"user", "plugin", "system"} {
+		if !isValidActorKind(ok) {
+			t.Errorf("%q should be valid", ok)
+		}
+	}
+	for _, bad := range []string{"", "root", "USER", "User", "robot", "anonymous"} {
+		if isValidActorKind(bad) {
+			t.Errorf("%q should be invalid", bad)
+		}
+	}
+}
+
 func TestPostgresStore_Emit_MetadataDefaultsToObject(t *testing.T) {
 	q := &fakeQuerier{insertReturnID: "1"}
 	s := NewPostgresStoreWithQuerier(q)

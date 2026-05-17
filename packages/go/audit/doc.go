@@ -32,16 +32,28 @@
 // change. v1 leaves PrevHash nil and relies on the SIEM-export path
 // documented in docs/06-auth-permissions.md §13.3.
 //
+// Trusted proxies and X-Forwarded-For: by default the Emitter trusts
+// no proxies and ignores X-Forwarded-For entirely — clientIP comes
+// from r.RemoteAddr. This prevents an attacker from spoofing their
+// source IP in the audit log by setting the XFF header. If the server
+// runs behind a known set of reverse proxies, install their CIDR
+// ranges via emitter.WithTrustedProxies(); XFF is then consulted only
+// when the immediate peer is a trusted proxy, and the walk is
+// rightmost-to-leftmost, stopping at the first address NOT in the
+// trusted set (the standard "trust chain" pattern).
+//
 // Typical wiring in an HTTP handler:
 //
 //	pool, _ := pgxpool.New(ctx, dsn)
 //	store := audit.NewPostgresStore(pool)
-//	emitter := audit.NewEmitter(store)
+//	emitter := audit.NewEmitter(store).WithTrustedProxies([]netip.Prefix{
+//	    netip.MustParsePrefix("10.0.0.0/8"), // internal LB range
+//	})
 //
 //	mux := http.NewServeMux()
 //	mux.HandleFunc("POST /api/v1/posts", createPost)
 //
-//	root := audit.Middleware(emitter)(mux)
+//	root := audit.Middleware(emitter, audit.WithEmitFailureRecorder(metrics))(mux)
 //
 // Inside a handler, attach the per-request actor/IP and emit a custom event:
 //

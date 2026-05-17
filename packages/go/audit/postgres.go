@@ -140,7 +140,12 @@ func (s *PostgresStore) Emit(ctx context.Context, e Event) error {
 		// here. Distinguishing them requires application context the
 		// store doesn't have; callers who want "system" explicitly can
 		// set Metadata["actor_kind"] = "system" and we'll honor it.
+		// The override is enum-checked against the allowed set so a
+		// plugin author can't write arbitrary strings into the column.
 		if v, ok := normalized.Metadata["actor_kind"].(string); ok && v != "" {
+			if !isValidActorKind(v) {
+				return errors.Join(ErrInvalidEvent, fmt.Errorf("audit: invalid actor_kind override %q (must be one of user, plugin, system)", v))
+			}
 			actorKind = v
 		} else {
 			actorKind = "system"
@@ -239,6 +244,19 @@ func (s *PostgresStore) List(ctx context.Context, f Filter) ([]Event, error) {
 		return nil, fmt.Errorf("audit: rows: %w", err)
 	}
 	return out, nil
+}
+
+// isValidActorKind reports whether s is one of the three actor_kind
+// enum values the audit_log column accepts. Used to validate the
+// Metadata["actor_kind"] override path so callers can't write
+// arbitrary strings into the column.
+func isValidActorKind(s string) bool {
+	switch s {
+	case "user", "plugin", "system":
+		return true
+	default:
+		return false
+	}
 }
 
 // bytesEqual is a tiny helper to avoid pulling in bytes just for one
