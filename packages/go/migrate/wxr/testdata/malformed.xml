@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0"
+  xmlns:wp="http://wordpress.org/export/1.2/"
+  xmlns:content="http://purl.org/rss/1.0/modules/content/"
+  xmlns:dc="http://purl.org/dc/elements/1.1/">
+<channel>
+  <title>Bad Blog</title>
+  <link>https://bad.example.com</link>
+  <description>Truncated</description>
+  <wp:wxr_version>1.2</wp:wxr_version>
+  <item>
+    <title>Truncated Post</title>
+    <content:encoded><![CDATA[hello world]]></content:encoded>
+    <wp:post_id>1</wp:post_id>
+    <wp:post_type><post_type>broken</wp:post_type>
+  </item>
+</channel>
+</rss>
