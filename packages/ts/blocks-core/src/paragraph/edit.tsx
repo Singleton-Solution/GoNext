@@ -1,13 +1,20 @@
 /**
  * `core/paragraph` Edit component.
  *
- * Minimal contenteditable surface: a single-line `<p contenteditable>` that
- * mirrors the persisted `content` attribute back through `setAttributes`.
- * The component is deliberately small — rich-text inline runs (bold, links,
- * etc.) live in a follow-up issue. What's here is enough for the inserter
- * + canvas walk-through and to satisfy the round-trip tests.
+ * When the block is *selected*, the editor mounts the canonical
+ * `<RichText/>` primitive from `@gonext/blocks-rich-text` — a Lexical-
+ * powered surface with proper IME, undo/redo, paste handling, inline
+ * formatting, and link insertion. When the block is *not* selected, we
+ * fall back to a plain non-editable `<p>` rendered with the persisted
+ * `content` string — this matches what `save()` would emit so the
+ * canvas preview is visually identical to the rendered output.
+ *
+ * The selected/unselected fork is deliberate: only the focused block
+ * needs the editor weight, and rendering the inert preview as plain
+ * DOM keeps the canvas snappy even with hundreds of blocks visible.
  */
 import type { BlockEditProps } from '@gonext/blocks-sdk';
+import { RichText } from '@gonext/blocks-rich-text';
 import type { ReactElement } from 'react';
 import type { ParagraphAttributes } from './save.ts';
 
@@ -28,18 +35,21 @@ export function ParagraphEdit({
     .filter((c): c is string => c !== null)
     .join(' ');
 
+  if (isSelected) {
+    return (
+      <RichText
+        value={attributes.content}
+        onChange={(html) => setAttributes({ content: html })}
+        placeholder="Paragraph placeholder"
+        className={classes}
+        dataBlock="core/paragraph"
+        ariaLabel="Paragraph content"
+      />
+    );
+  }
+
   return (
-    <p
-      className={classes}
-      data-block="core/paragraph"
-      contentEditable={isSelected}
-      suppressContentEditableWarning
-      onInput={(event) =>
-        setAttributes({
-          content: (event.target as HTMLParagraphElement).textContent ?? '',
-        })
-      }
-    >
+    <p className={classes} data-block="core/paragraph">
       {attributes.content || 'Paragraph placeholder'}
     </p>
   );

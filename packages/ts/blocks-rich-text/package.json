@@ -1,0 +1,54 @@
+{
+  "name": "@gonext/blocks-rich-text",
+  "version": "0.0.0",
+  "private": false,
+  "description": "Canonical rich-text Edit primitive for GoNext block authoring. Wraps the Lexical editor framework in a single <RichText/> component that core blocks (paragraph, heading, quote, list) and plugin blocks can mount in their edit.tsx. Ships round-trip-safe HTML serialize/deserialize helpers that match the byte-stable canonical HTML emitted by @gonext/blocks-core save() functions, so the editor canvas, persisted block tree, and Go SSR walker all line up. Apache-2.0.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "echo '@gonext/blocks-rich-text: source-only package, no build step'",
+    "lint": "echo '@gonext/blocks-rich-text lint: not yet implemented'",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "lexical": "^0.21.0",
+    "@lexical/react": "^0.21.0",
+    "@lexical/list": "^0.21.0",
+    "@lexical/link": "^0.21.0",
+    "@lexical/markdown": "^0.21.0",
+    "@lexical/html": "^0.21.0",
+    "@lexical/utils": "^0.21.0",
+    "@lexical/rich-text": "^0.21.0",
+    "@lexical/selection": "^0.21.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@gonext/test-config": "workspace:*",
+    "@testing-library/jest-dom": "^6.4.0",
+    "@testing-library/react": "^16.0.0",
+    "@testing-library/user-event": "^14.5.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitest/coverage-v8": "^1.6.0",
+    "jsdom": "^24.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^1.6.0"
+  }
+}
