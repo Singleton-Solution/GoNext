@@ -1,0 +1,19 @@
+<h1 id="welcome">Welcome to the blog</h1>
+<p>This is the opening paragraph of a fairly typical WordPress post that has been imported into GoNext. It introduces the topic in plain prose.</p>
+<h2>A short list of things I learned</h2>
+<ul>
+<li>Block trees are easier to reason about than freeform HTML.</li>
+<li>Lossy-but-honest beats silently dropping bytes.</li>
+<li>Test coverage on importers pays for itself in week one.</li>
+</ul>
+<p>Here is a quote that captures the sentiment nicely:</p>
+<blockquote>
+<p>The best time to convert your content was yesterday; the second-best time is during a migration.</p>
+<cite>An importer that knew what it was doing</cite>
+</blockquote>
+<h3>Some code, finally</h3>
+<pre><code class="language-go">func Convert(b []byte) ([]Block, error) {
+    return []Block{{Name: "core/paragraph"}}, nil
+}</code></pre>
+<hr/>
+<p>That's the end of the post.</p>
