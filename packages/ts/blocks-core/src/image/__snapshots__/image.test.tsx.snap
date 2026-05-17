@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`core/image > snapshot: bare image output 1`] = `"<figure class="gn-block-image"><img src="https://example.com/a.png" alt="A"/></figure>"`;
+
+exports[`core/image > snapshot: full image output with caption + href + align 1`] = `"<figure class="gn-block-image alignwide"><a href="https://example.com/full.png"><img src="https://example.com/a.png" alt="A photo" width="800" height="600"/></a><figcaption>A caption</figcaption></figure>"`;

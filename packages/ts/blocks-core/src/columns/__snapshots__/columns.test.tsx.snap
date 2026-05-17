@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`core/columns > snapshot: columns with verticalAlignment 1`] = `"<div class="gn-block-columns gn-block-columns--cols-3 is-stacked-on-mobile is-vertically-aligned-center"><!--gn-inner-blocks--></div>"`;
+
+exports[`core/columns > snapshot: default columns 1`] = `"<div class="gn-block-columns gn-block-columns--cols-2 is-stacked-on-mobile"><!--gn-inner-blocks--></div>"`;

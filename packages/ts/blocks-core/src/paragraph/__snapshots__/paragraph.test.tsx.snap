@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`core/paragraph > snapshot: save output for a simple paragraph 1`] = `"<p class="gn-block-paragraph">Hello</p>"`;
+
+exports[`core/paragraph > snapshot: save output with align + dropCap 1`] = `"<p class="gn-block-paragraph has-text-align-right has-drop-cap">Hi</p>"`;

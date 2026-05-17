@@ -1,0 +1,3 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`core/spacer > snapshot: spacer at 24px 1`] = `"<div class="gn-block-spacer" aria-hidden="true" style="height:24px"></div>"`;

@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`core/group > snapshot: default group (div) 1`] = `"<div class="gn-block-group is-layout-default"><!--gn-inner-blocks--></div>"`;
+
+exports[`core/group > snapshot: section group with flex layout 1`] = `"<section class="gn-block-group is-layout-flex"><!--gn-inner-blocks--></section>"`;

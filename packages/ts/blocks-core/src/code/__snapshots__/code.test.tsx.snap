@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`core/code > snapshot: code with language 1`] = `"<pre class="gn-block-code"><code class="language-go">fmt.Println(&quot;hi&quot;)</code></pre>"`;
+
+exports[`core/code > snapshot: code without language 1`] = `"<pre class="gn-block-code"><code>echo &quot;hi&quot;</code></pre>"`;

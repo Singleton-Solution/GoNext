@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`core/heading > snapshot: save output for h2 with no extras 1`] = `"<h2 class="gn-block-heading gn-block-heading--level-2">Section</h2>"`;
+
+exports[`core/heading > snapshot: save output with anchor + alignment 1`] = `"<h3 id="my-anchor" class="gn-block-heading gn-block-heading--level-3 has-text-align-left">Anchored</h3>"`;

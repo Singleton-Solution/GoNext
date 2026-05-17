@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`core/list > snapshot: ordered list with start + reversed 1`] = `"<ol start="5" reversed class="gn-block-list gn-block-list--ordered"><li>x</li><li>y</li><li>z</li></ol>"`;
+
+exports[`core/list > snapshot: unordered list output 1`] = `"<ul class="gn-block-list gn-block-list--unordered"><li>a</li><li>b</li></ul>"`;

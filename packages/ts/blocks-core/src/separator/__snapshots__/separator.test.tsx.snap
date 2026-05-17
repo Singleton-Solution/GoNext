@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`core/separator > snapshot: default separator 1`] = `"<hr class="gn-block-separator is-style-default"/>"`;
+
+exports[`core/separator > snapshot: dots separator 1`] = `"<hr class="gn-block-separator is-style-dots"/>"`;
