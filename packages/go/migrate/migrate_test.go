@@ -112,6 +112,21 @@ func TestSourceURLForDir_Relative(t *testing.T) {
 
 // --- Integration tests below: require a real Postgres + migrations dir ---
 
+// countMigrations returns the number of up-migration files in dir. The
+// canonical migration runner picks them up in lexical order, so this
+// is the version we expect Status() to report after a successful Run().
+func countMigrations(t *testing.T, dir string) uint {
+	t.Helper()
+	matches, err := filepath.Glob(filepath.Join(dir, "*.up.sql"))
+	if err != nil {
+		t.Fatalf("glob migrations: %v", err)
+	}
+	if len(matches) == 0 {
+		t.Fatalf("no *.up.sql files found in %s", dir)
+	}
+	return uint(len(matches)) //nolint:gosec // file count, can't overflow
+}
+
 func TestRun_IntegrationApplyAndRollback(t *testing.T) {
 	dsn := dsnFromEnv(t)
 	dir := repoMigrationsDir(t)
@@ -121,6 +136,11 @@ func TestRun_IntegrationApplyAndRollback(t *testing.T) {
 		MigrationDir: dir,
 	}
 	ctx := context.Background()
+
+	// We expect Run() to apply every *.up.sql in /migrations. The exact
+	// count grows over time as new migrations land; reading it from the
+	// directory keeps the test honest without hard-coding a number.
+	wantTop := countMigrations(t, dir)
 
 	// Up from scratch.
 	if err := Run(ctx, cfg, quietLogger()); err != nil {
@@ -132,13 +152,13 @@ func TestRun_IntegrationApplyAndRollback(t *testing.T) {
 		t.Fatalf("Run (second): %v", err)
 	}
 
-	// Status should report version 1, not dirty.
+	// Status should report the latest version, not dirty.
 	cur, dirty, err := Status(ctx, cfg, quietLogger())
 	if err != nil {
 		t.Fatalf("Status: %v", err)
 	}
-	if cur != 1 {
-		t.Errorf("current version: got %d, want 1", cur)
+	if cur != wantTop {
+		t.Errorf("current version: got %d, want %d (= #migrations in dir)", cur, wantTop)
 	}
 	if dirty {
 		t.Errorf("schema should not be dirty after a clean Run")
@@ -149,13 +169,13 @@ func TestRun_IntegrationApplyAndRollback(t *testing.T) {
 		t.Fatalf("Down(1): %v", err)
 	}
 
-	// After rollback, status reports version 0.
+	// After rollback, status reports one version below the top.
 	cur, _, err = Status(ctx, cfg, quietLogger())
 	if err != nil {
 		t.Fatalf("Status after Down: %v", err)
 	}
-	if cur != 0 {
-		t.Errorf("after Down(1) current: got %d, want 0", cur)
+	if cur != wantTop-1 {
+		t.Errorf("after Down(1) current: got %d, want %d", cur, wantTop-1)
 	}
 
 	// Re-apply to leave the DB in a known-good state for follow-on tests.
