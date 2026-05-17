@@ -10,6 +10,7 @@ import {
   BlockJSONSchema,
   BlockTreeJSONSchema,
   SCHEMA_DIALECT,
+  isPinnedDialect,
 } from './schema.ts';
 
 describe('BlockJSONSchema', () => {
@@ -56,5 +57,46 @@ describe('BlockTreeJSONSchema', () => {
   it('is an array of blocks', () => {
     expect(BlockTreeJSONSchema.type).toBe('array');
     expect(BlockTreeJSONSchema.items).toEqual({ $ref: BLOCK_SCHEMA_ID });
+  });
+});
+
+// Cross-stack contract: the canonical URI must match the Go-side
+// constant in `packages/go/jsonschemautil.Draft2020URI`. A drift here
+// would mean a block author's attribute schema validates differently
+// in the editor vs the server renderer. The string is duplicated here
+// (not imported from anywhere) on purpose so changing it requires
+// touching both sides.
+describe('SCHEMA_DIALECT', () => {
+  it('matches the canonical JSON Schema 2020-12 URL', () => {
+    expect(SCHEMA_DIALECT).toBe('https://json-schema.org/draft/2020-12/schema');
+  });
+});
+
+describe('isPinnedDialect', () => {
+  it('accepts the canonical URL', () => {
+    expect(isPinnedDialect(SCHEMA_DIALECT)).toBe(true);
+  });
+
+  it('trims surrounding whitespace', () => {
+    expect(isPinnedDialect(`  ${SCHEMA_DIALECT}\n`)).toBe(true);
+  });
+
+  it('rejects historic drafts', () => {
+    expect(isPinnedDialect('http://json-schema.org/draft-07/schema#')).toBe(
+      false,
+    );
+    expect(isPinnedDialect('http://json-schema.org/draft-06/schema#')).toBe(
+      false,
+    );
+    expect(isPinnedDialect('https://json-schema.org/draft/2019-09/schema')).toBe(
+      false,
+    );
+  });
+
+  it('rejects non-strings without throwing', () => {
+    expect(isPinnedDialect(undefined)).toBe(false);
+    expect(isPinnedDialect(null)).toBe(false);
+    expect(isPinnedDialect(42)).toBe(false);
+    expect(isPinnedDialect({})).toBe(false);
   });
 });

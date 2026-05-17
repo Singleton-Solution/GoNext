@@ -24,6 +24,7 @@ import {
   BLOCK_SCHEMA_ID,
   BlockTreeJSONSchema,
   BLOCK_TREE_SCHEMA_ID,
+  SCHEMA_DIALECT,
 } from './schema.ts';
 import type {
   AttributesSchema,
@@ -33,6 +34,61 @@ import type {
   ValidationError,
   ValidationResult,
 } from './types.ts';
+
+/**
+ * Thrown when a per-block attribute schema declares a `$schema` URL that
+ * isn't the pinned 2020-12 dialect. See `SCHEMA_DIALECT` for the policy
+ * rationale (issue #275). The plugin host bubbles this up to the
+ * operator as an install-time error, paired with the Go-side
+ * `jsonschemautil.ErrUnsupportedDialect` so the message is consistent
+ * across the stack.
+ */
+export class UnsupportedDialectError extends Error {
+  public override readonly name = 'UnsupportedDialectError';
+  public readonly declared: string;
+  public readonly blockType?: string;
+
+  constructor(declared: string, blockType?: string) {
+    const suffix = blockType !== undefined ? ` for block "${blockType}"` : '';
+    super(
+      `blocks-sdk: schema${suffix} declared $schema=${JSON.stringify(declared)}, ` +
+        `but only ${SCHEMA_DIALECT} is accepted. Rewrite the schema under ` +
+        `JSON Schema 2020-12 (see docs/02-plugin-system.md §7.7).`,
+    );
+    this.declared = declared;
+    if (blockType !== undefined) this.blockType = blockType;
+  }
+}
+
+/**
+ * Inspect a candidate schema for a top-level `$schema` field. If present
+ * and not the pinned dialect, throw `UnsupportedDialectError`. Absent
+ * `$schema` is accepted — Ajv2020 treats the document as 2020-12 by
+ * default, matching the policy in `packages/go/jsonschemautil`.
+ *
+ * Exported so the registry (`BlockRegistry.register`) can run the check
+ * at registration time, before the offending schema reaches Ajv's
+ * compile step where the error would be less obvious.
+ */
+export function assertPinnedDialect(
+  schema: unknown,
+  blockType?: string,
+): void {
+  if (
+    schema === null ||
+    typeof schema !== 'object' ||
+    Array.isArray(schema)
+  ) {
+    // Non-object schemas will fail Ajv's own checks with a clearer
+    // message; the dialect rule is meaningless for them.
+    return;
+  }
+  const $schema = (schema as { $schema?: unknown }).$schema;
+  if ($schema === undefined) return;
+  if (typeof $schema !== 'string' || $schema.trim() !== SCHEMA_DIALECT) {
+    throw new UnsupportedDialectError(String($schema), blockType);
+  }
+}
 
 /**
  * Lookup contract used by the validator and the registry. Keeping this as a
@@ -59,6 +115,12 @@ function createAjv(): Ajv {
     addUsedSchema: false,
   });
   addFormats(ajv);
+  // Defensive: the baseline schemas live alongside this file and are
+  // versioned together, but if someone hand-edits them with a different
+  // dialect we want to fail loudly at construction time rather than
+  // silently swap dialect semantics under every consumer.
+  assertPinnedDialect(BlockJSONSchema);
+  assertPinnedDialect(BlockTreeJSONSchema);
   ajv.addSchema(BlockJSONSchema, BLOCK_SCHEMA_ID);
   ajv.addSchema(BlockTreeJSONSchema, BLOCK_TREE_SCHEMA_ID);
   return ajv;
@@ -82,6 +144,11 @@ class AttributeValidatorCache {
     if (cached !== undefined) {
       return cached;
     }
+    // Enforce the pinned dialect at compile time. The registry checks
+    // this on `register()` too, but the validator is a public entry
+    // point — callers that construct a `BlockValidator` directly (no
+    // registry) still need the guard.
+    assertPinnedDialect(schema, typeName);
     const fn = this.ajv.compile(schema as Record<string, unknown>);
     this.fns.set(typeName, fn);
     return fn;

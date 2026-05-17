@@ -12,8 +12,14 @@
  * useless.
  */
 import { describe, expect, it } from 'vitest';
+import { SCHEMA_DIALECT } from './schema.ts';
 import type { BlockTypeDefinition } from './types.ts';
-import { BlockValidator, validateBlockTree } from './validator.ts';
+import {
+  assertPinnedDialect,
+  BlockValidator,
+  UnsupportedDialectError,
+  validateBlockTree,
+} from './validator.ts';
 
 const paragraphDef: BlockTypeDefinition = {
   name: 'core/paragraph',
@@ -319,6 +325,128 @@ describe('BlockValidator — invalidation', () => {
     expect(
       v.validate([{ type: 'core/paragraph', attributes: { text: 'a' } }]).valid,
     ).toBe(true);
+  });
+});
+
+// Issue #275: every attribute schema must declare the pinned 2020-12
+// dialect (or omit $schema, in which case the default applies). The
+// validator throws `UnsupportedDialectError` on first encounter with a
+// mismatched schema, so a stale plugin shipped with a draft-07 schema
+// fails at install/registration rather than producing silently
+// different validation semantics.
+describe('BlockValidator — JSON Schema dialect pin', () => {
+  it('accepts attribute schemas with an explicit 2020-12 $schema', () => {
+    const def: BlockTypeDefinition = {
+      name: 'core/pinned',
+      title: 'Pinned',
+      category: 'text',
+      attributes: {
+        $schema: SCHEMA_DIALECT,
+        type: 'object',
+        required: ['text'],
+        properties: { text: { type: 'string' } },
+      },
+      edit: async () => ({ default: () => null }),
+    };
+    const v = new BlockValidator((name) =>
+      name === def.name ? def : undefined,
+    );
+    expect(
+      v.validate([{ type: def.name, attributes: { text: 'ok' } }]).valid,
+    ).toBe(true);
+  });
+
+  it('accepts attribute schemas with no $schema declared', () => {
+    // Default policy: absent $schema is fine — Ajv2020 applies the
+    // pinned dialect under the hood. This is the most common shape in
+    // practice (the test fixtures further up the file all use it).
+    const def: BlockTypeDefinition = {
+      name: 'core/nodialect',
+      title: 'No dialect',
+      category: 'text',
+      attributes: {
+        type: 'object',
+        properties: { text: { type: 'string' } },
+      },
+      edit: async () => ({ default: () => null }),
+    };
+    const v = new BlockValidator((name) =>
+      name === def.name ? def : undefined,
+    );
+    expect(
+      v.validate([{ type: def.name, attributes: { text: 'ok' } }]).valid,
+    ).toBe(true);
+  });
+
+  it('rejects attribute schemas declaring draft-07 at compile time', () => {
+    const def: BlockTypeDefinition = {
+      name: 'core/legacy',
+      title: 'Legacy',
+      category: 'text',
+      attributes: {
+        $schema: 'http://json-schema.org/draft-07/schema#',
+        type: 'object',
+        properties: { text: { type: 'string' } },
+      },
+      edit: async () => ({ default: () => null }),
+    };
+    const v = new BlockValidator((name) =>
+      name === def.name ? def : undefined,
+    );
+    expect(() =>
+      v.validate([{ type: def.name, attributes: { text: 'ok' } }]),
+    ).toThrowError(UnsupportedDialectError);
+  });
+
+  it('rejects attribute schemas declaring draft-2019-09', () => {
+    const def: BlockTypeDefinition = {
+      name: 'core/almost',
+      title: 'Almost',
+      category: 'text',
+      attributes: {
+        $schema: 'https://json-schema.org/draft/2019-09/schema',
+        type: 'object',
+      },
+      edit: async () => ({ default: () => null }),
+    };
+    const v = new BlockValidator((name) =>
+      name === def.name ? def : undefined,
+    );
+    expect(() =>
+      v.validate([{ type: def.name, attributes: {} }]),
+    ).toThrowError(UnsupportedDialectError);
+  });
+
+  it('UnsupportedDialectError exposes the offending URL and block type', () => {
+    try {
+      assertPinnedDialect(
+        { $schema: 'http://json-schema.org/draft-07/schema#' },
+        'core/legacy',
+      );
+      expect.fail('expected assertPinnedDialect to throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(UnsupportedDialectError);
+      const e = err as UnsupportedDialectError;
+      expect(e.declared).toBe('http://json-schema.org/draft-07/schema#');
+      expect(e.blockType).toBe('core/legacy');
+      expect(e.message).toContain('draft-07');
+      expect(e.message).toContain(SCHEMA_DIALECT);
+    }
+  });
+
+  it('assertPinnedDialect is a no-op for non-object inputs', () => {
+    // Ajv handles non-object schemas with its own clearer errors; the
+    // dialect rule has nothing to say there.
+    expect(() => assertPinnedDialect(undefined)).not.toThrow();
+    expect(() => assertPinnedDialect(null)).not.toThrow();
+    expect(() => assertPinnedDialect('not a schema')).not.toThrow();
+    expect(() => assertPinnedDialect([])).not.toThrow();
+  });
+
+  it('assertPinnedDialect rejects non-string $schema values', () => {
+    expect(() => assertPinnedDialect({ $schema: 42 })).toThrowError(
+      UnsupportedDialectError,
+    );
   });
 });
 

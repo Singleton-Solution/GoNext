@@ -22,7 +22,7 @@ import type {
   BlockTypeDefinition,
   ValidationResult,
 } from './types.ts';
-import { BlockValidator } from './validator.ts';
+import { assertPinnedDialect, BlockValidator } from './validator.ts';
 
 export interface RegisterOptions {
   /**
@@ -64,6 +64,13 @@ export class BlockRegistry {
     def: BlockTypeDefinition<A>,
     options: RegisterOptions = {},
   ): void {
+    // Dialect pin: a block whose attribute schema declares a draft
+    // other than 2020-12 is rejected here, before it ever reaches the
+    // validator's compile cache. We do this BEFORE the duplicate check
+    // so a buggy HMR-driven re-register can't silently install a
+    // mis-dialect schema if someone passes `replace: true`. See issue
+    // #275 and `UnsupportedDialectError` for the contract.
+    assertPinnedDialect(def.attributes, def.name);
     const existing = this.defs.get(def.name);
     if (existing !== undefined && options.replace !== true) {
       throw new DuplicateBlockTypeError(def.name);
