@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Singleton-Solution/GoNext/packages/go/plugins/runtime/limits"
 	"github.com/tetratelabs/wazero"
 )
 
@@ -74,6 +75,13 @@ type Runtime struct {
 	// uses this seam to register its own host functions without
 	// modifying this package.
 	extraHosts []HostModuleBuilder
+
+	// enforcer applies the configured resource Limits to every call.
+	// One enforcer per Runtime; constructed in New from the resolved
+	// limits.Limits and shared across all Modules. Never nil — when
+	// no WithLimits is supplied, New installs a defaults-backed
+	// enforcer so Module.Call has a single uniform code path.
+	enforcer *limits.Enforcer
 }
 
 // wazeroRuntime is an alias for wazero.Runtime, kept under a local
@@ -106,6 +114,13 @@ type runtimeConfig struct {
 	timeSource       TimeSource
 	memoryLimitPages uint32
 	extraHosts       []HostModuleBuilder
+
+	// limits, when non-nil, overrides the default resource envelope.
+	// nil means "use limits.Default()". The separate flag (instead of
+	// always-default) lets WithLimits and WithMemoryLimitPages
+	// coexist: whichever option lands last wins for the memory cap
+	// specifically.
+	limits *limits.Limits
 }
 
 // WithLogger injects the structured logger. If unset, slog.Default is
@@ -157,6 +172,31 @@ func WithHostModule(b HostModuleBuilder) Option {
 	}
 }
 
+// WithLimits installs a resource envelope for the runtime. The Limits
+// govern CPU-time per call (soft + hard deadlines), memory pages, and
+// the per-plugin instance cap consulted by the pool.
+//
+// Order matters: if both WithLimits and WithMemoryLimitPages are
+// supplied, the *later* one wins for the memory cap. CPU and instance
+// limits only come from WithLimits — there is no separate option.
+//
+// Invalid Limits (e.g., hard deadline < soft deadline) are reported
+// by New() as an error rather than panicking at construction time,
+// keeping the option API non-fallible.
+func WithLimits(l limits.Limits) Option {
+	return func(c *runtimeConfig) {
+		copy := l
+		c.limits = &copy
+		// Propagate the memory cap so callers using only WithLimits
+		// see the full Limits applied — including memory. Callers
+		// that want a different memory page count layer
+		// WithMemoryLimitPages *after* WithLimits.
+		if copy.MemoryPages > 0 {
+			c.memoryLimitPages = copy.MemoryPages
+		}
+	}
+}
+
 // New constructs a Runtime. The provided context is used only for the
 // initial wazero runtime + host-module instantiation; it is NOT stored
 // for later use.
@@ -171,6 +211,24 @@ func New(ctx context.Context, opts ...Option) (*Runtime, error) {
 	}
 	for _, opt := range opts {
 		opt(&cfg)
+	}
+
+	// Resolve the effective Limits. WithLimits supplies one;
+	// otherwise we synthesise one from defaults plus whatever the
+	// scalar WithMemoryLimitPages option set. The result MUST validate
+	// — if it doesn't, we fail New rather than risk runtime surprises.
+	effectiveLimits := limits.Default()
+	if cfg.limits != nil {
+		effectiveLimits = *cfg.limits
+	}
+	// Always sync the memory cap back to the limits struct: the
+	// runtime config's scalar field is what the rest of the codepath
+	// has historically used, so it remains the source of truth for
+	// wazero-level memory enforcement.
+	effectiveLimits.MemoryPages = cfg.memoryLimitPages
+	enforcer, err := limits.NewEnforcer(effectiveLimits)
+	if err != nil {
+		return nil, fmt.Errorf("runtime: New: invalid limits: %w", err)
 	}
 
 	wazeroCfg := wazero.NewRuntimeConfig().
@@ -189,6 +247,7 @@ func New(ctx context.Context, opts ...Option) (*Runtime, error) {
 		timeSource: cfg.timeSource,
 		modules:    make(map[string]*Module),
 		extraHosts: cfg.extraHosts,
+		enforcer:   enforcer,
 	}
 
 	// Register the built-in "env" host module that exposes the minimum
@@ -334,6 +393,14 @@ func (r *Runtime) Close(ctx context.Context) error {
 // IsClosed reports whether Close has been called. Mostly useful in
 // tests and admin probes.
 func (r *Runtime) IsClosed() bool { return r.closed.Load() }
+
+// Enforcer exposes the runtime's resource enforcer. It is never nil —
+// even a runtime constructed without WithLimits has a defaults-backed
+// enforcer.
+//
+// The pool (#9) calls Enforcer().Acquire(name) before checking out a
+// new instance. Test code uses it to inspect counters.
+func (r *Runtime) Enforcer() *limits.Enforcer { return r.enforcer }
 
 // removeModule is called by Module.Close to drop the slot. Safe to
 // call after Runtime.Close — the map is nil, the delete is a no-op.

@@ -104,6 +104,17 @@ func (m *Module) Call(ctx context.Context, fnName string, params ...uint64) ([]u
 		return nil, ErrModuleClosed
 	}
 
+	// Apply the runtime's configured CPU-time envelope. The enforcer
+	// wraps ctx with a soft/hard deadline pair; wazero observes the
+	// cancellation (WithCloseOnContextDone in New) and traps the
+	// guest. A runtime built without explicit limits still has a
+	// defaults-backed enforcer, so the call site stays uniform.
+	if m.runtime != nil && m.runtime.enforcer != nil {
+		boundedCtx, cancel := m.runtime.enforcer.WithCPUDeadline(ctx)
+		defer cancel()
+		ctx = boundedCtx
+	}
+
 	results, err := fn.Call(ctx, params...)
 	if err != nil {
 		return nil, m.classifyCallError(fnName, err)
