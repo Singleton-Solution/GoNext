@@ -9,7 +9,11 @@ metadata:
   labels:
     {{- include "gonext.componentLabels" (dict "ctx" . "component" $component) | nindent 4 }}
 spec:
+  {{- if not .Values.web.hpa.enabled }}
+  # Emit replicas only when HPA is disabled — see api-deployment.yaml for
+  # the rationale. HPA owns desiredReplicas; helm upgrades must not race it.
   replicas: {{ .Values.web.replicaCount }}
+  {{- end }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -29,6 +33,7 @@ spec:
         {{- end }}
     spec:
       serviceAccountName: {{ include "gonext.serviceAccountName" . }}
+      automountServiceAccountToken: false
       terminationGracePeriodSeconds: {{ .Values.web.terminationGracePeriodSeconds }}
       {{- include "gonext.imagePullSecrets" . | nindent 6 }}
       securityContext:

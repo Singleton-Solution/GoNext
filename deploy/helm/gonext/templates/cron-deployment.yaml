@@ -28,6 +28,7 @@ spec:
         {{- end }}
     spec:
       serviceAccountName: {{ include "gonext.serviceAccountName" . }}
+      automountServiceAccountToken: false
       terminationGracePeriodSeconds: {{ .Values.cron.terminationGracePeriodSeconds }}
       {{- include "gonext.imagePullSecrets" . | nindent 6 }}
       securityContext:

@@ -8,7 +8,13 @@ metadata:
   labels:
     {{- include "gonext.componentLabels" (dict "ctx" . "component" $component) | nindent 4 }}
 spec:
+  {{- if not .Values.api.hpa.enabled }}
+  # Emit replicas only when HPA is disabled. Otherwise every `helm upgrade`
+  # would reset the count to the static default and override HPA's
+  # desiredReplicas. See Helm best-practices: don't set replicas alongside
+  # an HPA on the same Deployment.
   replicas: {{ .Values.api.replicaCount }}
+  {{- end }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -30,6 +36,9 @@ spec:
         {{- end }}
     spec:
       serviceAccountName: {{ include "gonext.serviceAccountName" . }}
+      # GoNext pods don't talk to the kube-apiserver. Disabling the SA
+      # token mount cuts off a stock lateral-movement vector.
+      automountServiceAccountToken: false
       terminationGracePeriodSeconds: {{ .Values.api.terminationGracePeriodSeconds }}
       {{- include "gonext.imagePullSecrets" . | nindent 6 }}
       securityContext:

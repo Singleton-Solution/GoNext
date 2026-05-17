@@ -130,6 +130,41 @@ spec:
           port: 3000
 ---
 # -----------------------------------------------------------------------------
+# web/admin/worker → core-api egress on 8080.
+#
+# Pairs with `allow-web-to-api` above (which opens ingress on the api side):
+# without this egress rule, default-deny on the source pod blocks SSR fetches
+# from public-web (`NEXT_PUBLIC_API_URL`), admin-web → core-api calls, and
+# worker → core-api back-edges (e.g. ISR webhook invocations from jobs).
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "gonext.fullname" . }}-allow-web-egress-api
+  labels:
+    {{- include "gonext.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: ["web", "admin", "worker"]
+      - key: app.kubernetes.io/instance
+        operator: In
+        values: [{{ .Release.Name | quote }}]
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: api
+              app.kubernetes.io/instance: {{ .Release.Name }}
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# -----------------------------------------------------------------------------
 # api/worker/cron → Postgres (5432) and Redis (6379).
 # Uses unrestricted egress on those ports because the DB/cache may live in
 # a different namespace, in-cluster subchart, or external CIDR. Tighten by

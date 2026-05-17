@@ -112,14 +112,19 @@ ServiceAccount name to use.
 
 {{/*
 Name of the Secret to envFrom.
+
+When `secrets.create=true` the chart renders its own Secret named
+"<fullname>-secrets" and pods envFrom it. When `secrets.create=false`
+the user MUST set `secrets.existingSecret` to point at an external
+Secret (sealed-secrets, external-secrets, vault-injected). Falling back
+to "<fullname>-secrets" in that case would silently wait for a Secret
+that nobody is going to create — so we fail fast with `required`.
 */}}
 {{- define "gonext.secretName" -}}
 {{- if .Values.secrets.create -}}
 {{- printf "%s-secrets" (include "gonext.fullname" .) -}}
-{{- else if .Values.secrets.existingSecret -}}
-{{- .Values.secrets.existingSecret -}}
 {{- else -}}
-{{- printf "%s-secrets" (include "gonext.fullname" .) -}}
+{{- required "secrets.create=false requires secrets.existingSecret to be set (name of a pre-existing Secret holding GONEXT_* keys)." .Values.secrets.existingSecret -}}
 {{- end -}}
 {{- end -}}
 

@@ -12,7 +12,7 @@
 #   secrets      — secret material projected into the Secret (or referenced)
 #   api          — core-api Deployment, Service, HPA, PDB
 #   worker       — core-worker Deployment, HPA (KEDA queue depth)
-#   cron         — core-cron Deployment (single leader, Redis lease)
+#   cron         — core-cron Deployment (two replicas, Redis leader-election lease)
 #   web          — public-web Deployment, Service, HPA, PDB
 #   admin        — admin-web Deployment, Service
 #   ingress      — single Ingress fronting public-web, admin-web, core-api
@@ -200,9 +200,11 @@ api:
   terminationGracePeriodSeconds: 60
 
   # Pod-level securityContext (per §4.3 rationale).
+  # runAsUser/runAsGroup = 65532 matches the distroless nonroot UID/GID.
   podSecurityContext:
     runAsNonRoot: true
     runAsUser: 65532
+    runAsGroup: 65532
     fsGroup: 65532
     seccompProfile:
       type: RuntimeDefault
@@ -210,6 +212,8 @@ api:
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
     capabilities:
       drop: ["ALL"]
 
@@ -288,6 +292,7 @@ worker:
   podSecurityContext:
     runAsNonRoot: true
     runAsUser: 65532
+    runAsGroup: 65532
     fsGroup: 65532
     seccompProfile:
       type: RuntimeDefault
@@ -295,6 +300,8 @@ worker:
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
     capabilities:
       drop: ["ALL"]
 
@@ -327,7 +334,7 @@ worker:
     prometheusServerAddress: "http://prometheus.monitoring.svc.cluster.local:9090"
 
 # --------------------------------------------------------------------------
-# cron — core-cron Deployment (single replica, Redis lease for HA-via-lease)
+# cron — core-cron Deployment (two replicas with Redis leader-election lease)
 # --------------------------------------------------------------------------
 cron:
   enabled: true
@@ -368,6 +375,7 @@ cron:
   podSecurityContext:
     runAsNonRoot: true
     runAsUser: 65532
+    runAsGroup: 65532
     fsGroup: 65532
     seccompProfile:
       type: RuntimeDefault
@@ -375,6 +383,8 @@ cron:
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
     capabilities:
       drop: ["ALL"]
 
@@ -432,12 +442,18 @@ web:
     periodSeconds: 5
     failureThreshold: 2
 
+  # NOTE: this assumes `sh` is on PATH in the Next.js image. The default
+  # `node:*-slim` and `node:*-alpine` bases ship it; distroless and scratch
+  # variants do NOT. If you swap to a distroless Next image, set this to
+  # ["/usr/bin/tini", "-s", "--", "kill", "-SIGTERM", "1"] or remove the
+  # delay and rely on `terminationGracePeriodSeconds`.
   preStopCommand: ["sh", "-c", "sleep 5 && kill -SIGTERM 1"]
   terminationGracePeriodSeconds: 30
 
   podSecurityContext:
     runAsNonRoot: true
     runAsUser: 1000
+    runAsGroup: 1000
     fsGroup: 1000
     seccompProfile:
       type: RuntimeDefault
@@ -445,6 +461,8 @@ web:
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
     capabilities:
       drop: ["ALL"]
 
@@ -511,12 +529,14 @@ admin:
     periodSeconds: 5
     failureThreshold: 2
 
+  # See web.preStopCommand for the distroless caveat. Same applies here.
   preStopCommand: ["sh", "-c", "sleep 5 && kill -SIGTERM 1"]
   terminationGracePeriodSeconds: 30
 
   podSecurityContext:
     runAsNonRoot: true
     runAsUser: 1000
+    runAsGroup: 1000
     fsGroup: 1000
     seccompProfile:
       type: RuntimeDefault
@@ -524,6 +544,8 @@ admin:
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true
     runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
     capabilities:
       drop: ["ALL"]
 

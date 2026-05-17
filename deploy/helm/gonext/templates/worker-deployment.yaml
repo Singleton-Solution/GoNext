@@ -8,7 +8,11 @@ metadata:
   labels:
     {{- include "gonext.componentLabels" (dict "ctx" . "component" $component) | nindent 4 }}
 spec:
+  {{- if not .Values.worker.hpa.enabled }}
+  # When KEDA's ScaledObject is enabled it owns desiredReplicas; emitting
+  # replicas here would cause helm upgrades to fight the scaler.
   replicas: {{ .Values.worker.replicaCount }}
+  {{- end }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -29,6 +33,7 @@ spec:
         {{- end }}
     spec:
       serviceAccountName: {{ include "gonext.serviceAccountName" . }}
+      automountServiceAccountToken: false
       terminationGracePeriodSeconds: {{ .Values.worker.terminationGracePeriodSeconds }}
       {{- include "gonext.imagePullSecrets" . | nindent 6 }}
       securityContext:
