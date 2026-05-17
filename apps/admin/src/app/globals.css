@@ -1,0 +1,249 @@
+/*
+ * @gonext/admin — global styles.
+ *
+ * Intentionally tiny: this scaffold pre-dates the design-system extraction
+ * (issue #34). Real visual styling lands with the design tokens package.
+ * For now we ship the shell-level styles needed for the sidebar+main layout
+ * to be navigable, and nothing more.
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --color-bg: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-border: #e4e6ea;
+  --color-text: #1c2024;
+  --color-text-muted: #6b7280;
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
+  --sidebar-width: 220px;
+  --sidebar-width-collapsed: 64px;
+  --header-height: 56px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --radius: 6px;
+  --font-sans:
+    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 var(--space-3);
+  font-weight: 600;
+}
+
+h1 {
+  font-size: 24px;
+}
+
+h2 {
+  font-size: 18px;
+}
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.app-shell__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-shell__header {
+  height: var(--header-height);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-6);
+  font-weight: 600;
+}
+
+.app-shell__content {
+  padding: var(--space-6);
+  flex: 1;
+}
+
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  transition: width 150ms ease;
+}
+
+.sidebar--collapsed {
+  width: var(--sidebar-width-collapsed);
+}
+
+.sidebar__header {
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  font-weight: 600;
+}
+
+.sidebar__toggle {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar__nav {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2) 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar__item a {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  color: var(--color-text);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+}
+
+.sidebar__item a:hover {
+  background: var(--color-bg);
+  text-decoration: none;
+}
+
+.sidebar__item--active a {
+  background: var(--color-bg);
+  border-left-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
+.sidebar--collapsed .sidebar__label {
+  display: none;
+}
+
+.widget-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.widget {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  min-height: 120px;
+}
+
+.widget__title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 var(--space-2);
+  color: var(--color-text);
+}
+
+.widget__body {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.login-card {
+  max-width: 360px;
+  margin: 80px auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-6);
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
+}
+
+.form-field label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.form-field input {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+}
+
+.form-field input:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+  border-color: var(--color-accent);
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  color: white;
+  border: 0;
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-4);
+  font-weight: 500;
+}
+
+.btn-primary:hover {
+  background: var(--color-accent-hover);
+}
+
+.muted {
+  color: var(--color-text-muted);
+}

@@ -1,0 +1,11 @@
+# Next.js build artifacts
+.next
+out
+next-env.d.ts
+
+# Coverage
+coverage
+
+# Node
+node_modules
+*.tsbuildinfo
