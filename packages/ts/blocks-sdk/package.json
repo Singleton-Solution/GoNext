@@ -1,0 +1,15 @@
+{
+  "name": "@gonext/blocks-sdk",
+  "version": "0.0.0",
+  "private": false,
+  "description": "Block-editor SDK for GoNext. Type definitions and helpers for registering custom blocks. Used by themes, plugins, and the block editor itself. Apache-2.0.",
+  "license": "Apache-2.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "echo '@gonext/blocks-sdk build: not yet implemented'",
+    "lint": "echo '@gonext/blocks-sdk lint: not yet implemented'",
+    "test": "echo '@gonext/blocks-sdk test: not yet implemented'",
+    "typecheck": "echo '@gonext/blocks-sdk typecheck: not yet implemented'"
+  }
+}

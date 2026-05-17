@@ -1,0 +1,15 @@
+{
+  "name": "@gonext/theme-sdk",
+  "version": "0.0.0",
+  "private": false,
+  "description": "Theme SDK for GoNext. Typed React component props (PostProps, ArchiveProps, etc.), theme.json type generation, template hierarchy helpers. Used by theme authors. Apache-2.0.",
+  "license": "Apache-2.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "echo '@gonext/theme-sdk build: not yet implemented'",
+    "lint": "echo '@gonext/theme-sdk lint: not yet implemented'",
+    "test": "echo '@gonext/theme-sdk test: not yet implemented'",
+    "typecheck": "echo '@gonext/theme-sdk typecheck: not yet implemented'"
+  }
+}

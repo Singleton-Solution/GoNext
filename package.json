@@ -1,0 +1,26 @@
+{
+  "name": "gonext-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "GoNext — root workspace for Next.js apps and TypeScript packages. Go workspace lives alongside (go.work).",
+  "license": "SEE LICENSE IN LICENSE",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "workspaces": [
+    "apps/*",
+    "packages/ts/*"
+  ],
+  "scripts": {
+    "build": "pnpm -r --parallel run build",
+    "dev": "pnpm -r --parallel run dev",
+    "lint": "pnpm -r --parallel run lint",
+    "test": "pnpm -r run test",
+    "typecheck": "pnpm -r --parallel run typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

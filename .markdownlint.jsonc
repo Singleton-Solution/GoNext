@@ -1,0 +1,10 @@
+// Rule reference: https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+// Run locally with: pnpm dlx markdownlint-cli2 "**/*.md"
+{
+  "default": true,
+  "MD013": false,            // line length — design docs are long
+  "MD024": { "siblings_only": true },  // duplicate headings allowed across sections
+  "MD033": false,            // inline HTML allowed (we use it in tables)
+  "MD041": false,            // first line must be top-level heading — too strict for ADRs
+  "MD046": { "style": "fenced" }
+}

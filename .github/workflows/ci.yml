@@ -69,12 +69,22 @@ jobs:
         with:
           go-version-file: 'go.work'
           cache: true
-      - name: go vet
-        run: go vet ./...
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
+      - name: go work sync
+        run: go work sync
+      - name: go vet (all workspace modules)
+        run: go list -m -f '{{.Dir}}/...' all | xargs go vet
+      - name: golangci-lint (per module)
+        run: |
+          # Install golangci-lint if not cached
+          if ! command -v golangci-lint >/dev/null 2>&1; then
+            curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.61.0
+            export PATH="$(go env GOPATH)/bin:$PATH"
+          fi
+          for dir in $(go list -m -f '{{.Dir}}' all); do
+            echo "::group::golangci-lint $dir"
+            (cd "$dir" && golangci-lint run ./...)
+            echo "::endgroup::"
+          done
 
   test-go:
     needs: [changes, lint-go]
@@ -99,16 +109,20 @@ jobs:
         with:
           go-version-file: 'go.work'
           cache: true
-      - name: Run tests
+      - name: go work sync
+        run: go work sync
+      - name: Run tests (all workspace modules)
         env:
           DATABASE_URL: postgres://postgres:ci@localhost:5432/gonext_test?sslmode=disable
           REDIS_URL: redis://localhost:6379
-        run: go test -race -coverprofile=coverage.out ./...
+        run: go list -m -f '{{.Dir}}/...' all | xargs go test -race -count=1
       - name: Upload coverage
+        if: success() || failure()
         uses: actions/upload-artifact@v4
         with:
           name: go-coverage
-          path: coverage.out
+          path: '**/coverage.out'
+          if-no-files-found: ignore
 
   lint-web:
     needs: changes

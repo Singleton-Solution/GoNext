@@ -1,0 +1,51 @@
+// Command gonext is the administrative CLI for a GoNext install.
+//
+// Status: skeleton — issue #1. Subsequent issues add subcommands per
+// docs/05-admin-api.md §3.9 (e.g., `gonext plugin install`,
+// `gonext migrate`, `gonext jobs`, `gonext bench`).
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+
+	"github.com/Singleton-Solution/GoNext/packages/go/buildinfo"
+)
+
+func main() {
+	args := os.Args[1:]
+	switch {
+	case len(args) == 0, args[0] == "version", args[0] == "--version", args[0] == "-v":
+		info := buildinfo.Get("cli")
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(info); err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
+	case args[0] == "help", args[0] == "--help", args[0] == "-h":
+		fmt.Println(usage)
+	default:
+		fmt.Fprintf(os.Stderr, "gonext: unknown command %q\n\n%s\n", args[0], usage)
+		os.Exit(2)
+	}
+}
+
+const usage = `gonext — administrative CLI for a GoNext install
+
+Status: skeleton. Subcommands land in subsequent issues.
+
+Usage:
+  gonext <command> [args]
+
+Commands (planned):
+  plugin     Manage plugins (install, activate, list, dev, test)
+  theme      Manage themes (install, activate, test)
+  migrate    Run database migrations or import from WordPress
+  jobs       Inspect and manage background jobs (queue, failed, drain, cron)
+  bench      Run synthetic performance benchmarks
+  version    Print version information
+
+Available now:
+  version    Print build info`

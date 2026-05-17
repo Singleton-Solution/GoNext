@@ -46,6 +46,12 @@ playwright-report/
 *.out
 go.work.sum
 
+# Stray Go binaries from `go build ./...` (workspace-mode lands the
+# binary next to main.go). The canonical output dir is /bin.
+apps/api/server
+apps/worker/worker
+cli/gonext/gonext
+
 # Local dev
 .dev/
 tmp/

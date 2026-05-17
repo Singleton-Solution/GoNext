@@ -89,6 +89,18 @@ Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`
 - Dependency upgrades without justification.
 - "Improve performance" PRs with no measurement.
 
+## Policy on AI-generated content
+
+We use AI assistance ourselves and welcome contributions that were drafted with AI help. What we **do not** accept:
+
+- **Unsolicited "AI auto-generated solution" comments dropped on issues.** These will be hidden as off-topic without further notice. We will not adopt code that lives only in issue comments.
+- **PRs that are clearly AI dumps with no human review.** Hallmarks: code doesn't match the repo's patterns, tests don't exercise real edge cases, commit messages are templated, the PR author hasn't engaged with the design docs. We will close such PRs and may block the author from the repo.
+- **Code that the author has not personally read, understood, and tested.** This is the DCO promise: by signing off you attest the work is yours to submit. Generated code is fine — but you have to own it, test it, and be able to explain it under review.
+
+Good AI use looks like: you read the design doc, drafted with AI help, reviewed the output line by line, ran the tests, added the edge cases the AI missed, and opened a PR that holds together as a coherent change. Bad AI use looks like: drop a comment with code, vanish.
+
+If you're not sure whether your contribution will be received well, open a `design-discussion` issue first and ask.
+
 ## Reporting bugs
 
 Open an issue with the `bug` template. Include:
