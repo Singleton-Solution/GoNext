@@ -1,0 +1,63 @@
+[Unit]
+# GoNext cron / scheduled-job runner.
+#
+# Alias of the worker binary with --mode=cron — same code path, but only
+# leases the cron leader key and enqueues due schedules. See
+# docs/12-jobs-cron.md §3 and docs/09-deployment-ops.md §16.
+#
+# Safe to run a single replica per cluster; the leader-lease in Redis
+# guarantees mutual exclusion if a second copy is started by mistake.
+Description=GoNext cron / scheduler
+Documentation=https://github.com/Singleton-Solution/GoNext/blob/main/docs/12-jobs-cron.md
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gonext
+Group=gonext
+
+EnvironmentFile=/etc/gonext/.env
+
+# Same binary as the worker — only the mode flag differs.
+ExecStart=/usr/local/bin/gonext-worker --mode=cron
+
+Restart=on-failure
+RestartSec=5s
+
+KillSignal=SIGTERM
+TimeoutStopSec=60
+
+LimitNOFILE=65536
+
+# ---------------------------------------------------------------------------
+# Security hardening (mirrors gonext-api.service)
+# ---------------------------------------------------------------------------
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/gonext
+
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target

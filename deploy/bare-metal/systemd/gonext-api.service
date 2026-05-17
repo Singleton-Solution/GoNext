@@ -1,0 +1,82 @@
+[Unit]
+# GoNext core API service.
+#
+# Serves the HTTP/JSON + GraphQL surface used by the public web and admin web
+# Next.js apps. See docs/09-deployment-ops.md §6.3.
+#
+# Hardening follows the systemd "Strict" preset; binary is expected at
+# /usr/local/bin/gonext-api with config in /etc/gonext/.env and a writable
+# state directory at /var/lib/gonext (created by install.sh).
+Description=GoNext core API
+Documentation=https://github.com/Singleton-Solution/GoNext/blob/main/docs/09-deployment-ops.md
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=gonext
+Group=gonext
+
+# Config is sourced from a single env file owned by root:gonext, mode 0640.
+EnvironmentFile=/etc/gonext/.env
+
+# The binary itself is a static Go build with no runtime dependencies.
+ExecStart=/usr/local/bin/gonext-api
+
+# Restart policy: keep the API up, but back off enough that a crash loop
+# does not hammer the database.
+Restart=on-failure
+RestartSec=5s
+
+# Graceful shutdown — give the API up to 60s to drain in-flight requests.
+KillSignal=SIGTERM
+TimeoutStopSec=60
+
+# Production file-descriptor ceiling. Default 1024 is too low for an HTTP
+# server with a connection pool.
+LimitNOFILE=65536
+
+# ---------------------------------------------------------------------------
+# Security hardening
+# ---------------------------------------------------------------------------
+# No setuid binaries can elevate privileges from this unit.
+NoNewPrivileges=true
+
+# Make /usr, /boot, /efi read-only and the rest of the filesystem read-only
+# except for ReadWritePaths.
+ProtectSystem=strict
+
+# /home, /root, /run/user are inaccessible.
+ProtectHome=true
+
+# Private /tmp and /var/tmp.
+PrivateTmp=true
+
+# Writable state directory for local media (if S3 is not configured) and
+# any cache/log spool.
+ReadWritePaths=/var/lib/gonext
+
+# Drop all capabilities — a plain HTTP server on a high port needs none.
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# Additional defense-in-depth: kernel and namespace surface.
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target
