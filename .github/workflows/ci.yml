@@ -84,9 +84,12 @@ jobs:
           done
       - name: golangci-lint (per module)
         run: |
-          # Install golangci-lint if not cached
+          # v2.x is required because earlier releases were built with go
+          # < 1.25 and refuse to lint against a 1.25 workspace. There is
+          # no .golangci.yml in the repo, so v2 defaults apply.
           if ! command -v golangci-lint >/dev/null 2>&1; then
-            curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.61.0
+            curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
+              | sh -s -- -b $(go env GOPATH)/bin v2.12.2
             export PATH="$(go env GOPATH)/bin:$PATH"
           fi
           for dir in $(go work edit -json | python3 -c "import json,sys; [print(u['DiskPath']) for u in json.load(sys.stdin)['Use']]"); do
