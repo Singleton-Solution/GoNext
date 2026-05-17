@@ -24,13 +24,15 @@ func TestHeaders_DefaultOptionsAppliesFullBaseline(t *testing.T) {
 	rec := serve(t, DefaultOptions())
 
 	want := map[string]string{
-		"Strict-Transport-Security":    "max-age=63072000; includeSubDomains; preload",
-		"X-Content-Type-Options":       "nosniff",
-		"Referrer-Policy":              "strict-origin-when-cross-origin",
-		"Cross-Origin-Opener-Policy":   "same-origin",
-		"Cross-Origin-Embedder-Policy": "require-corp",
-		"Cross-Origin-Resource-Policy": "same-site",
-		"X-Frame-Options":              "DENY",
+		"Strict-Transport-Security":         "max-age=63072000; includeSubDomains; preload",
+		"X-Content-Type-Options":            "nosniff",
+		"Referrer-Policy":                   "strict-origin-when-cross-origin",
+		"Cross-Origin-Opener-Policy":        "same-origin",
+		"Cross-Origin-Embedder-Policy":      "require-corp",
+		"Cross-Origin-Resource-Policy":      "same-site",
+		"X-Frame-Options":                   "DENY",
+		"X-Permitted-Cross-Domain-Policies": "none",
+		"Origin-Agent-Cluster":              "?1",
 	}
 	for k, v := range want {
 		if got := rec.Header().Get(k); got != v {
@@ -118,6 +120,8 @@ func TestHeaders_DisableFlagsOmitHeaders(t *testing.T) {
 		{"coep", func(o *Options) { o.DisableCOEP = true }, "Cross-Origin-Embedder-Policy"},
 		{"corp", func(o *Options) { o.DisableCORP = true }, "Cross-Origin-Resource-Policy"},
 		{"xfo", func(o *Options) { o.DisableFrameOptions = true }, "X-Frame-Options"},
+		{"xpcdp", func(o *Options) { o.DisablePermittedCrossDomainPolicies = true }, "X-Permitted-Cross-Domain-Policies"},
+		{"oac", func(o *Options) { o.DisableOriginAgentCluster = true }, "Origin-Agent-Cluster"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -173,6 +177,18 @@ func TestHeaders_OverridePerHeader(t *testing.T) {
 			mutate:    func(o *Options) { o.PermissionsPolicy = "geolocation=(self)" },
 			header:    "Permissions-Policy",
 			wantValue: "geolocation=(self)",
+		},
+		{
+			name:      "permitted cross-domain policies override",
+			mutate:    func(o *Options) { o.PermittedCrossDomainPolicies = "by-content-type" },
+			header:    "X-Permitted-Cross-Domain-Policies",
+			wantValue: "by-content-type",
+		},
+		{
+			name:      "origin agent cluster override",
+			mutate:    func(o *Options) { o.OriginAgentCluster = "?0" },
+			header:    "Origin-Agent-Cluster",
+			wantValue: "?0",
 		},
 	}
 	for _, tc := range cases {

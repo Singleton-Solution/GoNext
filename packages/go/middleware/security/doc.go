@@ -16,11 +16,26 @@
 // can override per-response if they truly need to (the middleware writes,
 // it does not lock).
 //
-// CSP is intentionally NOT set here. Content-Security-Policy requires
-// per-request nonce binding and per-route classification that belongs in
-// its own middleware; mixing it into a generic headers middleware would
-// either produce an unsafe policy or leak coupling. See docs/13 §3 for
-// the dedicated CSP design.
+// In addition to writing the canonical matrix, Headers deletes the
+// Server and X-Powered-By response headers (controlled by
+// Options.StripIdentifyingHeaders, on by default in every preset). This
+// removes a cheap fingerprinting vector that reverse proxies and Go's
+// own net/http often add.
+//
+// Per-request CSP nonce delivery is provided by the separate WithNonce
+// middleware. WithNonce generates a fresh 128-bit nonce per request from
+// crypto/rand, attaches it to r.Context (retrievable via
+// NonceFromContext), and writes it to the X-Script-Nonce response
+// header. A downstream Next.js (or other SSR) frontend reads the header
+// and stamps the nonce into inline <script nonce="..."> tags. The CSP
+// policy itself is intentionally not set here — see docs/13 §3 for the
+// dedicated CSP design.
+//
+// Route classification: callers whose mux mixes route classes (admin,
+// REST, public, media, plugin-frontend) can use ClassifiedHeaders which
+// uses Classify(r) to pick the appropriate Options preset per request.
+// SetClassifierPrefixes and SetClassifier configure the classifier;
+// OptionsFor(class) returns the corresponding preset for static wiring.
 //
 // Wiring example:
 //
@@ -29,6 +44,7 @@
 //	    Middlewares: []httpx.Middleware{
 //	        httpx.Recovery(logger),
 //	        httpx.RequestID(),
+//	        security.WithNonce(),
 //	        security.Headers(security.PublicSite()),
 //	        httpx.Logger(logger),
 //	    },

@@ -65,6 +65,28 @@ type Options struct {
 	// same origin (rare; CSP frame-ancestors is the modern replacement).
 	FrameOptions        string
 	DisableFrameOptions bool
+
+	// PermittedCrossDomainPolicies controls X-Permitted-Cross-Domain-Policies.
+	// Default: "none". The header is legacy (Adobe Flash / Acrobat clients
+	// honored it for cross-domain policy files), but it remains in the
+	// canonical matrix as defense-in-depth against old plugin clients.
+	PermittedCrossDomainPolicies        string
+	DisablePermittedCrossDomainPolicies bool
+
+	// OriginAgentCluster controls Origin-Agent-Cluster. Default: "?1".
+	// This is a structured-headers boolean that requests origin-keyed
+	// agent clusters from supporting browsers (perf + isolation hint).
+	OriginAgentCluster        string
+	DisableOriginAgentCluster bool
+
+	// StripIdentifyingHeaders, when true, removes the Server and
+	// X-Powered-By response headers before the inner handler runs.
+	// Reverse proxies and frameworks frequently set these; stripping them
+	// removes a cheap fingerprinting vector. Defaults to true in every
+	// preset (DefaultOptions, PublicSite, Admin, RESTAPI). Set the
+	// Disable* sibling to opt out explicitly.
+	StripIdentifyingHeaders        bool
+	DisableStripIdentifyingHeaders bool
 }
 
 // HSTSOptions models the Strict-Transport-Security directive components
@@ -113,10 +135,13 @@ func DefaultOptions() Options {
 		ContentTypeOptions: "nosniff",
 		ReferrerPolicy:     "strict-origin-when-cross-origin",
 		// PermissionsPolicy left blank → deny-by-default emitted at runtime.
-		COOP:         "same-origin",
-		COEP:         "require-corp",
-		CORP:         "same-site",
-		FrameOptions: "DENY",
+		COOP:                         "same-origin",
+		COEP:                         "require-corp",
+		CORP:                         "same-site",
+		FrameOptions:                 "DENY",
+		PermittedCrossDomainPolicies: "none",
+		OriginAgentCluster:           "?1",
+		StripIdentifyingHeaders:      true,
 	}
 }
 
@@ -236,12 +261,39 @@ func Headers(opts Options) func(http.Handler) http.Handler {
 		}
 		headers = append(headers, resolved{"X-Frame-Options", v})
 	}
+	if !opts.DisablePermittedCrossDomainPolicies {
+		v := opts.PermittedCrossDomainPolicies
+		if v == "" {
+			v = "none"
+		}
+		headers = append(headers, resolved{"X-Permitted-Cross-Domain-Policies", v})
+	}
+	if !opts.DisableOriginAgentCluster {
+		v := opts.OriginAgentCluster
+		if v == "" {
+			v = "?1"
+		}
+		headers = append(headers, resolved{"Origin-Agent-Cluster", v})
+	}
+
+	// stripIdentifying captures whether the middleware should delete the
+	// Server / X-Powered-By headers before invoking the inner handler.
+	// We resolve once at construction time so the hot path is branch-free.
+	stripIdentifying := opts.StripIdentifyingHeaders && !opts.DisableStripIdentifyingHeaders
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			h := w.Header()
 			for _, hdr := range headers {
 				h.Set(hdr.key, hdr.value)
+			}
+			if stripIdentifying {
+				// Delete before next runs so a downstream handler that
+				// re-sets them wins; this is the documented contract
+				// ("the middleware writes, it does not lock"). Callers who
+				// need a hard guarantee should wrap the response writer.
+				h.Del("Server")
+				h.Del("X-Powered-By")
 			}
 			next.ServeHTTP(w, r)
 		})
