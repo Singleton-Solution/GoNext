@@ -328,6 +328,12 @@ func (s *MemoryStore) Prune(_ context.Context, postID uuid.UUID, retention Reten
 
 	for _, id := range ids {
 		r := s.revisions[id]
+		// Permanent revisions short-circuit every cap. The Pruner
+		// (pruner.go) makes the same promise for the cross-entity
+		// retention sweep; this is the per-post twin.
+		if r.IsPermanent {
+			continue
+		}
 		if policy.MinKeepAll > 0 && now.Sub(r.CreatedAt) < policy.MinKeepAll {
 			continue // exempt from count caps; still subject to MaxAgeAutosave below
 		}
@@ -364,6 +370,9 @@ func (s *MemoryStore) Prune(_ context.Context, postID uuid.UUID, retention Reten
 		for _, id := range ids {
 			r := s.revisions[id]
 			if r.Kind != Autosave {
+				continue
+			}
+			if r.IsPermanent {
 				continue
 			}
 			if now.Sub(r.CreatedAt) >= policy.MaxAgeAutosave {

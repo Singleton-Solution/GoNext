@@ -12,6 +12,7 @@ import (
 
 	"github.com/Singleton-Solution/GoNext/cli/gonext/cmd/migrate"
 	"github.com/Singleton-Solution/GoNext/cli/gonext/cmd/plugin"
+	"github.com/Singleton-Solution/GoNext/cli/gonext/cmd/revisions"
 	"github.com/Singleton-Solution/GoNext/cli/gonext/cmd/theme"
 	"github.com/Singleton-Solution/GoNext/packages/go/buildinfo"
 )
@@ -35,6 +36,8 @@ func main() {
 		os.Exit(plugin.RunOS(args[1:]))
 	case args[0] == "migrate":
 		os.Exit(migrate.RunOS(args[1:]))
+	case args[0] == "revisions":
+		os.Exit(revisions.RunOS(args[1:]))
 	default:
 		fmt.Fprintf(os.Stderr, "gonext: unknown command %q\n\n%s\n", args[0], usage)
 		os.Exit(2)
@@ -52,12 +55,14 @@ Commands (planned):
   plugin     Manage plugins (install, activate, list, dev, test)
   theme      Manage themes (install, activate, test)
   migrate    Run database migrations or import from WordPress
+  revisions  Manage block-editor revision history
   jobs       Inspect and manage background jobs (queue, failed, drain, cron)
   bench      Run synthetic performance benchmarks
   version    Print version information
 
 Available now:
-  migrate     Apply / roll back / inspect database migrations
-  plugin test Run the plugin contract checks against a bundle
-  theme test  Run the theme contract suite against a theme on disk
-  version     Print build info`
+  migrate           Apply / roll back / inspect database migrations
+  plugin test       Run the plugin contract checks against a bundle
+  theme test        Run the theme contract suite against a theme on disk
+  revisions prune   Apply retention policy to post_revisions
+  version           Print build info`

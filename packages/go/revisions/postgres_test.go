@@ -154,11 +154,12 @@ func itoa(i int) string {
 // Layout MUST match selectByIDSQL / listSQL / latestByKindSQL:
 //
 //	id, post_id, author_id, created_at, kind, title, excerpt,
-//	content_blocks_hash, delta_from, delta, snapshot, comment
+//	content_blocks_hash, delta_from, delta, snapshot, comment,
+//	is_permanent
 func scanRevisionResponse(r Revision) func(dest ...any) error {
 	return func(dest ...any) error {
-		if len(dest) != 12 {
-			return errors.New("scanRevisionResponse: expected 12 destinations")
+		if len(dest) != 13 {
+			return errors.New("scanRevisionResponse: expected 13 destinations")
 		}
 		*dest[0].(*string) = r.ID.String()
 		*dest[1].(*string) = r.PostID.String()
@@ -180,6 +181,7 @@ func scanRevisionResponse(r Revision) func(dest ...any) error {
 		*dest[9].(*[]byte) = []byte(r.Delta)
 		*dest[10].(*[]byte) = []byte(r.Snapshot)
 		*dest[11].(*string) = r.Comment
+		*dest[12].(*bool) = r.IsPermanent
 		return nil
 	}
 }
@@ -715,6 +717,7 @@ func TestPostgresStore_Prune_DeletesMarkedRows(t *testing.T) {
 			*dest[3].(*RevisionKind) = r.kind
 			*dest[4].(*bool) = r.isSnapshot
 			*dest[5].(*string) = ""
+			*dest[6].(*bool) = r.isPermanent
 			return nil
 		}
 	}

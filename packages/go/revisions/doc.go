@@ -4,7 +4,8 @@
 // of the editable fields or as an RFC 6902 JSON Patch against an earlier
 // snapshot. The package owns the read path (Get / List / Latest /
 // Materialize), the write path (Save with auto snapshot-vs-delta
-// decision), and the retention sweep (Prune).
+// decision), the per-post retention sweep (Prune), and the
+// cross-entity retention pruner (Pruner — see pruner.go, issue #169).
 //
 // See docs/01-core-cms.md §4 for the product semantics (autosave UPSERT,
 // retention table, restoration rules) and §10.6 for the SQL DDL. The
@@ -100,6 +101,20 @@
 // MaxPublish > 0 if you want a cap). Snapshots that are still
 // referenced by un-pruned deltas are retained even if older — the
 // sweep does a reachability check, not a naive age delete.
+//
+// Revisions with IsPermanent=true are exempt from every cap and
+// every age check. The flag is the operator-facing pin for legal
+// holds, "first published" milestones, or any revision the editor
+// lets a user mark as permanent. Default false.
+//
+// # Cross-entity Pruner
+//
+// Pruner (pruner.go, issue #169) is the operator-facing retention
+// sweep. It enumerates posts via a PostLister, then applies the
+// per-post retention via Store.Prune (or PruneLocked for the
+// concurrency-safe FOR UPDATE SKIP LOCKED variant). Returns a Stats
+// report with Scanned, Deleted, Skipped, Duration. The CLI surface
+// is `gonext revisions prune` (cli/gonext/cmd/revisions).
 //
 // # Typical wiring
 //
