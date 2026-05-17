@@ -1,0 +1,6 @@
+{
+  "apiVersion": "gonext.io/v2",
+  "name": "gn-seo",
+  "version": "1.0.0",
+  "entry": "plugin.wasm"
+}

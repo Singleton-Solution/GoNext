@@ -1,0 +1,16 @@
+{
+  "apiVersion": "gonext.io/v1",
+  "name": "gn-seo",
+  "version": "2.3.1-rc.1+build.42",
+  "entry": "build/plugin.wasm",
+  "capabilities": ["kv.read", "kv.write", "audit.emit", "http.fetch"],
+  "hooks": {
+    "actions": ["post.published", "user.registered"],
+    "filters": ["the_content", "post.title"]
+  },
+  "jobs": ["gn-seo.sitemap-refresh", "gn-seo.broken-link-scan"],
+  "requires": {
+    "host": ">=1.0.0 <2.0.0"
+  },
+  "signature": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+}

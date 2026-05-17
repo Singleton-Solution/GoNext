@@ -1,0 +1,7 @@
+{
+  "apiVersion": "gonext.io/v1",
+  "name": "gn-seo",
+  "version": "1.0.0",
+  "entry": "plugin.wasm",
+  "capabilities": ["KV.READ", "kv read"]
+}
