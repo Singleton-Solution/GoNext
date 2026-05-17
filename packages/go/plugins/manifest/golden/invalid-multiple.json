@@ -1,0 +1,6 @@
+{
+  "apiVersion": "wrong",
+  "name": "Bad_Name",
+  "version": "not-semver",
+  "entry": "../etc/passwd"
+}

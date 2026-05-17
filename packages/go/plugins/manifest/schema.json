@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gonext.io/schemas/plugins/manifest.json",
+  "title": "GoNext Plugin Manifest (gonext.io/v1)",
+  "description": "JSON Schema for the manifest.json shipped inside every .gnplugin bundle. The Install path validates against this schema before any storage write or runtime load. See docs/02-plugin-system.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "name", "version", "entry"],
+  "properties": {
+    "apiVersion": {
+      "description": "Manifest API version. Only one literal is recognised today; future schema revisions will land as a sibling schema with a new literal.",
+      "type": "string",
+      "const": "gonext.io/v1"
+    },
+    "name": {
+      "description": "Platform-unique plugin slug. Lowercase ASCII start, lowercase ASCII + digits + hyphens after, 3..41 chars. Mirrors lifecycle.slugRegex so storage and validator agree.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{2,40}$"
+    },
+    "version": {
+      "description": "Plugin version. Strict Semantic Versioning 2.0.0 — MAJOR.MINOR.PATCH with optional pre-release and build metadata.",
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$"
+    },
+    "entry": {
+      "description": "Path inside the bundle to the WASM module the runtime will instantiate. POSIX-style, no leading slash, no parent traversal.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.\\-/]+\\.wasm$",
+      "not": { "pattern": "(^|/)\\.\\.(/|$)" }
+    },
+    "capabilities": {
+      "description": "Capabilities the plugin requests from the host. Each entry is a dotted token drawn from the platform capability catalog (e.g. \"kv.read\", \"audit.emit\"). Operators see this list at install time before activating.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9]*)*$"
+      }
+    },
+    "hooks": {
+      "description": "Actions and filters the plugin subscribes to. Action hooks are fire-and-forget; filter hooks transform a value through the pipeline.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "actions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)*$"
+          }
+        },
+        "filters": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)*$"
+          }
+        }
+      }
+    },
+    "jobs": {
+      "description": "Background TaskSpec ids the plugin owns. Validated as a flat list of dotted ids; the scheduler resolves them against its registry at activation time.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)*$"
+      }
+    },
+    "requires": {
+      "description": "Compatibility requirements expressed as semver ranges. Today only the host range is recognised; future fields (abi, runtime) will land here.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host"],
+      "properties": {
+        "host": {
+          "description": "Semver range the platform must satisfy. Accepts the npm-style operators (^, ~, >=, etc.) used by the resolver.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[~^>=<*0-9A-Za-z.\\-+ ,|]+$"
+        }
+      }
+    },
+    "signature": {
+      "description": "Detached ed25519 signature over the canonical bundle bytes, lowercase hex. Optional in v1 because the registry handles signing centrally; unsigned bundles are rejected by the operator-side install gate.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{128}$"
+    }
+  }
+}

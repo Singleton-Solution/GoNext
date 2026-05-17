@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Singleton-Solution/GoNext/packages/go/audit"
+	"github.com/Singleton-Solution/GoNext/packages/go/plugins/manifest"
 )
 
 // slugRegex enforces the manifest slug shape documented in
@@ -241,30 +242,41 @@ func (m *Manager) Install(ctx context.Context, bundle io.Reader) (string, error)
 		return "", fmt.Errorf("lifecycle: Install: bundle reader is required")
 	}
 
-	manifest, err := readManifestFromBundle(bundle)
+	manifestData, err := readManifestFromBundle(bundle)
 	if err != nil {
 		return "", fmt.Errorf("lifecycle: Install: %w", err)
 	}
 
-	if !slugRegex.MatchString(manifest.Slug) {
-		return "", fmt.Errorf("lifecycle: Install: invalid slug %q (must match %s)",
-			manifest.Slug, slugRegex.String())
+	// gonext.io/v1 manifests get the full JSON Schema validation pass
+	// (issue #34). Legacy manifests that don't declare apiVersion fall
+	// through to the cheap structural checks below — they predate the
+	// schema and the bundle parser (#44) will retire the legacy path
+	// once every plugin in the registry has been re-cut.
+	if declaresAPIVersion(manifestData.Raw) {
+		if _, vErr := manifest.Validate(manifestData.Raw); vErr != nil {
+			return "", fmt.Errorf("lifecycle: Install: %w", vErr)
+		}
 	}
-	if manifest.Version == "" {
+
+	if !slugRegex.MatchString(manifestData.Slug) {
+		return "", fmt.Errorf("lifecycle: Install: invalid slug %q (must match %s)",
+			manifestData.Slug, slugRegex.String())
+	}
+	if manifestData.Version == "" {
 		return "", fmt.Errorf("lifecycle: Install: manifest version is required")
 	}
-	if manifest.ABIVersion <= 0 {
+	if manifestData.ABIVersion <= 0 {
 		return "", fmt.Errorf("lifecycle: Install: manifest abi_version must be > 0 (got %d)",
-			manifest.ABIVersion)
+			manifestData.ABIVersion)
 	}
 
-	caps := extractCapabilityNames(manifest.Capabilities)
+	caps := extractCapabilityNames(manifestData.Capabilities)
 
 	plugin := Plugin{
-		Slug:         manifest.Slug,
-		Version:      manifest.Version,
-		ABIVersion:   manifest.ABIVersion,
-		Manifest:     manifest.Raw,
+		Slug:         manifestData.Slug,
+		Version:      manifestData.Version,
+		ABIVersion:   manifestData.ABIVersion,
+		Manifest:     manifestData.Raw,
 		State:        StateInstalled,
 		Capabilities: caps,
 		InstalledAt:  m.now().UTC(),
@@ -512,6 +524,36 @@ func (m *Manager) audit(ctx context.Context, slug, eventType string, sev audit.S
 			slog.String("err", err.Error()),
 		)
 	}
+}
+
+// declaresAPIVersion reports whether the raw manifest bytes carry an
+// apiVersion key (regardless of value). It is the cheap structural
+// switch gating the call into the manifest package: legacy fixtures
+// that predate the apiVersion field don't set it, and we want to leave
+// them on the old structural checks until #44 retires the legacy path.
+//
+// Crucially, we route into the schema validator even when the value is
+// the *wrong* literal — that lets the schema's const check produce a
+// proper "apiVersion must be gonext.io/v1" error instead of letting the
+// manifest sneak past the gate and trip an unrelated downstream check.
+//
+// We decode into a tiny anonymous struct rather than into manifest.Manifest
+// because we don't want declaresAPIVersion to inherit the strict-schema
+// surface — it must succeed on bytes that don't satisfy the v1 schema
+// at all (the schema validator is what reports the failure).
+func declaresAPIVersion(raw []byte) bool {
+	if len(raw) == 0 {
+		return false
+	}
+	var probe struct {
+		APIVersion *string `json:"apiVersion"`
+	}
+	if err := json.Unmarshal(raw, &probe); err != nil {
+		// Malformed JSON is not our problem here — the typed decode in
+		// readManifestFromBundle will surface the parse error.
+		return false
+	}
+	return probe.APIVersion != nil
 }
 
 // readManifestFromBundle pulls manifest.json out of a .gnplugin ZIP and
