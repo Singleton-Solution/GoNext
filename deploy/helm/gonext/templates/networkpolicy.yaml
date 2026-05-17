@@ -1,0 +1,192 @@
+{{- if .Values.networkPolicy.enabled -}}
+# -----------------------------------------------------------------------------
+# Default-deny baseline.
+#
+# Selects every Pod in the namespace and admits NO traffic ingress or egress.
+# All further policies in this file ADD allows on top. NetworkPolicy semantics
+# are union-additive: each rule is OR'd with the others.
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "gonext.fullname" . }}-default-deny
+  labels:
+    {{- include "gonext.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# -----------------------------------------------------------------------------
+# DNS egress — required by virtually every other rule.
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "gonext.fullname" . }}-allow-dns
+  labels:
+    {{- include "gonext.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# -----------------------------------------------------------------------------
+# Ingress controller → public-web, admin-web, core-api.
+# Assumes the ingress controller runs in `ingress-nginx`. Adjust namespace
+# selector if you use a different controller.
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "gonext.fullname" . }}-allow-ingress
+  labels:
+    {{- include "gonext.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: ["api", "web", "admin"]
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 3000
+---
+# -----------------------------------------------------------------------------
+# web/admin/worker → core-api (the worker hits the API for ISR webhook
+# back-edges; web/admin hit it for data).
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "gonext.fullname" . }}-allow-web-to-api
+  labels:
+    {{- include "gonext.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: api
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values: ["web", "admin", "worker"]
+              - key: app.kubernetes.io/instance
+                operator: In
+                values: [{{ .Release.Name | quote }}]
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# -----------------------------------------------------------------------------
+# core-api → public-web (ISR revalidate webhook).
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "gonext.fullname" . }}-allow-api-to-web
+  labels:
+    {{- include "gonext.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: web
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: api
+              app.kubernetes.io/instance: {{ .Release.Name }}
+      ports:
+        - protocol: TCP
+          port: 3000
+---
+# -----------------------------------------------------------------------------
+# api/worker/cron → Postgres (5432) and Redis (6379).
+# Uses unrestricted egress on those ports because the DB/cache may live in
+# a different namespace, in-cluster subchart, or external CIDR. Tighten by
+# adding a `to:` selector for your actual data plane.
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "gonext.fullname" . }}-allow-api-egress-data
+  labels:
+    {{- include "gonext.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: ["api", "worker", "cron"]
+      - key: app.kubernetes.io/instance
+        operator: In
+        values: [{{ .Release.Name | quote }}]
+  policyTypes:
+    - Egress
+  egress:
+    # Postgres
+    - ports:
+        - protocol: TCP
+          port: 5432
+    # Redis
+    - ports:
+        - protocol: TCP
+          port: 6379
+    # api needs to egress to web for ISR revalidate.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: web
+              app.kubernetes.io/instance: {{ .Release.Name }}
+      ports:
+        - protocol: TCP
+          port: 3000
+{{- with .Values.networkPolicy.externalEgress }}
+    # User-configured external egress (S3, SMTP, CDN webhooks).
+    {{- range . }}
+    - to:
+        - ipBlock:
+            cidr: {{ .cidr | quote }}
+            {{- with .except }}
+            except:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+      {{- with .ports }}
+      ports:
+        {{- range . }}
+        - protocol: TCP
+          port: {{ . }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+{{- end }}
+{{- end -}}

@@ -1,0 +1,43 @@
+{{- if and .Values.worker.enabled .Values.worker.hpa.enabled -}}
+# -----------------------------------------------------------------------------
+# Worker autoscaling — KEDA ScaledObject on Asynq queue depth.
+#
+# This resource depends on the KEDA operator + CRDs (`keda.sh/v1alpha1`).
+# It is OFF by default. To enable:
+#
+#   1. Install KEDA: https://keda.sh/docs/latest/deploy/
+#   2. Make sure an Asynq exporter (doc 10) is publishing
+#      `asynq_queue_depth{queue="..."}` to Prometheus.
+#   3. Point `worker.hpa.prometheusServerAddress` at your Prom instance.
+#   4. Set `worker.hpa.enabled=true` and customise `worker.hpa.triggers`.
+#
+# Without KEDA installed, this manifest will fail to apply — that is
+# intentional. The worker still scales statically via `worker.replicaCount`.
+# -----------------------------------------------------------------------------
+{{- $component := "worker" -}}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "gonext.componentFullname" (dict "ctx" . "component" $component) }}
+  labels:
+    {{- include "gonext.componentLabels" (dict "ctx" . "component" $component) | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "gonext.componentFullname" (dict "ctx" . "component" $component) }}
+  minReplicaCount: {{ .Values.worker.hpa.minReplicas }}
+  maxReplicaCount: {{ .Values.worker.hpa.maxReplicas }}
+  pollingInterval: {{ .Values.worker.hpa.pollingInterval }}
+  cooldownPeriod: {{ .Values.worker.hpa.cooldownPeriod }}
+  triggers:
+    {{- range $queue, $cfg := .Values.worker.hpa.triggers }}
+    - type: prometheus
+      metadata:
+        serverAddress: {{ $.Values.worker.hpa.prometheusServerAddress | quote }}
+        metricName: asynq_queue_depth_{{ $queue }}
+        threshold: {{ $cfg.threshold | quote }}
+        query: |
+          sum(asynq_queue_depth{queue="{{ $queue }}"})
+    {{- end }}
+{{- end -}}

@@ -1,0 +1,228 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GoNext Helm values",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "global": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "imageRegistry": { "type": "string" },
+        "imagePullSecrets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "name": { "type": "string" } },
+            "required": ["name"]
+          }
+        }
+      }
+    },
+    "nameOverride": { "type": "string" },
+    "fullnameOverride": { "type": "string" },
+    "serviceAccount": {
+      "type": "object",
+      "properties": {
+        "create": { "type": "boolean" },
+        "name": { "type": "string" },
+        "annotations": { "type": "object" }
+      }
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "extraConfig": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "secrets": {
+      "type": "object",
+      "properties": {
+        "create": { "type": "boolean" },
+        "existingSecret": { "type": "string" },
+        "data": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "required": ["create"]
+    },
+    "api": { "$ref": "#/$defs/coreComponent" },
+    "worker": {
+      "allOf": [{ "$ref": "#/$defs/coreComponent" }],
+      "type": "object",
+      "properties": {
+        "hpa": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "minReplicas": { "type": "integer", "minimum": 0 },
+            "maxReplicas": { "type": "integer", "minimum": 1 },
+            "pollingInterval": { "type": "integer", "minimum": 1 },
+            "cooldownPeriod": { "type": "integer", "minimum": 0 },
+            "prometheusServerAddress": { "type": "string" },
+            "triggers": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "threshold": { "type": "string" }
+                },
+                "required": ["threshold"]
+              }
+            }
+          },
+          "required": ["enabled"]
+        }
+      }
+    },
+    "cron": { "$ref": "#/$defs/coreComponent" },
+    "web": {
+      "allOf": [{ "$ref": "#/$defs/webComponent" }]
+    },
+    "admin": {
+      "allOf": [{ "$ref": "#/$defs/webComponent" }]
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "className": { "type": "string" },
+        "annotations": { "type": "object" },
+        "publicHost": { "type": "string" },
+        "adminHost": { "type": "string" },
+        "tls": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "secretName": { "type": "string" }
+          },
+          "required": ["enabled"]
+        }
+      },
+      "required": ["enabled"]
+    },
+    "networkPolicy": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "dnsServiceCIDR": { "type": "string" },
+        "externalEgress": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "cidr": { "type": "string" },
+              "except": { "type": "array", "items": { "type": "string" } },
+              "ports": { "type": "array", "items": { "type": "integer" } }
+            },
+            "required": ["cidr"]
+          }
+        }
+      },
+      "required": ["enabled"]
+    },
+    "postgresql": { "type": "object" },
+    "redis": { "type": "object" },
+    "minio": { "type": "object" }
+  },
+  "required": ["api", "worker", "cron", "web", "admin"],
+
+  "$defs": {
+    "imageSpec": {
+      "type": "object",
+      "properties": {
+        "repository": { "type": "string" },
+        "tag": { "type": "string" },
+        "pullPolicy": {
+          "type": "string",
+          "enum": ["Always", "IfNotPresent", "Never"]
+        }
+      },
+      "required": ["repository"]
+    },
+    "resourceSpec": {
+      "type": "object",
+      "properties": {
+        "requests": {
+          "type": "object",
+          "properties": {
+            "cpu":    { "type": ["string", "number"] },
+            "memory": { "type": "string" }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "cpu":    { "type": ["string", "number"] },
+            "memory": { "type": "string" }
+          }
+        }
+      }
+    },
+    "coreComponent": {
+      "type": "object",
+      "properties": {
+        "enabled":      { "type": "boolean" },
+        "replicaCount": { "type": "integer", "minimum": 0 },
+        "image":        { "$ref": "#/$defs/imageSpec" },
+        "args":         { "type": "array", "items": { "type": "string" } },
+        "resources":    { "$ref": "#/$defs/resourceSpec" },
+        "terminationGracePeriodSeconds": { "type": "integer", "minimum": 0 },
+        "podSecurityContext":       { "type": "object" },
+        "containerSecurityContext": { "type": "object" },
+        "livenessProbe":            { "type": "object" },
+        "readinessProbe":           { "type": "object" },
+        "preStopCommand":           { "type": "array", "items": { "type": "string" } },
+        "nodeSelector":             { "type": "object" },
+        "tolerations":              { "type": "array" },
+        "affinity":                 { "type": "object" },
+        "podAnnotations":           { "type": "object" }
+      },
+      "required": ["enabled", "image"]
+    },
+    "webComponent": {
+      "type": "object",
+      "properties": {
+        "enabled":      { "type": "boolean" },
+        "replicaCount": { "type": "integer", "minimum": 0 },
+        "image":        { "$ref": "#/$defs/imageSpec" },
+        "service": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string" },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "annotations": { "type": "object" }
+          }
+        },
+        "extraEnv":   { "type": "array" },
+        "resources":  { "$ref": "#/$defs/resourceSpec" },
+        "terminationGracePeriodSeconds": { "type": "integer", "minimum": 0 },
+        "podSecurityContext":       { "type": "object" },
+        "containerSecurityContext": { "type": "object" },
+        "livenessProbe":            { "type": "object" },
+        "readinessProbe":           { "type": "object" },
+        "preStopCommand":           { "type": "array", "items": { "type": "string" } },
+        "hpa": {
+          "type": "object",
+          "properties": {
+            "enabled":     { "type": "boolean" },
+            "minReplicas": { "type": "integer", "minimum": 0 },
+            "maxReplicas": { "type": "integer", "minimum": 1 },
+            "targetCPUUtilizationPercentage": { "type": "integer", "minimum": 1, "maximum": 100 }
+          }
+        },
+        "pdb": {
+          "type": "object",
+          "properties": {
+            "enabled":      { "type": "boolean" },
+            "minAvailable": { "type": ["integer", "string"] }
+          }
+        }
+      },
+      "required": ["enabled", "image"]
+    }
+  }
+}

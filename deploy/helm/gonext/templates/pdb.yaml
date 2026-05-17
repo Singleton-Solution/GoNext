@@ -1,0 +1,27 @@
+{{- if and .Values.api.enabled .Values.api.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "gonext.componentFullname" (dict "ctx" . "component" "api") }}
+  labels:
+    {{- include "gonext.componentLabels" (dict "ctx" . "component" "api") | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.api.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "gonext.componentSelectorLabels" (dict "ctx" . "component" "api") | nindent 6 }}
+{{- end }}
+{{- if and .Values.web.enabled .Values.web.pdb.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "gonext.componentFullname" (dict "ctx" . "component" "web") }}
+  labels:
+    {{- include "gonext.componentLabels" (dict "ctx" . "component" "web") | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.web.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "gonext.componentSelectorLabels" (dict "ctx" . "component" "web") | nindent 6 }}
+{{- end }}

@@ -1,0 +1,615 @@
+# Default values for the GoNext Helm chart.
+#
+# This file intentionally ships SAFE, NON-PROD defaults. Everything that
+# matters for production (replica counts, resource limits, hosts, TLS,
+# secrets) is parameterised. Override per environment with --values or
+# --set.
+#
+# Section index:
+#   global       — cluster-wide knobs (namespace, image registry, pull secrets)
+#   serviceAccount — RBAC identity for all GoNext pods
+#   config       — non-secret env values projected into the ConfigMap
+#   secrets      — secret material projected into the Secret (or referenced)
+#   api          — core-api Deployment, Service, HPA, PDB
+#   worker       — core-worker Deployment, HPA (KEDA queue depth)
+#   cron         — core-cron Deployment (single leader, Redis lease)
+#   web          — public-web Deployment, Service, HPA, PDB
+#   admin        — admin-web Deployment, Service
+#   ingress      — single Ingress fronting public-web, admin-web, core-api
+#   networkPolicy — default-deny + selective allow rules
+#   postgresql / redis / minio — optional Bitnami subcharts, default OFF
+
+# --------------------------------------------------------------------------
+# global
+# --------------------------------------------------------------------------
+global:
+  # Image registry used as a prefix for all GoNext images unless an image
+  # block overrides it. Leave empty to use full image paths from each
+  # component's image.repository.
+  imageRegistry: ""
+
+  # Image pull secrets attached to every Pod (and the ServiceAccount).
+  imagePullSecrets: []
+  # - name: ghcr-pull-secret
+
+# --------------------------------------------------------------------------
+# nameOverride / fullnameOverride
+# --------------------------------------------------------------------------
+# Override the chart name suffix used in resource names. Useful when
+# running multiple chart instances in one namespace.
+nameOverride: ""
+fullnameOverride: ""
+
+# --------------------------------------------------------------------------
+# serviceAccount
+# --------------------------------------------------------------------------
+serviceAccount:
+  # Create a ServiceAccount for GoNext pods. Set to false to use the
+  # cluster default or a pre-existing SA.
+  create: true
+  name: ""
+  annotations: {}
+  # eks.amazonaws.com/role-arn: arn:aws:iam::123:role/gonext-irsa
+
+# --------------------------------------------------------------------------
+# config — projected into a ConfigMap and envFrom'd by all GoNext pods.
+# --------------------------------------------------------------------------
+# Mirror the env surface from packages/go/config/. Each key here is
+# emitted into the ConfigMap as-is. Add/remove freely.
+config:
+  # Deployment environment. development | staging | production | test.
+  GONEXT_ENV: production
+
+  # HTTP listener for core-api. Containers expose 8080.
+  GONEXT_SERVER_ADDR: ":8080"
+  GONEXT_SERVER_READ_HEADER_TIMEOUT: "5s"
+  GONEXT_SERVER_READ_TIMEOUT: "15s"
+  GONEXT_SERVER_WRITE_TIMEOUT: "30s"
+  GONEXT_SERVER_IDLE_TIMEOUT: "60s"
+  GONEXT_SERVER_SHUTDOWN_TIMEOUT: "30s"
+  GONEXT_SERVER_MAX_HEADER_BYTES: "1048576"
+
+  # Comma-separated CIDRs trusted to set X-Forwarded-* headers. Empty =
+  # trust no upstream (in-cluster only). Set to the ingress-controller
+  # pod CIDR if you front via nginx/envoy.
+  GONEXT_TRUSTED_PROXIES: ""
+
+  # Logging.
+  GONEXT_LOG_LEVEL: "INFO"
+  GONEXT_LOG_FORMAT: "json"
+  GONEXT_LOG_ADDSRC: "false"
+
+  # Database pool tuning. URL is in the secret.
+  GONEXT_DB_MAX_OPEN_CONNS: "25"
+  GONEXT_DB_MAX_IDLE_CONNS: "5"
+  GONEXT_DB_CONN_MAX_LIFETIME: "30m"
+  GONEXT_DB_CONN_MAX_IDLE_TIME: "5m"
+  GONEXT_DB_STATEMENT_TIMEOUT: "30s"
+  GONEXT_MIGRATION_DIR: "/app/migrations"
+
+  # Redis pool tuning. URL is in the secret.
+  GONEXT_REDIS_POOL_SIZE: "20"
+  GONEXT_REDIS_MIN_IDLE_CONNS: "2"
+  GONEXT_REDIS_DIAL_TIMEOUT: "5s"
+  GONEXT_REDIS_READ_TIMEOUT: "3s"
+  GONEXT_REDIS_WRITE_TIMEOUT: "3s"
+
+  # Object storage. Keys go in the secret.
+  GONEXT_S3_BUCKET: "gonext-media"
+  GONEXT_S3_REGION: "us-east-1"
+  GONEXT_S3_ENDPOINT: ""        # empty = AWS default; set for MinIO/R2/etc.
+  GONEXT_S3_USE_SSL: "true"
+  GONEXT_S3_PATH_STYLE: "false" # true for MinIO
+
+  # Auth timings (secrets themselves live in the Secret).
+  GONEXT_AUTH_SESSION_TTL: "720h"      # 30d
+  GONEXT_AUTH_SESSION_IDLE_TTL: "168h" # 7d
+
+  # Worker queue weights (consumed by core-worker only; harmless on others).
+  DONEXT_WORKER_QUEUES: "default=6,media=4,invalidation=2,migrate=2,webhooks=2"
+
+  # Cron leader lease.
+  DONEXT_CRON_LEASE_KEY: "gonext:cron:leader"
+  DONEXT_CRON_LEASE_TTL: "15s"
+
+# Free-form additional ConfigMap entries layered on top of `config`.
+extraConfig: {}
+
+# --------------------------------------------------------------------------
+# secrets
+# --------------------------------------------------------------------------
+secrets:
+  # If `create: true`, the chart renders a Secret from the values below.
+  # If false, the chart skips it and assumes a pre-existing Secret named
+  # `existingSecret`. Production setups should bring their own (SOPS,
+  # external-secrets, vault) and set create=false.
+  create: true
+
+  # Name of an existing Secret to envFrom. Used when secrets.create=false.
+  # Defaults to "<release>-secrets" when empty.
+  existingSecret: ""
+
+  # Secret material. When create=true, these are projected as plain strings.
+  # Recommended pattern: supply via --set-string or sealed-secrets and
+  # leave the defaults empty/placeholder.
+  data:
+    # Postgres DSN. postgres://user:pass@host:5432/db?sslmode=require
+    GONEXT_DATABASE_URL: ""
+
+    # Redis URL. redis://[:pass@]host:6379/0
+    GONEXT_REDIS_URL: ""
+
+    # Auth secrets — REQUIRED, each ≥ 32 bytes after base64-decode.
+    # docs/13-security-baseline.md §5 enforces entropy at boot.
+    GONEXT_AUTH_PEPPER: ""
+    GONEXT_AUTH_SESSION_SECRET: ""
+    GONEXT_AUTH_CSRF_SECRET: ""
+
+    # S3 credentials. Leave blank when using IRSA / workload identity.
+    GONEXT_S3_ACCESS_KEY: ""
+    GONEXT_S3_SECRET_KEY: ""
+
+# --------------------------------------------------------------------------
+# api — core-api Deployment, Service, HPA, PDB
+# --------------------------------------------------------------------------
+api:
+  enabled: true
+  replicaCount: 3
+
+  image:
+    repository: ghcr.io/gonext/gonext-core
+    tag: ""           # falls back to .Chart.AppVersion when empty
+    pullPolicy: IfNotPresent
+
+  # Command/args passed to the core image. The dev binary entrypoint is
+  # `/gonext`; the args choose the mode.
+  args: ["serve", "api"]
+
+  service:
+    type: ClusterIP
+    port: 8080
+    metricsPort: 9090
+    annotations: {}
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 1Gi
+
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /readyz
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    failureThreshold: 2
+
+  # preStop drains the in-flight requests before SIGTERM. Timeout must be
+  # < terminationGracePeriodSeconds.
+  preStopCommand: ["/gonext", "drain", "--timeout=45s"]
+  terminationGracePeriodSeconds: 60
+
+  # Pod-level securityContext (per §4.3 rationale).
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    fsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    capabilities:
+      drop: ["ALL"]
+
+  # writable scratch via emptyDir so readOnlyRootFilesystem stays on.
+  tmpVolume:
+    enabled: true
+    sizeLimit: 256Mi
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+
+  hpa:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+    behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+          - type: Percent
+            value: 25
+            periodSeconds: 60
+      scaleUp:
+        stabilizationWindowSeconds: 0
+        selectPolicy: Max
+        policies:
+          - type: Pods
+            value: 4
+            periodSeconds: 30
+          - type: Percent
+            value: 100
+            periodSeconds: 30
+
+  pdb:
+    enabled: true
+    minAvailable: 2
+
+# --------------------------------------------------------------------------
+# worker — core-worker Deployment
+# --------------------------------------------------------------------------
+worker:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: ghcr.io/gonext/gonext-core
+    tag: ""
+    pullPolicy: IfNotPresent
+
+  args: ["serve", "worker"]
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 1Gi
+
+  # Workers aren't behind a Service — no readinessProbe.
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 8080
+    initialDelaySeconds: 15
+    periodSeconds: 20
+    failureThreshold: 3
+
+  preStopCommand: ["/gonext", "drain", "--timeout=240s"]
+  terminationGracePeriodSeconds: 300
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    fsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    capabilities:
+      drop: ["ALL"]
+
+  tmpVolume:
+    enabled: true
+    sizeLimit: 512Mi
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+
+  # KEDA-based autoscaling on Asynq queue depth. Disabled by default —
+  # requires KEDA CRDs installed in the cluster. When disabled, scale
+  # the worker via the static replicaCount above.
+  hpa:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 20
+    # Pollinterval and cooldown for ScaledObject.
+    pollingInterval: 30
+    cooldownPeriod: 300
+    # Trigger queue list. Each queue→threshold maps to one Prometheus
+    # query against the Asynq exporter. See docs/12-jobs-cron.md.
+    triggers:
+      default:
+        threshold: "50"
+      media:
+        threshold: "20"
+    prometheusServerAddress: "http://prometheus.monitoring.svc.cluster.local:9090"
+
+# --------------------------------------------------------------------------
+# cron — core-cron Deployment (single replica, Redis lease for HA-via-lease)
+# --------------------------------------------------------------------------
+cron:
+  enabled: true
+  # Per §4.7: two replicas with leader election via Redis. We default to
+  # 2 so a node loss doesn't kill the leader for the full TTL.
+  replicaCount: 2
+
+  image:
+    repository: ghcr.io/gonext/gonext-core
+    tag: ""
+    pullPolicy: IfNotPresent
+
+  args: ["serve", "cron"]
+
+  # `Recreate` so the lease flips cleanly on rollouts.
+  strategy:
+    type: Recreate
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 8080
+    initialDelaySeconds: 10
+    periodSeconds: 20
+    failureThreshold: 3
+
+  preStopCommand: ["/gonext", "drain", "--timeout=15s"]
+  terminationGracePeriodSeconds: 30
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    fsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    capabilities:
+      drop: ["ALL"]
+
+  tmpVolume:
+    enabled: true
+    sizeLimit: 64Mi
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+
+# --------------------------------------------------------------------------
+# web — public-web Deployment + Service + HPA + PDB
+# --------------------------------------------------------------------------
+web:
+  enabled: true
+  replicaCount: 3
+
+  image:
+    repository: ghcr.io/gonext/gonext-web
+    tag: ""
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 3000
+    annotations: {}
+
+  # Extra env layered on the per-pod env block.
+  extraEnv:
+    - name: DONEXT_WEB_APP
+      value: "public"
+
+  resources:
+    requests:
+      cpu: 300m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  livenessProbe:
+    httpGet:
+      path: /api/health
+      port: 3000
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /api/ready
+      port: 3000
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    failureThreshold: 2
+
+  preStopCommand: ["sh", "-c", "sleep 5 && kill -SIGTERM 1"]
+  terminationGracePeriodSeconds: 30
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    capabilities:
+      drop: ["ALL"]
+
+  tmpVolume:
+    enabled: true
+    sizeLimit: 256Mi
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+
+  hpa:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 30
+    targetCPUUtilizationPercentage: 60
+
+  pdb:
+    enabled: true
+    minAvailable: 2
+
+# --------------------------------------------------------------------------
+# admin — admin-web Deployment + Service
+# --------------------------------------------------------------------------
+admin:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: ghcr.io/gonext/gonext-web
+    tag: ""
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 3000
+    annotations: {}
+
+  extraEnv:
+    - name: DONEXT_WEB_APP
+      value: "admin"
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 384Mi
+    limits:
+      cpu: "1"
+      memory: 768Mi
+
+  livenessProbe:
+    httpGet:
+      path: /api/health
+      port: 3000
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /api/ready
+      port: 3000
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    failureThreshold: 2
+
+  preStopCommand: ["sh", "-c", "sleep 5 && kill -SIGTERM 1"]
+  terminationGracePeriodSeconds: 30
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    capabilities:
+      drop: ["ALL"]
+
+  tmpVolume:
+    enabled: true
+    sizeLimit: 256Mi
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+
+# --------------------------------------------------------------------------
+# ingress
+# --------------------------------------------------------------------------
+ingress:
+  enabled: false
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+  # Public site host(s). /, /api, /graphql are routed to web and api.
+  publicHost: example.com
+  # Admin host. / → admin-web, /api → core-api.
+  adminHost: admin.example.com
+  tls:
+    enabled: true
+    secretName: example-com-tls
+
+# --------------------------------------------------------------------------
+# networkPolicy — default-deny + explicit allows.
+# --------------------------------------------------------------------------
+networkPolicy:
+  enabled: false
+
+  # CIDR for kube-dns. Adjust if your cluster runs DNS elsewhere.
+  dnsServiceCIDR: "0.0.0.0/0"
+
+  # External hosts that the cluster gateway lets out (S3, SMTP, CDN).
+  # NetworkPolicy can target arbitrary CIDRs; leave [] to manage egress
+  # at the cluster egress gateway instead.
+  externalEgress: []
+  # - cidr: 0.0.0.0/0
+  #   except: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+  #   ports: [443]
+
+# --------------------------------------------------------------------------
+# postgresql — OPTIONAL Bitnami subchart. Disabled by default.
+# --------------------------------------------------------------------------
+# Production should point GONEXT_DATABASE_URL at a managed DB and leave
+# this disabled. Enable only for kind/minikube smoke tests.
+postgresql:
+  enabled: false
+  auth:
+    username: gonext
+    password: ""           # set via --set-string in non-prod only
+    database: gonext
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+
+# --------------------------------------------------------------------------
+# redis — OPTIONAL Bitnami subchart. Disabled by default.
+# --------------------------------------------------------------------------
+redis:
+  enabled: false
+  architecture: standalone
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: true
+      size: 5Gi
+
+# --------------------------------------------------------------------------
+# minio — OPTIONAL Bitnami subchart. Disabled by default.
+# --------------------------------------------------------------------------
+minio:
+  enabled: false
+  auth:
+    rootUser: gonext
+    rootPassword: ""       # set via --set-string in non-prod only
+  defaultBuckets: "gonext-media"
+  persistence:
+    enabled: true
+    size: 10Gi

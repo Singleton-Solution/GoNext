@@ -1,0 +1,19 @@
+# Helm's default ignore list, plus the usual editor/OS chaff.
+.DS_Store
+.git/
+.gitignore
+.bzr/
+.bzrignore
+.hg/
+.hgignore
+.svn/
+*.swp
+*.bak
+*.tmp
+*.orig
+*.tgz
+*~
+.idea/
+.vscode/
+*.tmproj
+OWNERS

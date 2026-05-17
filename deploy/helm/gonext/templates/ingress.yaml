@@ -1,0 +1,66 @@
+{{- if .Values.ingress.enabled -}}
+{{- $apiName := include "gonext.componentFullname" (dict "ctx" . "component" "api") -}}
+{{- $webName := include "gonext.componentFullname" (dict "ctx" . "component" "web") -}}
+{{- $adminName := include "gonext.componentFullname" (dict "ctx" . "component" "admin") -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "gonext.fullname" . }}
+  labels:
+    {{- include "gonext.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.publicHost }}
+        - {{ .Values.ingress.adminHost }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.publicHost }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $apiName }}
+                port:
+                  number: {{ .Values.api.service.port }}
+          - path: /graphql
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $apiName }}
+                port:
+                  number: {{ .Values.api.service.port }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $webName }}
+                port:
+                  number: {{ .Values.web.service.port }}
+    - host: {{ .Values.ingress.adminHost }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $apiName }}
+                port:
+                  number: {{ .Values.api.service.port }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $adminName }}
+                port:
+                  number: {{ .Values.admin.service.port }}
+{{- end -}}

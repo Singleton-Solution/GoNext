@@ -1,0 +1,52 @@
+apiVersion: v2
+name: gonext
+description: |
+  Helm chart for the GoNext platform — a Kubernetes deployment of the
+  core-api, core-worker, core-cron, public-web, and admin-web services
+  per docs/09-deployment-ops.md §4.
+
+  Postgres, Redis, and MinIO are declared as OPTIONAL Bitnami subcharts;
+  production deployments are expected to point at a managed database and
+  cache and leave the subcharts disabled (see values.yaml).
+type: application
+
+# Chart version (SemVer) — bump on every change to templates/defaults.
+version: 0.1.0
+
+# Default app version shipped by the chart. Per-component overrides live
+# in values.yaml under <component>.image.tag.
+appVersion: "0.1.0"
+
+home: https://github.com/Singleton-Solution/GoNext
+sources:
+  - https://github.com/Singleton-Solution/GoNext
+
+keywords:
+  - gonext
+  - cms
+  - go
+  - nextjs
+
+maintainers:
+  - name: GoNext
+    url: https://github.com/Singleton-Solution/GoNext
+
+# Optional subchart dependencies. Disabled by default — production should
+# use managed Postgres/Redis and external S3. Enable for kind/minikube
+# smoke tests or small self-host installs.
+dependencies:
+  - name: postgresql
+    version: "15.5.x"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: postgresql.enabled
+    alias: postgresql
+  - name: redis
+    version: "20.x.x"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: redis.enabled
+    alias: redis
+  - name: minio
+    version: "14.x.x"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: minio.enabled
+    alias: minio
