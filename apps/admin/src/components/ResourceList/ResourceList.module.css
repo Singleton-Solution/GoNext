@@ -1,0 +1,324 @@
+/*
+ * <ResourceList> styles.
+ *
+ * Scoped via CSS Modules so the class names don't clash with the global
+ * scaffold styles in `src/app/globals.css`. Uses the shared design tokens
+ * declared on :root there (--space-*, --color-*, --radius). When the design
+ * system extraction lands (issue #34) these can be swapped for the token
+ * package without changing the markup.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e4e6ea);
+  border-radius: var(--radius, 6px);
+  overflow: hidden;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 12px);
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  border-bottom: 1px solid var(--color-border, #e4e6ea);
+  flex-wrap: wrap;
+}
+
+.search {
+  flex: 1 1 240px;
+  min-width: 200px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border, #e4e6ea);
+  border-radius: var(--radius, 6px);
+  font: inherit;
+  background: var(--color-bg, #f6f7f9);
+}
+
+.search:focus {
+  outline: 2px solid var(--color-accent, #2563eb);
+  outline-offset: -1px;
+  background: var(--color-surface, #fff);
+}
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  flex-wrap: wrap;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1, 4px);
+  padding: 4px 10px;
+  border: 1px solid var(--color-border, #e4e6ea);
+  border-radius: 999px;
+  background: var(--color-surface, #fff);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chip[aria-pressed='true'],
+.chipActive {
+  background: var(--color-accent, #2563eb);
+  border-color: var(--color-accent, #2563eb);
+  color: #fff;
+}
+
+.chipMenu {
+  position: relative;
+}
+
+.chipMenuPanel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 160px;
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e4e6ea);
+  border-radius: var(--radius, 6px);
+  padding: 4px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chipMenuItem {
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.chipMenuItem:hover,
+.chipMenuItem:focus {
+  background: var(--color-bg, #f6f7f9);
+  outline: none;
+}
+
+.bulkBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  padding: var(--space-2, 8px) var(--space-4, 16px);
+  background: #eef2ff;
+  border-bottom: 1px solid var(--color-border, #e4e6ea);
+  font-size: 13px;
+}
+
+.bulkBarCount {
+  font-weight: 600;
+  margin-right: var(--space-2, 8px);
+}
+
+.bulkButton {
+  padding: 4px 10px;
+  border: 1px solid var(--color-border, #e4e6ea);
+  border-radius: var(--radius, 6px);
+  background: var(--color-surface, #fff);
+  font: inherit;
+  cursor: pointer;
+}
+
+.bulkButton:hover {
+  border-color: var(--color-accent, #2563eb);
+}
+
+.bulkButtonDanger {
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
+.bulkButtonDanger:hover {
+  background: #fef2f2;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table thead {
+  background: var(--color-bg, #f6f7f9);
+}
+
+.th {
+  text-align: left;
+  font-weight: 600;
+  padding: var(--space-2, 8px) var(--space-3, 12px);
+  border-bottom: 1px solid var(--color-border, #e4e6ea);
+  white-space: nowrap;
+  color: var(--color-text-muted, #6b7280);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.thSortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.thSortable:hover {
+  color: var(--color-text, #1c2024);
+}
+
+.sortIndicator {
+  margin-left: 4px;
+  display: inline-block;
+  font-size: 10px;
+  width: 8px;
+}
+
+.td {
+  padding: var(--space-3, 12px);
+  border-bottom: 1px solid var(--color-border, #e4e6ea);
+  vertical-align: middle;
+}
+
+.row {
+  cursor: default;
+}
+
+.row:hover {
+  background: var(--color-bg, #f6f7f9);
+}
+
+.row:focus {
+  outline: 2px solid var(--color-accent, #2563eb);
+  outline-offset: -2px;
+}
+
+.rowSelected {
+  background: #f0f5ff;
+}
+
+.rowSelected:hover {
+  background: #e5eeff;
+}
+
+.checkboxCell {
+  width: 36px;
+  padding-left: var(--space-4, 16px);
+  padding-right: 0;
+}
+
+.skeletonCell {
+  height: 18px;
+  background: linear-gradient(
+    90deg,
+    var(--color-border, #e4e6ea) 0%,
+    #f0f1f3 50%,
+    var(--color-border, #e4e6ea) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: 4px;
+  animation: shimmer 1.2s linear infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.empty {
+  padding: var(--space-8, 32px);
+  text-align: center;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.errorBox {
+  padding: var(--space-4, 16px);
+  margin: var(--space-3, 12px);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  border-radius: var(--radius, 6px);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+}
+
+.errorRetry {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid #991b1b;
+  color: #991b1b;
+  padding: 4px 10px;
+  border-radius: var(--radius, 6px);
+  font: inherit;
+  cursor: pointer;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2, 8px) var(--space-4, 16px);
+  border-top: 1px solid var(--color-border, #e4e6ea);
+  font-size: 13px;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.pager {
+  display: inline-flex;
+  gap: var(--space-2, 8px);
+}
+
+.pagerButton {
+  padding: 4px 10px;
+  border: 1px solid var(--color-border, #e4e6ea);
+  border-radius: var(--radius, 6px);
+  background: var(--color-surface, #fff);
+  font: inherit;
+  cursor: pointer;
+}
+
+.pagerButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.confirmBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.confirmDialog {
+  background: var(--color-surface, #fff);
+  padding: var(--space-6, 24px);
+  border-radius: var(--radius, 6px);
+  max-width: 420px;
+  width: calc(100% - 32px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+}
+
+.confirmActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2, 8px);
+  margin-top: var(--space-4, 16px);
+}
