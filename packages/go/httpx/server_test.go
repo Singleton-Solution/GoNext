@@ -199,7 +199,7 @@ func TestServer_PortConflict_Errors(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go srv1.Run(ctx)
+	go func() { _ = srv1.Run(ctx) }() // shutdown error not relevant to this test
 	<-srv1.Ready()
 
 	// Second server tries the same port.
@@ -247,7 +247,7 @@ func TestServer_MiddlewareApplied(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go srv.Run(ctx)
+	go func() { _ = srv.Run(ctx) }() // shutdown error not relevant to this test
 	<-srv.Ready()
 
 	resp, err := http.Get("http://" + srv.Addr() + "/")
