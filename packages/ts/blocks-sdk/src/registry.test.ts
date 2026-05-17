@@ -7,7 +7,9 @@ import {
   BlockRegistry,
   DuplicateBlockTypeError,
 } from './registry.ts';
+import { SCHEMA_DIALECT } from './schema.ts';
 import type { BlockTypeDefinition } from './types.ts';
+import { UnsupportedDialectError } from './validator.ts';
 
 const paragraph: BlockTypeDefinition = {
   name: 'core/paragraph',
@@ -142,6 +144,66 @@ describe('BlockRegistry', () => {
         blockType: 'core/heading',
       });
       expect(out.errors[0]?.path.startsWith('/0/attributes')).toBe(true);
+    });
+
+    // Issue #275: dialect pin is enforced at registration time so a
+    // mis-drafted plugin fails at install, not on first validate. See
+    // `UnsupportedDialectError` and `assertPinnedDialect` in
+    // `validator.ts`.
+    it('rejects registration of a block whose attribute schema declares draft-07', () => {
+      const legacy: BlockTypeDefinition = {
+        name: 'core/legacy',
+        title: 'Legacy',
+        category: 'text',
+        attributes: {
+          $schema: 'http://json-schema.org/draft-07/schema#',
+          type: 'object',
+          properties: { text: { type: 'string' } },
+        },
+        edit: async () => ({ default: () => null }),
+      };
+      expect(() => registry.register(legacy)).toThrowError(
+        UnsupportedDialectError,
+      );
+      expect(registry.has('core/legacy')).toBe(false);
+    });
+
+    it('accepts an explicit 2020-12 $schema on registration', () => {
+      const pinned: BlockTypeDefinition = {
+        name: 'core/pinned',
+        title: 'Pinned',
+        category: 'text',
+        attributes: {
+          $schema: SCHEMA_DIALECT,
+          type: 'object',
+          required: ['text'],
+          additionalProperties: false,
+          properties: { text: { type: 'string' } },
+        },
+        edit: async () => ({ default: () => null }),
+      };
+      expect(() => registry.register(pinned)).not.toThrow();
+      expect(registry.has('core/pinned')).toBe(true);
+    });
+
+    it('rejects mis-drafted replacement schemas even with replace=true', () => {
+      registry.register(paragraph);
+      const bad: BlockTypeDefinition = {
+        ...paragraph,
+        attributes: {
+          $schema: 'http://json-schema.org/draft-07/schema#',
+          type: 'object',
+          required: ['text'],
+          additionalProperties: false,
+          properties: { text: { type: 'string' } },
+        },
+      };
+      expect(() => registry.register(bad, { replace: true })).toThrowError(
+        UnsupportedDialectError,
+      );
+      // The original registration must survive — we don't want HMR to
+      // half-install a broken schema.
+      expect(registry.get('core/paragraph')).toBe(paragraph);
     });
 
     it('re-registration invalidates the cached attribute validator', () => {

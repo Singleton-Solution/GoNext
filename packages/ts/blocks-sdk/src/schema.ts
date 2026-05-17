@@ -19,8 +19,24 @@
 /**
  * The JSON Schema 2020-12 dialect identifier we declare on every schema.
  * Ajv resolves this via the default meta-schemas; no network fetch occurs.
+ *
+ * This MUST stay in lock-step with `Draft2020URI` in
+ * `packages/go/jsonschemautil` — block authors are guaranteed that their
+ * attribute schemas use the same dialect on the Go server and in the TS
+ * editor. A drift here is a cross-stack semantic bug.
+ *
+ * See docs/02-plugin-system.md §7.7 and GitHub issue #275 for the
+ * rationale behind the pin.
  */
 export const SCHEMA_DIALECT = 'https://json-schema.org/draft/2020-12/schema';
+
+/**
+ * Tested in `schema.test.ts` so a drift here is caught in CI alongside
+ * the Go-side counterpart constant.
+ */
+export function isPinnedDialect(value: unknown): value is string {
+  return typeof value === 'string' && value.trim() === SCHEMA_DIALECT;
+}
 
 /** Sentinel `$id` for the single-block schema; used to wire `$ref`s. */
 export const BLOCK_SCHEMA_ID = 'https://gonext.dev/schemas/block.json';

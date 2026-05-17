@@ -28,6 +28,7 @@ import type {
   BlockDeprecation,
   BlockTypeDefinition,
 } from './types.ts';
+import { assertPinnedDialect } from './validator.ts';
 
 /**
  * Hard cap on migration steps for a single block. A correctly authored
@@ -56,6 +57,11 @@ const eligibilityFns = new WeakMap<
 function getEligibility(dep: BlockDeprecation): (attrs: unknown) => boolean {
   const cached = eligibilityFns.get(dep);
   if (cached !== undefined) return cached;
+  // Deprecation entries are also JSON Schema documents; pin them to
+  // 2020-12 just like the live attribute schemas. Authors who fail to
+  // update an old draft-07 deprecation chain learn at compile time
+  // rather than seeing migrations silently no-op against new semantics.
+  assertPinnedDialect(dep.attributes);
   const fn = eligibilityAjv.compile(dep.attributes as Record<string, unknown>);
   const wrapper = (attrs: unknown): boolean => Boolean(fn(attrs));
   eligibilityFns.set(dep, wrapper);

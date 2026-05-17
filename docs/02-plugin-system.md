@@ -1221,8 +1221,11 @@ We are honest with ourselves: client-side isolation is **defense in depth**. The
 ### 7.7 JSON Schema dialect
 
 <!-- fixed per review (C15): pin all JSON Schema-shaped specs to JSON Schema 2020-12. -->
+<!-- updated per #275: strict pin, no draft-07 compat layer — the dialect mismatch is rejected at install time. The shared validator is `packages/go/jsonschemautil`; the TS counterpart re-exports `SCHEMA_DIALECT` and `UnsupportedDialectError` from `@gonext/blocks-sdk`. -->
 
-Wherever this doc or the SDK introduces JSON Schema (the manifest itself, block attribute schemas in §7.4, plugin-supplied settings registered through the `@host/sdk` settings API), the dialect is **JSON Schema 2020-12** (`$schema: "https://json-schema.org/draft/2020-12/schema"`). The host's manifest validator and the editor's attribute validator both target 2020-12 features (`prefixItems`, dynamic `$ref`, `unevaluatedProperties`). Plugins authored against earlier drafts are accepted by the validator only when their declared `$schema` is one we explicitly map (currently draft-07 and 2020-12); other drafts fail validation at install time.
+Wherever this doc or the SDK introduces JSON Schema (the manifest itself, block attribute schemas in §7.4, plugin-supplied settings registered through the `@host/sdk` settings API), the dialect is **JSON Schema 2020-12** (`$schema: "https://json-schema.org/draft/2020-12/schema"`). The host's manifest validator and the editor's attribute validator both target 2020-12 features (`prefixItems`, dynamic `$ref`, `unevaluatedProperties`).
+
+The pin is enforced at install/registration time: a schema document whose top-level `$schema` declares any other URL is rejected with an `UnsupportedDialect` error (Go: `jsonschemautil.ErrUnsupportedDialect`; TS: `UnsupportedDialectError` from `@gonext/blocks-sdk`). Omitting `$schema` is fine — the compiler applies the pinned default. There is no compat layer for draft-07 or earlier; plugins authored against older drafts must be rewritten before they install. This trade keeps validation semantics (`unevaluated*`, `prefixItems`, `$dynamicRef`) identical on the server (Go `santhosh-tekuri/jsonschema` in 2020-12 mode) and in the editor (Ajv2020), which is the whole point of having a single dialect.
 
 ---
 

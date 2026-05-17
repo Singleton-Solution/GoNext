@@ -41,10 +41,13 @@ export {
   BlockJSONSchema,
   BlockTreeJSONSchema,
   SCHEMA_DIALECT,
+  isPinnedDialect,
 } from './schema.ts';
 
 export {
+  assertPinnedDialect,
   BlockValidator,
+  UnsupportedDialectError,
   validateBlockTree,
   type BlockTypeLookup,
 } from './validator.ts';

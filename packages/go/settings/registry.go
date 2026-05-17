@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/Singleton-Solution/GoNext/packages/go/jsonschemautil"
 	"github.com/santhosh-tekuri/jsonschema/v5"
 )
 
@@ -93,7 +94,13 @@ func (r *Registry) Register(s Setting) error {
 
 	compiled, err := compileSchema(s.Key, s.Schema)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidSchema, err)
+		// Preserve both error chains: callers errors.Is against
+		// ErrInvalidSchema (the package's "your schema is broken"
+		// sentinel) AND against jsonschemautil.ErrUnsupportedDialect
+		// (so a plugin host can produce a dedicated "wrong JSON Schema
+		// draft" message). %w + errors.Join is the smallest change
+		// that satisfies both.
+		return fmt.Errorf("%w: %w", ErrInvalidSchema, err)
 	}
 
 	r.mu.Lock()
@@ -176,20 +183,17 @@ func (r *Registry) settingFor(key string) (*registryEntry, bool) {
 // compileSchema compiles a JSON Schema 2020-12 document. The key
 // argument is used only as a stable identifier for $ref resolution and
 // error messages — it is not a URL the compiler dereferences.
+//
+// Dialect is pinned to draft 2020-12 by the shared jsonschemautil
+// package; schemas declaring a different "$schema" URL are rejected
+// here so a typo in a plugin manifest fails at registration with a
+// dedicated error rather than silently switching validation semantics.
+// See packages/go/jsonschemautil/jsonschemautil.go for the policy.
 func compileSchema(key string, raw []byte) (*jsonschema.Schema, error) {
-	c := jsonschema.NewCompiler()
-	c.Draft = jsonschema.Draft2020
 	// AddResource gives the schema a stable URI so a panic-y compiler
 	// doesn't fall back to filesystem lookups for an unspecified key.
 	resourceURL := "https://gonext.local/settings/" + key + ".json"
-	if err := c.AddResource(resourceURL, strings.NewReader(string(raw))); err != nil {
-		return nil, fmt.Errorf("add resource: %w", err)
-	}
-	schema, err := c.Compile(resourceURL)
-	if err != nil {
-		return nil, fmt.Errorf("compile: %w", err)
-	}
-	return schema, nil
+	return jsonschemautil.Compile(resourceURL, raw)
 }
 
 // globalRegistry is the package-level default registry. Code that

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/Singleton-Solution/GoNext/packages/go/jsonschemautil"
 	"github.com/Singleton-Solution/GoNext/packages/go/policy"
 )
 
@@ -109,6 +110,71 @@ func TestRegistry_RegisterRejectsMalformedSchema(t *testing.T) {
 	s.Schema = json.RawMessage(`{not-json`)
 	if err := reg.Register(s); !errors.Is(err, ErrInvalidSchema) {
 		t.Errorf("expected ErrInvalidSchema, got %v", err)
+	}
+}
+
+// TestRegistry_RegisterAcceptsExplicit2020Dialect proves the dialect
+// pin lets through schemas that explicitly declare the canonical URI,
+// in addition to the existing "schema with no $schema field" case.
+// This is the "valid 2020-12 schema" leg of issue #275's test plan.
+func TestRegistry_RegisterAcceptsExplicit2020Dialect(t *testing.T) {
+	reg := NewRegistry()
+	s := stringSetting("test.with-dialect")
+	s.Schema = json.RawMessage(`{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"type": "string",
+		"minLength": 1
+	}`)
+	if err := reg.Register(s); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+}
+
+// TestRegistry_RegisterRejectsDraft07Schema is the headline behavior:
+// a setting whose Schema field declares draft-07 must be refused with
+// a clear, sentinel-chained error. Plugin loaders surface this back to
+// the operator as "your plugin's settings declared the wrong JSON
+// Schema draft" — see docs/02-plugin-system.md §7.7.
+func TestRegistry_RegisterRejectsDraft07Schema(t *testing.T) {
+	reg := NewRegistry()
+	s := stringSetting("test.draft07")
+	s.Schema = json.RawMessage(`{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "string"
+	}`)
+	err := reg.Register(s)
+	if err == nil {
+		t.Fatal("Register accepted a draft-07 schema; expected rejection")
+	}
+	if !errors.Is(err, ErrInvalidSchema) {
+		t.Errorf("error should chain ErrInvalidSchema: %v", err)
+	}
+	if !errors.Is(err, jsonschemautil.ErrUnsupportedDialect) {
+		t.Errorf("error should chain jsonschemautil.ErrUnsupportedDialect: %v", err)
+	}
+	// Operator-facing message: ensure the offending draft is named so
+	// the plugin author can fix it without spelunking through code.
+	if !strings.Contains(err.Error(), "draft-07") {
+		t.Errorf("error message should mention the bad draft: %v", err)
+	}
+}
+
+// TestRegistry_RegisterRejectsOtherDraftSchemas locks down the policy
+// that ANY non-2020-12 dialect is rejected, not just draft-07.
+func TestRegistry_RegisterRejectsOtherDraftSchemas(t *testing.T) {
+	cases := []string{
+		"http://json-schema.org/draft-04/schema#",
+		"http://json-schema.org/draft-06/schema#",
+		"https://json-schema.org/draft/2019-09/schema",
+	}
+	for _, dialect := range cases {
+		reg := NewRegistry()
+		s := stringSetting("test.draft")
+		s.Schema = json.RawMessage(`{"$schema":"` + dialect + `","type":"string"}`)
+		err := reg.Register(s)
+		if !errors.Is(err, jsonschemautil.ErrUnsupportedDialect) {
+			t.Errorf("dialect %q: expected ErrUnsupportedDialect, got %v", dialect, err)
+		}
 	}
 }
 
