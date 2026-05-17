@@ -1,0 +1,44 @@
+<!-- wp:template-part {"slug":"header","tagName":"header"} /-->
+
+<!-- wp:group {"tagName":"main","className":"site-main category","layout":{"type":"constrained"}} -->
+<main class="wp-block-group site-main category">
+  <!-- wp:group {"className":"category__header","layout":{"type":"flow"}} -->
+  <div class="wp-block-group category__header">
+    <!-- wp:paragraph {"className":"category__eyebrow"} -->
+    <p class="category__eyebrow">Category</p>
+    <!-- /wp:paragraph -->
+    <!-- wp:query-title {"type":"archive","className":"category__title"} /-->
+    <!-- wp:term-description {"className":"category__description"} /-->
+  </div>
+  <!-- /wp:group -->
+
+  <!-- wp:group {"className":"category__layout","layout":{"type":"flex","flexWrap":"nowrap"}} -->
+  <div class="wp-block-group category__layout">
+    <!-- wp:query {"queryId":4,"query":{"perPage":12,"inherit":true}} -->
+    <div class="wp-block-query category__list">
+      <!-- wp:post-template -->
+        <!-- wp:group {"className":"post-card"} -->
+        <div class="wp-block-group post-card">
+          <!-- wp:post-featured-image {"isLink":true,"aspectRatio":"16/9"} /-->
+          <!-- wp:post-title {"isLink":true,"level":2,"className":"post-card__title"} /-->
+          <!-- wp:template-part {"slug":"post-meta","theme":"gn-pro"} /-->
+          <!-- wp:post-excerpt {"className":"post-card__excerpt"} /-->
+        </div>
+        <!-- /wp:group -->
+      <!-- /wp:post-template -->
+
+      <!-- wp:query-pagination -->
+        <!-- wp:query-pagination-previous /-->
+        <!-- wp:query-pagination-numbers /-->
+        <!-- wp:query-pagination-next /-->
+      <!-- /wp:query-pagination -->
+    </div>
+    <!-- /wp:query -->
+
+    <!-- wp:template-part {"slug":"sidebar","tagName":"aside"} /-->
+  </div>
+  <!-- /wp:group -->
+</main>
+<!-- /wp:group -->
+
+<!-- wp:template-part {"slug":"footer","tagName":"footer"} /-->
