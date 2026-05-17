@@ -401,9 +401,11 @@ var _ = func() *Manager {
 	var ctx context.Context
 	_, _ = m.Create(ctx, "", nil, 0, 0)
 	_, _ = m.Get(ctx, "", 0)
+	_, _ = m.Regenerate(ctx, "", 0)
 	_ = m.Delete(ctx, "")
 	_ = m.DeleteAllForUser(ctx, "")
 	_, _ = m.List(ctx, "")
+	m.SetMaxDataSize(0)
 	_ = m.Close()
 	return m
 }
