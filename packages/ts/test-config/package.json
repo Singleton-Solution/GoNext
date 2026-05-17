@@ -1,0 +1,40 @@
+{
+  "name": "@gonext/test-config",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared Vitest + React Testing Library config and setup helpers for GoNext TypeScript packages. Provides a base Vitest config (jsdom env, coverage thresholds, globals) and a setup module that wires jest-dom matchers, fetch stubbing, and per-test cleanup. Consumed by apps/admin and shared React packages.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./vitest.base": "./vitest.base.ts",
+    "./setup": "./setup.ts"
+  },
+  "files": [
+    "index.ts",
+    "vitest.base.ts",
+    "setup.ts",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "echo '@gonext/test-config: source-only package, no build step'",
+    "lint": "echo '@gonext/test-config lint: not yet implemented'",
+    "test": "echo '@gonext/test-config: no tests (config-only package)'",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@testing-library/jest-dom": ">=6",
+    "@testing-library/react": ">=14",
+    "@vitest/coverage-v8": ">=1",
+    "vitest": ">=1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.4.0",
+    "@testing-library/react": "^14.2.0",
+    "@vitest/coverage-v8": "^1.6.0",
+    "typescript": "^5.6.0",
+    "vitest": "^1.6.0"
+  }
+}
