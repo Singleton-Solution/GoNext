@@ -1,6 +1,7 @@
 package csrf
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -8,7 +9,10 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -18,22 +22,17 @@ import (
 // document them as `const` to keep the surface area small — the doc
 // comments on Options are the contract.
 const (
-	defaultTTL        = time.Hour
-	defaultCookieName = "csrf"
-	defaultHeaderName = "X-CSRF-Token"
-	defaultFormField  = "csrf_token"
+	defaultTTL              = time.Hour
+	defaultCookieName       = "csrf"
+	defaultHeaderName       = "X-CSRF-Token"
+	defaultFormField        = "csrf_token"
+	defaultMaxFormBodyBytes = 64 << 10 // 64 KiB
 
 	// cookieIDBytes is the entropy of the anonymous cookie ID embedded in
 	// every token. 32 bytes (256 bits) matches docs/06-auth-permissions.md
 	// §9 ("csrf_token: 32 random bytes, base64url") and is well beyond
 	// what's needed for collision resistance.
 	cookieIDBytes = 32
-
-	// minBodyForFormParse caps how much of a form-encoded body we'll
-	// read to find csrf_token. 64 KiB is huge for a CSRF token (~80 B
-	// expected) but small enough that an attacker can't make us buffer
-	// gigabytes by sending Content-Type: application/x-www-form-urlencoded.
-	maxFormParseBytes = 64 << 10 // 64 KiB
 )
 
 // safeMethods is the set of HTTP methods we never block. Per RFC 7231,
@@ -53,13 +52,16 @@ var safeMethods = map[string]struct{}{
 // field has a sane default. New() copies the struct, so post-construction
 // mutation by the caller is harmless.
 type Options struct {
-	// TTL is how long a minted token remains valid. Default 1h. A request
-	// whose token is older than TTL is rejected with 403 even if the
-	// HMAC checks out — this caps replay risk if a token leaks via logs
-	// or a referer header.
+	// TTL is how long a minted token remains valid. Default 1h (when
+	// zero). A request whose token is older than TTL is rejected with
+	// 403 even if the HMAC checks out — this caps replay risk if a
+	// token leaks via logs or a referer header.
 	//
-	// Setting TTL to a negative value disables freshness checking
-	// entirely (HMAC-only). Setting TTL to zero uses the default.
+	// Must be >= 0. Negative values panic at New(): a negative MaxAge
+	// in a Set-Cookie header means "delete this cookie immediately"
+	// per RFC 6265, which silently breaks the entire middleware in
+	// real browsers. If you want long-lived tokens, use a large positive
+	// value (e.g. 30 * 24 * time.Hour).
 	TTL time.Duration
 
 	// CookieName is the name of the cookie that carries the token to
@@ -80,12 +82,34 @@ type Options struct {
 	// SkipPaths is a list of URL path prefixes that bypass CSRF
 	// validation. Used for endpoints that authenticate by means other
 	// than session cookies (webhook signatures, /auth/login, OIDC
-	// callback, API token auth). Matching is by HasPrefix, so passing
-	// "/webhooks/" exempts every nested route.
+	// callback, API token auth). Matching is by HasPrefix on the
+	// CANONICALIZED path (path.Clean is applied first), so a request
+	// like POST /webhooks/../admin/users will NOT match a /webhooks/
+	// prefix; it is rejected with 400 Bad Request instead.
 	//
 	// A skipped GET still gets a cookie minted on the response, so the
 	// admin UI's first state-changing call has a token to echo.
 	SkipPaths []string
+
+	// TrustProxyHeaders, when true, causes the middleware to honor the
+	// X-Forwarded-Proto header for determining whether the Secure
+	// attribute is set on the issued cookie. ONLY enable this when the
+	// service is behind a proxy that strips/sets X-Forwarded-* (see
+	// config.ServerConfig.TrustedProxies). With it off (the default),
+	// an attacker on a direct-HTTP deployment cannot force Secure on
+	// the cookie and DoS the user by causing the browser to silently
+	// drop the cookie on plain-HTTP requests.
+	TrustProxyHeaders bool
+
+	// MaxFormBodyBytes caps how much of a form-encoded body the
+	// middleware will read to find the CSRF token. Default 64 KiB
+	// (when zero). Bodies above this size will fail token extraction
+	// and the request will 403 — which means: bump this if you accept
+	// large form POSTs (uploads via multipart/form-data are the common
+	// case). Set to a negative value to disable the cap (NOT
+	// recommended; allows an attacker to make the middleware buffer
+	// arbitrary bytes by sending Content-Type: form-urlencoded).
+	MaxFormBodyBytes int64
 
 	// Now is an optional clock injection point for tests. nil = time.Now.
 	Now func() time.Time
@@ -110,10 +134,15 @@ var (
 // shorter secret because shipping with a weak key is a programming bug
 // that should fail at construction time, not at first request.
 //
+// New also panics if opts.TTL is negative — see Options.TTL.
+//
 // The returned middleware is safe for concurrent use.
 func New(secret []byte, opts Options) func(http.Handler) http.Handler {
 	if len(secret) < 16 {
 		panic("csrf.New: secret must be at least 16 bytes (32 recommended)")
+	}
+	if opts.TTL < 0 {
+		panic("csrf.New: TTL must be >= 0 (negative values produced Max-Age=0 cookies, which RFC 6265 specifies as immediate-delete)")
 	}
 
 	cfg := opts // shallow copy so we own the defaults
@@ -129,6 +158,9 @@ func New(secret []byte, opts Options) func(http.Handler) http.Handler {
 	if cfg.FormField == "" {
 		cfg.FormField = defaultFormField
 	}
+	if cfg.MaxFormBodyBytes == 0 {
+		cfg.MaxFormBodyBytes = defaultMaxFormBodyBytes
+	}
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
@@ -139,6 +171,17 @@ func New(secret []byte, opts Options) func(http.Handler) http.Handler {
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Path-traversal guard. A request whose URL path is not
+			// already canonical (contains "..", "//", "./" etc.) is
+			// signaling intent to traverse; we reject before any
+			// SkipPaths or method check so an attacker cannot bypass
+			// CSRF by passing a non-canonical path that we'd skip but
+			// the downstream router would normalize. See #135 review.
+			if isNonCanonicalPath(r.URL.Path) {
+				http.Error(w, "Bad Request", http.StatusBadRequest)
+				return
+			}
+
 			if isSkippedPath(r.URL.Path, cfg.SkipPaths) {
 				// Skipped routes still get a cookie minted (idempotent) so
 				// the next non-skipped call has a token to send.
@@ -177,6 +220,10 @@ func New(secret []byte, opts Options) func(http.Handler) http.Handler {
 // Token on a request that arrived without a cookie returns "" — the
 // caller should either send the response (browser stores cookie) and
 // retry, or use the middleware's ensureCookie path by issuing a GET first.
+//
+// Token always reads the default cookie name. Callers who configured
+// Options.CookieName to a non-default value should call TokenFromCookie
+// with that name instead.
 func Token(r *http.Request) string {
 	c, err := r.Cookie(defaultCookieName)
 	if err != nil || c.Value == "" {
@@ -228,7 +275,7 @@ func ensureCookie(w http.ResponseWriter, r *http.Request, key []byte, cfg Option
 		Path:     "/",
 		MaxAge:   int(cfg.TTL.Seconds()),
 		HttpOnly: false, // double-submit requires JS-readable cookie
-		Secure:   isTLS(r),
+		Secure:   isTLS(r, cfg),
 		SameSite: http.SameSiteLaxMode,
 	})
 }
@@ -252,7 +299,7 @@ func verifyRequest(r *http.Request, key []byte, cfg Options) error {
 	// Referer headers and logs.
 	presented := r.Header.Get(cfg.HeaderName)
 	if presented == "" {
-		presented = tokenFromForm(r, cfg.FormField)
+		presented = tokenFromForm(r, cfg)
 	}
 	if presented == "" {
 		return fmt.Errorf("verifyRequest: %w", errMissingToken)
@@ -278,50 +325,130 @@ func verifyRequest(r *http.Request, key []byte, cfg Options) error {
 	return nil
 }
 
-// tokenFromForm extracts the form field without triggering net/http's
-// MaxBytesReader (which would mutate r.Body). We read at most
-// maxFormParseBytes and only when Content-Type indicates a form.
-func tokenFromForm(r *http.Request, field string) string {
+// tokenFromForm extracts the form field for a form-encoded body without
+// permanently consuming r.Body — downstream handlers that read the raw
+// body still see it. We buffer up to cfg.MaxFormBodyBytes bytes (default
+// 64 KiB) and only when Content-Type indicates a form.
+func tokenFromForm(r *http.Request, cfg Options) string {
 	ct := r.Header.Get("Content-Type")
-	// strip "; charset=..." etc.
+	// strip "; charset=..." / "; boundary=..." etc.
 	if i := strings.IndexByte(ct, ';'); i >= 0 {
 		ct = strings.TrimSpace(ct[:i])
 	}
 	switch ct {
-	case "application/x-www-form-urlencoded", "multipart/form-data":
-		// http.Request.FormValue calls ParseForm/ParseMultipartForm
-		// which will consume r.Body. Per RFC 7231, a POST body can be
-		// read exactly once; the handler downstream may also want it.
-		// Mitigation: limit body to maxFormParseBytes before parsing,
-		// which is small enough to fully buffer.
-		r.Body = http.MaxBytesReader(nil, r.Body, maxFormParseBytes)
-		return r.FormValue(field)
+	case "application/x-www-form-urlencoded":
+		// Read at most MaxFormBodyBytes and parse manually so we can
+		// restore r.Body for the downstream handler. Using
+		// r.FormValue would call ParseForm, which drains r.Body and
+		// leaves it at EOF for the next reader.
+		if r.Body == nil {
+			return ""
+		}
+		var reader io.Reader = r.Body
+		if cfg.MaxFormBodyBytes >= 0 {
+			reader = io.LimitReader(r.Body, cfg.MaxFormBodyBytes+1)
+		}
+		raw, err := io.ReadAll(reader)
+		// Best-effort close; net/http will close the original body
+		// at end-of-request anyway.
+		_ = r.Body.Close()
+		if err != nil {
+			return ""
+		}
+		// Refuse to parse a body larger than the cap; restore the
+		// truncated body so handlers see the same partial content
+		// (downstream will likely fail too, which is the intent).
+		if cfg.MaxFormBodyBytes >= 0 && int64(len(raw)) > cfg.MaxFormBodyBytes {
+			r.Body = io.NopCloser(bytes.NewReader(raw))
+			return ""
+		}
+		// Restore the body so handlers can re-read it.
+		r.Body = io.NopCloser(bytes.NewReader(raw))
+		vals, err := url.ParseQuery(string(raw))
+		if err != nil {
+			return ""
+		}
+		return vals.Get(cfg.FormField)
+	case "multipart/form-data":
+		// Multipart parsing buffers parts into memory or temp files
+		// per net/http internal logic. We let r.ParseMultipartForm do
+		// the work but bound the read with MaxBytesReader. This DOES
+		// consume r.Body — multipart cannot be cheaply re-played —
+		// but r.PostFormValue continues to work in downstream handlers
+		// because Go caches the parsed form. JSON handlers using raw
+		// r.Body for multipart would be a misuse of multipart anyway.
+		if cfg.MaxFormBodyBytes >= 0 {
+			r.Body = http.MaxBytesReader(nil, r.Body, cfg.MaxFormBodyBytes)
+		}
+		// 32 MiB is net/http's documented default for the in-memory
+		// portion of multipart; the rest spills to temp files. We
+		// pass it explicitly to make the limit obvious.
+		if err := r.ParseMultipartForm(32 << 20); err != nil {
+			return ""
+		}
+		return r.FormValue(cfg.FormField)
 	}
 	return ""
 }
 
-// isTLS returns true if the request was received over TLS or arrived
-// from a trusted proxy with X-Forwarded-Proto: https. Used to decide
-// whether to set the Secure attribute on the cookie. In dev (plain HTTP)
-// we return false so the cookie isn't dropped by the browser.
-func isTLS(r *http.Request) bool {
+// isTLS returns true if the request was received over TLS, or arrived
+// from a trusted proxy with X-Forwarded-Proto: https. The proxy-header
+// path is only honored when cfg.TrustProxyHeaders is true (i.e. when
+// the caller explicitly says the deployment terminates TLS upstream).
+// Otherwise an attacker on plain HTTP could force Secure on the cookie
+// and silently lock themselves (or, worse, all users sharing an L7) out
+// of the application.
+func isTLS(r *http.Request, cfg Options) bool {
 	if r.TLS != nil {
 		return true
 	}
-	if r.Header.Get("X-Forwarded-Proto") == "https" {
+	if cfg.TrustProxyHeaders && r.Header.Get("X-Forwarded-Proto") == "https" {
 		return true
 	}
 	return false
 }
 
+// isNonCanonicalPath returns true when p contains traversal or
+// normalization segments (.., ., //) that path.Clean would resolve
+// away. Such a path signals intent to confuse the router (which may
+// canonicalize before dispatch) and is rejected before the SkipPaths
+// check; we cannot assume a particular downstream router's behavior.
+//
+// We deliberately do NOT flag a plain trailing slash on a directory-
+// style path (e.g. "/webhooks/"): path.Clean strips trailing slashes,
+// but the SkipPaths design uses them as prefix markers and many
+// real-world routers treat "/x/" as a valid URL distinct from "/x".
+// Allowing a trailing slash is safe because it cannot route a request
+// to a sibling path the way ".." can.
+func isNonCanonicalPath(p string) bool {
+	if p == "" {
+		return false // let downstream handle the empty case
+	}
+	cleaned := path.Clean(p)
+	if cleaned == p {
+		return false
+	}
+	// Re-add a trailing slash to the cleaned form if the original had
+	// one (and the cleaned form isn't already root "/"). If the only
+	// difference between the two is the trailing slash, the path is
+	// considered canonical for our purposes.
+	if strings.HasSuffix(p, "/") && cleaned != "/" {
+		if cleaned+"/" == p {
+			return false
+		}
+	}
+	return true
+}
+
 // isSkippedPath returns true if path starts with any of prefixes. Empty
-// prefix list returns false.
-func isSkippedPath(path string, prefixes []string) bool {
-	for _, p := range prefixes {
-		if p == "" {
+// prefix list returns false. Callers MUST ensure path is canonicalized
+// (or rejected) before calling — see isNonCanonicalPath.
+func isSkippedPath(p string, prefixes []string) bool {
+	for _, prefix := range prefixes {
+		if prefix == "" {
 			continue
 		}
-		if strings.HasPrefix(path, p) {
+		if strings.HasPrefix(p, prefix) {
 			return true
 		}
 	}
@@ -407,17 +534,18 @@ func verifyToken(tok string, key []byte, cfg Options) (string, error) {
 		return "", errInvalidHMAC
 	}
 
-	// Freshness. Negative TTL disables the check (HMAC-only mode).
-	if cfg.TTL >= 0 {
-		age := cfg.Now().Sub(time.Unix(ts, 0))
-		if age < -1*time.Minute {
-			// Token from the future — clock skew over 1 minute is
-			// suspicious; reject. Treat like expired.
-			return "", errExpiredToken
-		}
-		if age > cfg.TTL {
-			return "", errExpiredToken
-		}
+	// Freshness. TTL is guaranteed >= 0 by New() (zero is replaced
+	// with defaultTTL there). Tokens minted in the future beyond a
+	// 1-minute skew tolerance are rejected; tokens older than TTL
+	// are rejected.
+	age := cfg.Now().Sub(time.Unix(ts, 0))
+	if age < -1*time.Minute {
+		// Token from the future — clock skew over 1 minute is
+		// suspicious; reject. Treat like expired.
+		return "", errExpiredToken
+	}
+	if age > cfg.TTL {
+		return "", errExpiredToken
 	}
 	return cookieID, nil
 }

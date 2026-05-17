@@ -151,3 +151,35 @@ func TestIsSkippedPath(t *testing.T) {
 		})
 	}
 }
+
+func TestIsNonCanonicalPath(t *testing.T) {
+	cases := []struct {
+		name string
+		path string
+		want bool
+	}{
+		// Canonical paths — must NOT be flagged.
+		{"root", "/", false},
+		{"simple", "/admin/users", false},
+		{"trailing-slash-on-dir", "/webhooks/", false},
+		{"nested", "/api/v1/admin/users", false},
+		{"empty", "", false}, // special-cased so net/http can handle empties
+
+		// Non-canonical — MUST be flagged.
+		{"parent-traversal", "/webhooks/../admin/users", true},
+		{"parent-traversal-tail", "/admin/..", true},
+		{"self-segment", "/admin/./users", true},
+		{"double-slash", "/admin//users", true},
+		{"trailing-double-slash", "/admin//", true},
+		{"leading-self", "/./admin", true},
+		{"only-dots", "/..", true},
+		{"complex", "/a/b/../c/./d//e", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := isNonCanonicalPath(tc.path); got != tc.want {
+				t.Errorf("isNonCanonicalPath(%q) = %v, want %v", tc.path, got, tc.want)
+			}
+		})
+	}
+}

@@ -3,6 +3,7 @@ package csrf_test
 import (
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
 	"strings"
@@ -56,6 +57,20 @@ func TestNew_PanicsOnWeakSecret(t *testing.T) {
 		}
 	}()
 	_ = csrf.New([]byte("short"), csrf.Options{})
+}
+
+func TestNew_PanicsOnNegativeTTL(t *testing.T) {
+	// Negative TTL would produce a Set-Cookie with Max-Age=0, which
+	// browsers interpret as "delete this cookie immediately" per
+	// RFC 6265. The old behavior silently broke real-browser flows;
+	// we now panic at construction time so the misconfig is caught
+	// at boot rather than at runtime.
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("expected panic on a negative TTL")
+		}
+	}()
+	_ = csrf.New(testSecret, csrf.Options{TTL: -1 * time.Second})
 }
 
 func TestNew_ZeroOptionsAreValid(t *testing.T) {
@@ -113,6 +128,11 @@ func TestSafeMethodMintsCookie(t *testing.T) {
 	}
 	if !strings.Contains(got.Value, ".") {
 		t.Errorf("cookie value missing '.' separators: %q", got.Value)
+	}
+	// MaxAge MUST be positive — Max-Age=0 means delete-immediately
+	// per RFC 6265, which would silently break the entire middleware.
+	if got.MaxAge <= 0 {
+		t.Errorf("MaxAge: got %d, want > 0 (RFC 6265: 0/negative means delete)", got.MaxAge)
 	}
 }
 
@@ -382,6 +402,81 @@ func TestSkipPath_StillMintsCookie(t *testing.T) {
 	}
 }
 
+// TestSkipPaths_PathTraversalBypass exercises the bug the PR #290
+// reviewer reported: a request like POST /webhooks/../admin/users
+// matches the /webhooks/ skip prefix under naive HasPrefix, but the
+// downstream router (http.ServeMux, chi, gorilla/mux) canonicalizes
+// the path to /admin/users — bypassing CSRF on a sensitive endpoint.
+//
+// The middleware now rejects non-canonical paths with 400 BEFORE any
+// SkipPaths check.
+func TestSkipPaths_PathTraversalBypass(t *testing.T) {
+	h := build(t, csrf.Options{
+		SkipPaths: []string{"/webhooks/", "/auth/login"},
+	})
+
+	traversals := []string{
+		"/webhooks/../admin/users",
+		"/webhooks/../../admin",
+		"/webhooks/./../admin",
+		"/auth/login/../admin",
+		"/auth/login/../../etc/passwd",
+		"/webhooks//../admin",       // double-slash then traversal
+		"/webhooks/sub/../../admin", // nested traversal
+	}
+	for _, p := range traversals {
+		t.Run(p, func(t *testing.T) {
+			// Use httptest.NewRequest's url.URL directly so that the
+			// raw, non-canonical path survives all the way to the
+			// middleware. (NewRequest uses url.Parse, which preserves
+			// the path as-is.)
+			req := httptest.NewRequest(http.MethodPost, p, nil)
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("traversal POST %q: status %d, want 400 (non-canonical path)", p, rec.Code)
+			}
+		})
+	}
+}
+
+// TestSafeMethod_PathTraversal_Rejected verifies the canonical-path
+// guard fires for GET too (it sits before the method check). An
+// attacker probing the cookie-mint endpoint via traversal should not
+// be able to mint a cookie either.
+func TestSafeMethod_PathTraversal_Rejected(t *testing.T) {
+	h := build(t, csrf.Options{SkipPaths: []string{"/webhooks/"}})
+	req := httptest.NewRequest(http.MethodGet, "/webhooks/../admin", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("traversal GET: status %d, want 400", rec.Code)
+	}
+}
+
+// TestCanonicalPathStillAllowed ensures the guard doesn't false-positive
+// on perfectly valid paths the application uses every day.
+func TestCanonicalPathStillAllowed(t *testing.T) {
+	h := build(t, csrf.Options{SkipPaths: []string{"/webhooks/"}})
+	canonical := []string{
+		"/",
+		"/admin",
+		"/admin/users",
+		"/webhooks/stripe",
+		"/api/v1/posts",
+	}
+	for _, p := range canonical {
+		t.Run(p, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, p, nil)
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Errorf("canonical GET %q: status %d, want 200", p, rec.Code)
+			}
+		})
+	}
+}
+
 func TestCustomNames(t *testing.T) {
 	h := build(t, csrf.Options{
 		CookieName: "x_my_csrf",
@@ -484,33 +579,67 @@ func TestSPAFlow_EndToEnd(t *testing.T) {
 	}
 }
 
-func TestNegativeTTL_DisablesFreshnessCheck(t *testing.T) {
-	// TTL < 0 means HMAC-only — useful for tests, not recommended
-	// for production. Verify the contract.
-	clock := time.Unix(1_700_000_000, 0)
-	now := func() time.Time { return clock }
-	mw := csrf.New(testSecret, csrf.Options{TTL: -1, Now: now})
-	rec := httptest.NewRecorder()
-	mw(okHandler).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+// TestRealBrowserCookieRoundTrip uses a live httptest.Server plus a real
+// http.Client with a cookie jar — not direct req.AddCookie injection —
+// to verify that the cookie the middleware emits is one a browser will
+// actually keep and replay on the next request.
+//
+// Direct-injection tests (req.AddCookie) bypass RFC-6265 cookie-jar
+// semantics, so a Max-Age=0 cookie still appears as "received" in those
+// tests even though no real browser would store it. The original PR
+// shipped exactly such a test for negative TTL; this case is the
+// regression guard.
+func TestRealBrowserCookieRoundTrip(t *testing.T) {
+	mw := csrf.New(testSecret, csrf.Options{TTL: time.Hour})
+	srv := httptest.NewServer(mw(okHandler))
+	defer srv.Close()
+
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatalf("cookiejar.New: %v", err)
+	}
+	client := &http.Client{Jar: jar}
+
+	// Step 1: GET — server mints cookie, browser stores it.
+	resp, err := client.Get(srv.URL + "/")
+	if err != nil {
+		t.Fatalf("first GET: %v", err)
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("first GET status: %d", resp.StatusCode)
+	}
+
+	// Verify the jar actually has the cookie. With Max-Age <= 0
+	// the jar would discard the Set-Cookie and this list would be
+	// empty.
+	u, _ := url.Parse(srv.URL)
+	cookies := jar.Cookies(u)
+	if len(cookies) == 0 {
+		t.Fatal("real cookie jar did not retain the issued cookie (Max-Age<=0?)")
+	}
 	var tok string
-	for _, c := range rec.Result().Cookies() {
+	for _, c := range cookies {
 		if c.Name == "csrf" {
 			tok = c.Value
 		}
 	}
 	if tok == "" {
-		t.Fatal("could not mint token")
+		t.Fatal("real cookie jar has no csrf cookie")
 	}
 
-	// 100 years later — still accepted because TTL is disabled.
-	mw2 := csrf.New(testSecret, csrf.Options{TTL: -1, Now: func() time.Time { return clock.Add(100 * 365 * 24 * time.Hour) }})
-	req := httptest.NewRequest(http.MethodPost, "/", nil)
-	req.AddCookie(&http.Cookie{Name: "csrf", Value: tok})
+	// Step 2: POST with the jar AND the matching header. Should pass.
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/admin/posts", strings.NewReader(""))
 	req.Header.Set("X-CSRF-Token", tok)
-	rec2 := httptest.NewRecorder()
-	mw2(okHandler).ServeHTTP(rec2, req)
-	if rec2.Code != http.StatusOK {
-		t.Errorf("status %d, want 200 (TTL disabled)", rec2.Code)
+	resp2, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	_, _ = io.Copy(io.Discard, resp2.Body)
+	_ = resp2.Body.Close()
+	if resp2.StatusCode != http.StatusOK {
+		t.Errorf("POST via real browser flow: status %d, want 200", resp2.StatusCode)
 	}
 }
 
@@ -542,24 +671,70 @@ func TestSecureCookieOnTLS(t *testing.T) {
 	}
 }
 
-func TestSecureCookieOnForwardedProto(t *testing.T) {
-	// Behind a TLS-terminating proxy, the request arrives over plain HTTP
-	// but X-Forwarded-Proto: https. Cookie should still be Secure.
-	h := build(t, csrf.Options{})
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.Header.Set("X-Forwarded-Proto", "https")
-	h.ServeHTTP(rec, req)
+// TestSecureCookieOnForwardedProto_OnlyWhenTrusted exercises the
+// proxy-header gate: by default the middleware ignores X-Forwarded-Proto
+// (otherwise an attacker on plain HTTP could force Secure on the cookie
+// and DoS the user). Only when Options.TrustProxyHeaders is true does
+// the header sway the Secure attribute.
+func TestSecureCookieOnForwardedProto_OnlyWhenTrusted(t *testing.T) {
+	t.Run("untrusted (default) ignores header", func(t *testing.T) {
+		h := build(t, csrf.Options{})
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("X-Forwarded-Proto", "https")
+		h.ServeHTTP(rec, req)
 
-	var got *http.Cookie
-	for _, c := range rec.Result().Cookies() {
-		if c.Name == "csrf" {
-			got = c
+		var got *http.Cookie
+		for _, c := range rec.Result().Cookies() {
+			if c.Name == "csrf" {
+				got = c
+			}
 		}
-	}
-	if got == nil || !got.Secure {
-		t.Errorf("X-Forwarded-Proto=https should produce Secure cookie; got %+v", got)
-	}
+		if got == nil {
+			t.Fatal("no csrf cookie")
+		}
+		if got.Secure {
+			t.Error("untrusted X-Forwarded-Proto must NOT set Secure (defends against DoS via forced-Secure-on-plain-HTTP)")
+		}
+	})
+
+	t.Run("trusted honors header", func(t *testing.T) {
+		h := build(t, csrf.Options{TrustProxyHeaders: true})
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("X-Forwarded-Proto", "https")
+		h.ServeHTTP(rec, req)
+
+		var got *http.Cookie
+		for _, c := range rec.Result().Cookies() {
+			if c.Name == "csrf" {
+				got = c
+			}
+		}
+		if got == nil || !got.Secure {
+			t.Errorf("trusted X-Forwarded-Proto=https should set Secure; got %+v", got)
+		}
+	})
+
+	t.Run("trusted but no header still insecure", func(t *testing.T) {
+		// Behind a proxy that didn't terminate TLS, the cookie should
+		// still NOT be Secure.
+		h := build(t, csrf.Options{TrustProxyHeaders: true})
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+		var got *http.Cookie
+		for _, c := range rec.Result().Cookies() {
+			if c.Name == "csrf" {
+				got = c
+			}
+		}
+		if got == nil {
+			t.Fatal("no csrf cookie")
+		}
+		if got.Secure {
+			t.Error("Secure should NOT be set when no X-Forwarded-Proto present")
+		}
+	})
 }
 
 func TestInsecureCookieOnPlainHTTP(t *testing.T) {
@@ -578,4 +753,202 @@ func TestInsecureCookieOnPlainHTTP(t *testing.T) {
 	if got.Secure {
 		t.Error("Secure should NOT be set on plain HTTP (dev would break otherwise)")
 	}
+}
+
+// TestFormBody_RestoredForDownstreamHandler verifies the middleware no
+// longer drains r.Body for a form-encoded request. The reviewer flagged
+// this as a foot-gun: handlers downstream that call json.NewDecoder or
+// io.ReadAll(r.Body) used to see EOF.
+func TestFormBody_RestoredForDownstreamHandler(t *testing.T) {
+	var downstreamSawBody string
+	tap := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		downstreamSawBody = string(raw)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	mw := csrf.New(testSecret, csrf.Options{})
+	h := mw(tap)
+
+	// Mint a token to drive a valid POST.
+	tok := freshTokenFromGET(t, h)
+
+	formBody := url.Values{"csrf_token": {tok}, "title": {"hello"}, "body": {"world"}}.Encode()
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(formBody))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "csrf", Value: tok})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d, want 200", rec.Code)
+	}
+	if downstreamSawBody != formBody {
+		t.Errorf("downstream handler saw body %q, want full original %q (middleware drained r.Body)", downstreamSawBody, formBody)
+	}
+}
+
+// TestFormBody_ContentTypeWithCharset verifies that a charset suffix on
+// the Content-Type (e.g. "application/x-www-form-urlencoded; charset=UTF-8")
+// is correctly stripped before matching, so the form path is taken.
+func TestFormBody_ContentTypeWithCharset(t *testing.T) {
+	h := build(t, csrf.Options{})
+	tok := freshTokenFromGET(t, h)
+
+	body := url.Values{"csrf_token": {tok}}.Encode()
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+	req.AddCookie(&http.Cookie{Name: "csrf", Value: tok})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Errorf("form POST with charset param: status %d, want 200", rec.Code)
+	}
+}
+
+// TestFormBody_NilBody covers the r.Body == nil guard. httptest.NewRequest
+// supplies a non-nil body even for nil input, so we use http.NewRequest
+// directly which leaves Body nil.
+func TestFormBody_NilBody(t *testing.T) {
+	h := build(t, csrf.Options{})
+	tok := freshTokenFromGET(t, h)
+
+	req, _ := http.NewRequest(http.MethodPost, "/", nil)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "csrf", Value: tok})
+	// No X-CSRF-Token header — middleware falls through to tokenFromForm
+	// which hits the nil-body branch and returns "". Result: 403 (no
+	// token).
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("nil body + form CT: status %d, want 403", rec.Code)
+	}
+}
+
+// TestFormBody_MalformedFormBody triggers url.ParseQuery's error path.
+// url.ParseQuery only errors on invalid percent-encoding, so we feed
+// "%ZZ" which is not valid hex.
+func TestFormBody_MalformedFormBody(t *testing.T) {
+	h := build(t, csrf.Options{})
+	tok := freshTokenFromGET(t, h)
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("csrf_token=%ZZ"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "csrf", Value: tok})
+	// No header — falls through to form. ParseQuery returns an error;
+	// we return "" → 403.
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("malformed form body: status %d, want 403", rec.Code)
+	}
+}
+
+// TestFormBody_Multipart exercises the multipart/form-data branch.
+func TestFormBody_Multipart(t *testing.T) {
+	h := build(t, csrf.Options{})
+	tok := freshTokenFromGET(t, h)
+
+	// Hand-roll a minimal multipart body. The boundary is fixed for
+	// reproducibility; real-world clients use random boundaries.
+	const boundary = "----test-csrf-boundary"
+	var body strings.Builder
+	body.WriteString("--" + boundary + "\r\n")
+	body.WriteString("Content-Disposition: form-data; name=\"csrf_token\"\r\n\r\n")
+	body.WriteString(tok + "\r\n")
+	body.WriteString("--" + boundary + "\r\n")
+	body.WriteString("Content-Disposition: form-data; name=\"title\"\r\n\r\n")
+	body.WriteString("hello\r\n")
+	body.WriteString("--" + boundary + "--\r\n")
+
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body.String()))
+	req.Header.Set("Content-Type", "multipart/form-data; boundary="+boundary)
+	req.AddCookie(&http.Cookie{Name: "csrf", Value: tok})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Errorf("multipart form POST: status %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestFormBody_MultipartTooLarge_403 exercises the ParseMultipartForm
+// error branch when MaxBytesReader trips.
+func TestFormBody_MultipartTooLarge_403(t *testing.T) {
+	// 1 KiB cap is tiny on purpose — even a header-only multipart will
+	// exceed it once the boundary, disposition header, and token are in.
+	h := build(t, csrf.Options{MaxFormBodyBytes: 64})
+	tok := freshTokenFromGET(t, h)
+
+	const boundary = "----test-csrf-boundary"
+	var body strings.Builder
+	body.WriteString("--" + boundary + "\r\n")
+	body.WriteString("Content-Disposition: form-data; name=\"csrf_token\"\r\n\r\n")
+	body.WriteString(tok + "\r\n")
+	body.WriteString("--" + boundary + "--\r\n")
+
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body.String()))
+	req.Header.Set("Content-Type", "multipart/form-data; boundary="+boundary)
+	req.AddCookie(&http.Cookie{Name: "csrf", Value: tok})
+	// no X-CSRF-Token header → falls through to form path → MaxBytesReader
+	// trips → ParseMultipartForm errors → tokenFromForm returns "".
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("oversize multipart: status %d, want 403", rec.Code)
+	}
+}
+
+// TestMaxFormBodyBytes_Configurable verifies the size cap is configurable
+// and the default fires when bodies exceed it.
+func TestMaxFormBodyBytes_Configurable(t *testing.T) {
+	// Default (64 KiB): a 128 KiB body must be rejected with 403 (token
+	// extraction fails because the body is too big to scan).
+	t.Run("default rejects oversize body", func(t *testing.T) {
+		h := build(t, csrf.Options{})
+		tok := freshTokenFromGET(t, h)
+		// Build a > 64 KiB body. csrf_token first so the token would
+		// be findable if we read the full body.
+		filler := strings.Repeat("x", 128*1024)
+		formBody := url.Values{"csrf_token": {tok}, "blob": {filler}}.Encode()
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(formBody))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(&http.Cookie{Name: "csrf", Value: tok})
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("oversize form body with default cap: status %d, want 403", rec.Code)
+		}
+	})
+
+	// Configured higher (256 KiB): the same request now succeeds.
+	t.Run("configured higher accepts large body", func(t *testing.T) {
+		h := build(t, csrf.Options{MaxFormBodyBytes: 512 * 1024})
+		tok := freshTokenFromGET(t, h)
+		filler := strings.Repeat("x", 128*1024)
+		formBody := url.Values{"csrf_token": {tok}, "blob": {filler}}.Encode()
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(formBody))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(&http.Cookie{Name: "csrf", Value: tok})
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Errorf("oversize form body with raised cap: status %d, want 200", rec.Code)
+		}
+	})
+
+	// Negative cap disables the limit (documented foot-gun).
+	t.Run("negative disables the cap", func(t *testing.T) {
+		h := build(t, csrf.Options{MaxFormBodyBytes: -1})
+		tok := freshTokenFromGET(t, h)
+		filler := strings.Repeat("x", 128*1024)
+		formBody := url.Values{"csrf_token": {tok}, "blob": {filler}}.Encode()
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(formBody))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(&http.Cookie{Name: "csrf", Value: tok})
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Errorf("negative cap should disable the limit: status %d, want 200", rec.Code)
+		}
+	})
 }
