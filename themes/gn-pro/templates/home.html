@@ -1,0 +1,36 @@
+<!-- wp:template-part {"slug":"header","tagName":"header"} /-->
+
+<!-- wp:group {"tagName":"main","className":"site-main home","layout":{"type":"constrained"}} -->
+<main class="wp-block-group site-main home">
+  <!-- wp:heading {"level":1,"className":"home__title"} -->
+  <h1 class="home__title">Latest Posts</h1>
+  <!-- /wp:heading -->
+
+  <!-- wp:paragraph {"className":"home__lede"} -->
+  <p class="home__lede">News, deep-dives, and release notes from the team.</p>
+  <!-- /wp:paragraph -->
+
+  <!-- wp:query {"queryId":2,"query":{"perPage":12,"postType":"post","order":"desc","orderBy":"date","inherit":false}} -->
+  <div class="wp-block-query">
+    <!-- wp:post-template -->
+      <!-- wp:group {"className":"post-card"} -->
+      <div class="wp-block-group post-card">
+        <!-- wp:post-featured-image {"isLink":true,"aspectRatio":"16/9"} /-->
+        <!-- wp:post-title {"isLink":true,"level":2,"className":"post-card__title"} /-->
+        <!-- wp:template-part {"slug":"post-meta","theme":"gn-pro"} /-->
+        <!-- wp:post-excerpt {"moreText":"Read more","className":"post-card__excerpt"} /-->
+      </div>
+      <!-- /wp:group -->
+    <!-- /wp:post-template -->
+
+    <!-- wp:query-pagination -->
+      <!-- wp:query-pagination-previous /-->
+      <!-- wp:query-pagination-numbers /-->
+      <!-- wp:query-pagination-next /-->
+    <!-- /wp:query-pagination -->
+  </div>
+  <!-- /wp:query -->
+</main>
+<!-- /wp:group -->
+
+<!-- wp:template-part {"slug":"footer","tagName":"footer"} /-->
