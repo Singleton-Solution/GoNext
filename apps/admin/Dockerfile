@@ -51,12 +51,20 @@ FROM node:${NODE_VERSION} AS builder
 WORKDIR /repo
 RUN corepack enable
 
-# Reuse the resolved node_modules from the deps stage.
-COPY --from=deps /repo/node_modules ./node_modules
-COPY --from=deps /repo/apps/web/node_modules ./apps/web/node_modules
-COPY --from=deps /repo/apps/admin/node_modules ./apps/admin/node_modules
+# Reuse the resolved install state from the deps stage. pnpm keeps the real
+# package contents in /repo/node_modules/.pnpm and exposes the hoisted set
+# via /repo/node_modules; per-workspace node_modules directories are created
+# lazily and only when a workspace actually declares runtime deps. Today the
+# placeholder apps/web and apps/admin manifests declare none, so those
+# per-workspace directories may not exist — copying the entire deps state
+# (the whole /repo tree, which at this point contains only the manifests +
+# node_modules layout pnpm produced) keeps this Dockerfile correct both
+# today and after the apps get filled in.
+COPY --from=deps /repo /repo
 
-# Bring in workspace manifests and source.
+# Overlay workspace manifests and source on top of the deps state. The
+# source COPYs intentionally come after the deps copy so they win on
+# conflict (e.g. when a source file replaces something pnpm wrote).
 COPY package.json pnpm-workspace.yaml ./
 COPY pnpm-lock.yaml* ./
 COPY apps/web/ apps/web/
@@ -130,8 +138,22 @@ LABEL org.opencontainers.image.title="gonext-admin" \
       org.opencontainers.image.revision="${COMMIT}" \
       org.opencontainers.image.created="${BUILD_DATE}"
 
-# When `output: 'standalone'` is enabled, replace the CMD below with:
-#   CMD ["node", "apps/admin/server.js"]
-# For now `pnpm start` defers to the package.json script (placeholder today).
-ENTRYPOINT ["pnpm", "--filter", "@gonext/admin"]
-CMD ["start"]
+# Runtime entrypoint.
+#
+# The container must be runnable today (placeholder apps/admin/package.json
+# has no `start` script and no real Next.js server) AND keep working once
+# the real Next.js app lands. We resolve this with a small shell fallback
+# chain rather than hard-coding `pnpm start`:
+#
+#   1. If apps/admin/server.js exists (the artifact `next build` emits
+#      when next.config.js sets `output: 'standalone'`), run it under node
+#      — this is the long-term steady state.
+#   2. Else if `next` is resolvable from apps/admin, exec `next start`
+#      from that workspace — the pre-standalone runtime.
+#   3. Else fall back to a harmless message so `docker run` exits 0 with
+#      a clear signal that the placeholder app is what's shipped.
+#
+# When `output: 'standalone'` lands this fallback collapses to step (1)
+# with no Dockerfile change needed.
+ENTRYPOINT ["/bin/sh", "-c"]
+CMD ["if [ -f apps/admin/server.js ]; then exec node apps/admin/server.js; elif pnpm --filter @gonext/admin exec -- node -e \"require.resolve('next/package.json')\" >/dev/null 2>&1; then exec pnpm --filter @gonext/admin exec -- next start -p \"${PORT:-3000}\" -H \"${HOSTNAME:-0.0.0.0}\"; else echo '@gonext/admin: placeholder image (no Next.js server yet).'; fi"]
