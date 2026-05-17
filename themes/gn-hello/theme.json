@@ -1,0 +1,59 @@
+{
+  "$schema": "https://gonext.dev/schemas/theme.json/v1",
+  "version": 1,
+  "title": "gn-hello",
+  "settings": {
+    "appearanceTools": true,
+    "color": {
+      "palette": [
+        { "slug": "ink",       "name": "Ink",       "color": "#0f172a" },
+        { "slug": "paper",     "name": "Paper",     "color": "#ffffff" },
+        { "slug": "muted",     "name": "Muted",     "color": "#64748b" },
+        { "slug": "accent",    "name": "Accent",    "color": "#2563eb" }
+      ],
+      "custom": true
+    },
+    "typography": {
+      "fontFamilies": [
+        { "slug": "sans",
+          "name": "Sans",
+          "fontFamily": "system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" },
+        { "slug": "serif",
+          "name": "Serif",
+          "fontFamily": "Iowan Old Style, Apple Garamond, Baskerville, Georgia, serif" }
+      ],
+      "fontSizes": [
+        { "slug": "sm",  "name": "Small",  "size": "0.875rem" },
+        { "slug": "md",  "name": "Medium", "size": "1rem"     },
+        { "slug": "lg",  "name": "Large",  "size": "1.25rem"  },
+        { "slug": "xl",  "name": "X-Large","size": "1.75rem"  }
+      ],
+      "lineHeight": true
+    },
+    "layout": {
+      "contentSize": "720px",
+      "wideSize":    "1180px"
+    }
+  },
+  "styles": {
+    "color":      { "background": "var(--wp-preset--color--paper)",
+                    "text":       "var(--wp-preset--color--ink)" },
+    "typography": { "fontFamily": "var(--wp-preset--font-family--serif)",
+                    "fontSize":   "var(--wp-preset--font-size--md)",
+                    "lineHeight": "1.6" },
+    "elements": {
+      "h1":   { "typography": { "fontSize": "var(--wp-preset--font-size--xl)", "lineHeight": "1.2" } },
+      "h2":   { "typography": { "fontSize": "var(--wp-preset--font-size--lg)" } },
+      "link": { "color":      { "text": "var(--wp-preset--color--accent)" } }
+    }
+  },
+  "supports": {
+    "blockTemplates": false,
+    "siteEditor":     false,
+    "menus":          ["primary"]
+  },
+  "templateParts": [
+    { "name": "header", "title": "Header", "area": "header" },
+    { "name": "footer", "title": "Footer", "area": "footer" }
+  ]
+}
