@@ -369,3 +369,55 @@ var wasmInvalid = []byte{
 	// random trailing bytes; wazero rejects on magic check first
 	0xff, 0xff, 0xff, 0xff,
 }
+
+// wasmTightLoop is the binary form of wat/tightloop.wat — a module
+// that exports `spin`, which enters an infinite `loop`/`br 0`. Used by
+// the limits package CPU-deadline tests: with no host calls and no
+// natural exit, the call runs until wazero traps it on context
+// cancellation.
+//
+//	(module
+//	  (memory (export "memory") 1)
+//	  (func $spin (export "spin")
+//	    (loop $forever
+//	      br $forever)))
+var wasmTightLoop = []byte{
+	0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00,
+
+	// type section: 1 type () -> ()
+	// 0x60 0x00 0x00 = 3 bytes
+	// payload = 0x01 + 3 = 4
+	0x01, 0x04,
+	0x01,
+	0x60, 0x00, 0x00,
+
+	// function section
+	0x03, 0x02, 0x01, 0x00,
+
+	// memory section: min 1 page
+	0x05, 0x03, 0x01, 0x00, 0x01,
+
+	// export section:
+	//   "memory" 0x06 + 6 + 0x02 0x00 = 9
+	//   "spin"   0x04 + 4 + 0x00 0x00 = 7
+	// payload = 0x02 + 9 + 7 = 17 = 0x11
+	0x07, 0x11,
+	0x02,
+	0x06, 'm', 'e', 'm', 'o', 'r', 'y', 0x02, 0x00,
+	0x04, 's', 'p', 'i', 'n', 0x00, 0x00,
+
+	// code section:
+	// body = 0x00 (locals) + 0x03 (loop) + 0x40 (blocktype void)
+	//      + 0x0c 0x00 (br 0)
+	//      + 0x0b (end loop) + 0x0b (end func)
+	//      = 1+1+1+2+1+1 = 7
+	// payload = 0x01 + 0x07 + 7 = 9
+	0x0a, 0x09,
+	0x01,
+	0x07,
+	0x00,
+	0x03, 0x40,
+	0x0c, 0x00,
+	0x0b,
+	0x0b,
+}
