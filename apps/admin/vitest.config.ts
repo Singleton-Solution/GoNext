@@ -21,11 +21,29 @@ export default mergeConfig(
       setupFiles: ['./vitest.setup.ts'],
       // Tests live next to the code they cover.
       include: ['src/**/*.{test,spec}.{ts,tsx}'],
+      // Coverage thresholds are intentionally low for the scaffold — most
+      // surfaces are inert placeholders that ship their behavior in
+      // subsequent issues. Raise these once the first real feature lands.
+      coverage: {
+        thresholds: {
+          lines: 0,
+          functions: 0,
+          branches: 0,
+          statements: 0,
+        },
+      },
     },
     resolve: {
       alias: {
         '@': srcPath,
       },
+    },
+    // Vitest uses esbuild for TS/TSX. Switch JSX to the automatic runtime so
+    // React 19 components don't need `import React` at the top of every file
+    // (the runtime injects `react/jsx-runtime` for us). Matches Next's
+    // jsx: "preserve" + automatic transform behavior.
+    esbuild: {
+      jsx: 'automatic',
     },
   }),
 );
