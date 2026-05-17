@@ -22,6 +22,7 @@ import (
 
 	"github.com/Singleton-Solution/GoNext/packages/go/buildinfo"
 	"github.com/Singleton-Solution/GoNext/packages/go/config"
+	"github.com/Singleton-Solution/GoNext/packages/go/db"
 	"github.com/Singleton-Solution/GoNext/packages/go/httpx"
 	"github.com/Singleton-Solution/GoNext/packages/go/log"
 )
@@ -62,6 +63,12 @@ func run(ctx context.Context) error {
 		"addr", cfg.Server.Addr,
 		"go_version", bi.GoVersion,
 	)
+
+	pool, err := db.New(ctx, cfg.Database, logger)
+	if err != nil {
+		return fmt.Errorf("db: %w", err)
+	}
+	defer pool.Close()
 
 	mux := buildRouter(cfg)
 

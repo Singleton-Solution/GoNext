@@ -32,9 +32,19 @@ setup: ## Install Go and JS dependencies, sync workspaces.
 .PHONY: build build-go build-js
 build: build-go build-js ## Build everything.
 
+# GO_MODULES is the list of workspace member directories. Earlier we used
+# `go list -m -f '{{.Dir}}/...' all | xargs go build`, but `all` in workspace
+# mode expands to the union of every module's full transitive dep graph,
+# which makes `go build` try to compile half of $GOPATH/pkg/mod. The clean
+# fix is to iterate the workspace's own members, not their dep closures.
+GO_MODULES := packages/go apps/api apps/worker cli/gonext
+
 build-go: ## Build all Go binaries.
 	@echo "==> Building Go workspace"
-	@go list -m -f '{{.Dir}}/...' all | xargs go build
+	@for dir in $(GO_MODULES); do \
+		echo "  → $$dir"; \
+		(cd $$dir && go build ./...) || exit 1; \
+	done
 
 build-js: ## Build all JS/TS workspace packages.
 	@echo "==> Building pnpm workspace"
@@ -46,9 +56,12 @@ build-js: ## Build all JS/TS workspace packages.
 .PHONY: test test-go test-js
 test: test-go test-js ## Run all tests.
 
-test-go: ## Run Go tests.
+test-go: ## Run Go tests (per-module).
 	@echo "==> Running Go tests"
-	@go list -m -f '{{.Dir}}/...' all | xargs go test -race -count=1
+	@for dir in $(GO_MODULES); do \
+		echo "  → $$dir"; \
+		(cd $$dir && go test -race -count=1 ./...) || exit 1; \
+	done
 
 test-js: ## Run JS/TS tests.
 	@echo "==> Running JS/TS tests"
@@ -60,12 +73,15 @@ test-js: ## Run JS/TS tests.
 .PHONY: lint lint-go lint-js lint-md
 lint: lint-go lint-js lint-md ## Run all linters.
 
-lint-go: ## Run go vet + golangci-lint (if installed).
+lint-go: ## Run go vet + golangci-lint (if installed) per module.
 	@echo "==> Linting Go"
-	@go list -m -f '{{.Dir}}/...' all | xargs go vet
+	@for dir in $(GO_MODULES); do \
+		echo "  → $$dir"; \
+		(cd $$dir && go vet ./...) || exit 1; \
+	done
 	@if command -v golangci-lint >/dev/null 2>&1; then \
-		for dir in $$(go list -m -f '{{.Dir}}' all); do \
-			(cd $$dir && golangci-lint run ./...); \
+		for dir in $(GO_MODULES); do \
+			(cd $$dir && golangci-lint run ./...) || exit 1; \
 		done; \
 	else \
 		echo "(golangci-lint not installed, skipping)"; \
