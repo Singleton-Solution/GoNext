@@ -1,0 +1,140 @@
+# GraphQL schema scaffold for the GoNext API.
+#
+# This is the initial schema for issue #83. It defines the read paths
+# (viewer, user, post, posts) plus a minimal mutation (createPost) so
+# we can exercise capability gating end-to-end. The full schema (pages,
+# terms, comments, media) lands in subsequent issues; the shape here
+# is the Relay-cursor style described in docs/05-admin-api.md §3.2.
+#
+# Conventions:
+#   * Lists use Relay-style {Type}Connection / {Type}Edge / PageInfo.
+#   * Mutations take a single Input object and return the updated entity.
+#   * Capability checks run inside resolvers (no schema-level @auth);
+#     this matches the REST policy.Can pattern so a single audit trail
+#     covers both transports.
+
+"""
+DateTime is an RFC3339 timestamp. Stored UTC, serialized with
+fractional seconds when present.
+"""
+scalar DateTime
+
+"""
+Cursor is an opaque, base64-encoded position used by Relay cursor
+pagination. Clients must treat it as a black box.
+"""
+scalar Cursor
+
+"""
+The currently authenticated user, plus content lookups. Every field
+is capability-gated server-side; an unauthenticated request resolving
+`viewer` returns null with no error path (the standard Relay shape).
+"""
+type Query {
+  "Currently authenticated user, or null if anonymous."
+  viewer: User
+
+  "Look up a post by its ID. Returns null if not found or not visible."
+  post(id: ID!): Post
+
+  """
+  Paginated list of posts. Returns a Relay cursor connection. `first`
+  caps the page size (server enforces a hard ceiling); `after` is the
+  cursor returned by the previous page's `pageInfo.endCursor`.
+  """
+  posts(first: Int, after: Cursor, filter: PostFilter): PostConnection!
+
+  "Look up a user by its ID."
+  user(id: ID!): User
+}
+
+"Top-level mutations. Phase 1 covers post creation only."
+type Mutation {
+  """
+  Create a new post in the requested status. Requires the `edit_posts`
+  capability. The resolver pulls the author from the request principal
+  — clients cannot spoof authorship.
+  """
+  createPost(input: CreatePostInput!): Post!
+}
+
+"""
+A registered user of the system. Sensitive fields (email) are only
+exposed to the viewer themselves or principals holding the
+`list_users` capability; otherwise they are nulled out.
+"""
+type User {
+  id: ID!
+  handle: String!
+  displayName: String
+  email: String
+  createdAt: DateTime!
+}
+
+"""
+A piece of content. The Post type here is the union of fields shared
+by all content types; the full content surface (pages, terms, media)
+extends Node / Content interfaces — those land in a follow-up issue.
+"""
+type Post {
+  id: ID!
+  title: String!
+  slug: String!
+  status: PostStatus!
+  excerpt: String
+  authorID: ID!
+  "Author of the post. Batched via dataloader to avoid N+1 lookups."
+  author: User!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  publishedAt: DateTime
+}
+
+"Publishing state of a Post. Mirrors the database enum 1:1."
+enum PostStatus {
+  DRAFT
+  PENDING
+  PUBLISHED
+  SCHEDULED
+  PRIVATE
+  TRASHED
+}
+
+"Filter parameters for `posts`. All fields are AND-combined."
+input PostFilter {
+  "Filter by status. Omitted = published only (the public default)."
+  status: PostStatus
+  "Filter by author ID."
+  authorID: ID
+  "Free-text title prefix match."
+  titlePrefix: String
+}
+
+"Cursor-paginated Post list. Standard Relay shape."
+type PostConnection {
+  edges: [PostEdge!]!
+  pageInfo: PageInfo!
+  "Total count of items matching the filter. May be expensive — clients should only request when they intend to render a count."
+  totalCount: Int!
+}
+
+type PostEdge {
+  cursor: Cursor!
+  node: Post!
+}
+
+"Standard Relay PageInfo. `endCursor` is empty when there is no next page."
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: Cursor
+  endCursor: Cursor
+}
+
+"Input for the createPost mutation."
+input CreatePostInput {
+  title: String!
+  slug: String!
+  excerpt: String
+  status: PostStatus
+}

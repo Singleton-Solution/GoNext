@@ -1,0 +1,56 @@
+# gqlgen configuration for the GoNext API.
+#
+# Layout:
+#   * Schema lives in schema.graphql (single file for now; gqlgen happily
+#     globs multiple files when we split it later).
+#   * Generated server code goes into generated/ — kept separate from
+#     hand-written code so a `gqlgen generate` run can be re-applied
+#     without clobbering resolver bodies.
+#   * Model structs go into model/ — gqlgen owns this directory; do
+#     not hand-edit, edit the schema and regenerate.
+#   * Resolver bodies live in resolvers/. gqlgen creates *.resolvers.go
+#     once per schema generation and never overwrites it afterwards;
+#     subsequent regenerations only patch interface diffs.
+
+schema:
+  - schema.graphql
+
+exec:
+  filename: generated/exec.go
+  package: generated
+
+model:
+  filename: model/models_gen.go
+  package: model
+
+resolver:
+  layout: follow-schema
+  dir: resolvers
+  package: resolvers
+  filename_template: "{name}.resolvers.go"
+
+# Tell gqlgen NOT to invent model structs for our domain types; we
+# bind them to the same Post/User shapes already used by the REST
+# handlers (via packages/go/db queries). For now, gqlgen-generated
+# models are the source of truth — the bindings come in a follow-up
+# when the shared domain types land.
+autobind: []
+
+# Map scalars to Go types we already use elsewhere.
+models:
+  ID:
+    model:
+      - github.com/99designs/gqlgen/graphql.ID
+  DateTime:
+    model:
+      - github.com/Singleton-Solution/GoNext/apps/api/internal/graphql/model.DateTime
+  Cursor:
+    model:
+      - github.com/Singleton-Solution/GoNext/apps/api/internal/graphql/model.Cursor
+  # Force a resolver for Post.author so the dataloader fan-out runs.
+  # Without this, gqlgen generates a trivial pass-through that reads
+  # the (always-nil) author field directly off the model struct.
+  Post:
+    fields:
+      author:
+        resolver: true
