@@ -71,8 +71,17 @@ jobs:
           cache: true
       - name: go work sync
         run: go work sync
-      - name: go vet (all workspace modules)
-        run: go list -m -f '{{.Dir}}/...' all | xargs go vet
+      # First-party modules only. `go list -m all` walks the entire
+      # transitive dep graph including testcontainers' pulled-in Docker
+      # source and other irrelevant packages, which then fail `go vet`
+      # on the runner. The workspace `use` block is the source of truth.
+      - name: go vet (workspace modules)
+        run: |
+          for dir in $(go work edit -json | python3 -c "import json,sys; [print(u['DiskPath']) for u in json.load(sys.stdin)['Use']]"); do
+            echo "::group::go vet $dir"
+            (cd "$dir" && go vet ./...)
+            echo "::endgroup::"
+          done
       - name: golangci-lint (per module)
         run: |
           # Install golangci-lint if not cached
@@ -80,7 +89,7 @@ jobs:
             curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.61.0
             export PATH="$(go env GOPATH)/bin:$PATH"
           fi
-          for dir in $(go list -m -f '{{.Dir}}' all); do
+          for dir in $(go work edit -json | python3 -c "import json,sys; [print(u['DiskPath']) for u in json.load(sys.stdin)['Use']]"); do
             echo "::group::golangci-lint $dir"
             (cd "$dir" && golangci-lint run ./...)
             echo "::endgroup::"
@@ -111,11 +120,18 @@ jobs:
           cache: true
       - name: go work sync
         run: go work sync
-      - name: Run tests (all workspace modules)
+      - name: Run tests (workspace modules)
         env:
           DATABASE_URL: postgres://postgres:ci@localhost:5432/gonext_test?sslmode=disable
           REDIS_URL: redis://localhost:6379
-        run: go list -m -f '{{.Dir}}/...' all | xargs go test -race -count=1
+        run: |
+          # Workspace `use` is the source of truth — `all` would pull
+          # transitive deps that don't belong to this repo.
+          for dir in $(go work edit -json | python3 -c "import json,sys; [print(u['DiskPath']) for u in json.load(sys.stdin)['Use']]"); do
+            echo "::group::go test $dir"
+            (cd "$dir" && go test -race -count=1 ./...)
+            echo "::endgroup::"
+          done
       - name: Upload coverage
         if: success() || failure()
         uses: actions/upload-artifact@v4
