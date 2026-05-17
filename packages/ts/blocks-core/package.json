@@ -23,7 +23,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@gonext/blocks-sdk": "workspace:*"
+    "@gonext/blocks-sdk": "workspace:*",
+    "@gonext/blocks-rich-text": "workspace:*"
   },
   "peerDependencies": {
     "react": "^19.0.0"
