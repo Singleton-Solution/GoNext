@@ -3,11 +3,14 @@
 // It loads configuration from the environment, sets up structured logging,
 // builds the HTTP router, applies the middleware chain, and serves until
 // interrupted by SIGINT/SIGTERM (the standard container lifecycle) or
-// until the parent context is canceled.
+// until the parent context is canceled. On signal, the shutdown
+// orchestrator (packages/go/shutdown) drives a LIFO drain across the
+// HTTP server, audit emitter, metrics flusher, Redis client, and DB
+// pool — all within the configured ShutdownTimeout budget.
 //
 // Exit codes:
 //
-//	0 — clean shutdown after Run completed without error.
+//	0 — clean shutdown after every registered closer drained.
 //	1 — configuration or startup error before serving began.
 //	2 — server error during run (port conflict, drain timeout, etc.).
 package main
@@ -15,6 +18,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -30,6 +34,7 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/httpx"
 	"github.com/Singleton-Solution/GoNext/packages/go/log"
 	redisclient "github.com/Singleton-Solution/GoNext/packages/go/redis"
+	"github.com/Singleton-Solution/GoNext/packages/go/shutdown"
 )
 
 const serviceName = "api"
@@ -69,17 +74,52 @@ func run(ctx context.Context) error {
 		"go_version", bi.GoVersion,
 	)
 
+	// Build the shutdown orchestrator first so we can register every
+	// long-lived resource as we create it. The orchestrator owns the
+	// signal handler (SIGINT/SIGTERM) and the drain budget; the
+	// per-binary main() is responsible only for wiring resources in
+	// dependency order.
+	orch, err := shutdown.New(shutdown.Options{
+		Log:    logger,
+		Budget: cfg.Server.ShutdownTimeout,
+	})
+	if err != nil {
+		return fmt.Errorf("shutdown: %w", err)
+	}
+
+	// DB and Redis are persistent state — register them first so they
+	// drain LAST (LIFO). Everything that runs during the drain (the
+	// HTTP server flushing in-flight responses, the audit emitter
+	// writing its last record) may depend on these.
 	pool, err := db.New(ctx, cfg.Database, logger)
 	if err != nil {
 		return fmt.Errorf("db: %w", err)
 	}
-	defer pool.Close()
+	if regErr := orch.Register("db.pool", shutdown.CloserFromFunc(pool.Close)); regErr != nil {
+		pool.Close()
+		return fmt.Errorf("register db: %w", regErr)
+	}
 
 	rdb, err := redisclient.New(ctx, cfg.Redis, logger)
 	if err != nil {
 		return fmt.Errorf("redis: %w", err)
 	}
-	defer func() { _ = rdb.Close() }()
+	if regErr := orch.Register("redis.client", shutdown.CloserFromIO(rdb)); regErr != nil {
+		_ = rdb.Close()
+		return fmt.Errorf("register redis: %w", regErr)
+	}
+
+	// Metrics + audit are best-effort flush points. They're registered
+	// AFTER persistence (so they drain BEFORE persistence on LIFO) —
+	// the last audit record needs the DB pool alive when it writes.
+	//
+	// Stubbed for now: metrics.Close and audit.Close exist in their
+	// respective packages but the wiring of a real exporter/emitter
+	// lands in the per-issue work for #4 (metrics) and #54 (audit).
+	// The registration shape is final, so when those exporters land,
+	// the only diff here is swapping the no-op for the real instance.
+	orch.MustRegister(logger, "metrics.flusher", noopCloser("metrics"))
+	orch.MustRegister(logger, "audit.emitter", noopCloser("audit"))
 
 	mux := buildRouter(cfg, pool, rdb)
 
@@ -97,7 +137,52 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("server: %w", err)
 	}
 
-	return srv.Run(ctx)
+	// The HTTP server is the LAST registration → FIRST to drain. That's
+	// the contract: stop accepting new connections immediately, then
+	// drain in-flight, then unwind state. We run Run() in a goroutine
+	// with a derived ctx so the orchestrator can cancel it just before
+	// invoking Shutdown.
+	serverCtx, cancelServer := context.WithCancel(ctx)
+	defer cancelServer()
+	orch.MustRegister(logger, "http.server", func(shutdownCtx context.Context) error {
+		// Cancel Run's ctx first so its own signal/ctx wait unblocks;
+		// then call Shutdown to drain in-flight requests. Without the
+		// cancel, Run's goroutine would Shutdown twice (once via its
+		// own signal handler if a real SIGTERM raced, once via us).
+		cancelServer()
+		return srv.Shutdown(shutdownCtx)
+	})
+
+	runErr := make(chan error, 1)
+	go func() { runErr <- srv.Run(serverCtx) }()
+
+	// Wait for either a signal/ctx cancellation (orchestrator path) or
+	// the server's Run returning an error on its own (port conflict,
+	// bind failure). Either way, drain through the orchestrator so all
+	// resources see a consistent shutdown.
+	waitErr := make(chan error, 1)
+	go func() { waitErr <- orch.Wait(ctx) }()
+
+	select {
+	case err := <-runErr:
+		// Server crashed (or stopped cleanly before signal). Run the
+		// drain anyway so the DB pool and Redis client are closed
+		// cleanly.
+		drainErr := orch.Drain(context.Background())
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("server: %w", err)
+		}
+		return drainErr
+	case err := <-waitErr:
+		// Drain finished. The Run goroutine has been canceled and its
+		// closer fired through the orchestrator; drain its return
+		// value with a non-blocking receive so it isn't leaked.
+		select {
+		case <-runErr:
+		default:
+		}
+		return err
+	}
 }
 
 // buildRouter assembles the HTTP route table. Subsequent issues mount
@@ -152,5 +237,20 @@ func parseLogLevel(s string) slog.Level {
 		return slog.LevelError
 	default:
 		return slog.LevelInfo
+	}
+}
+
+// noopCloser is a placeholder for resources whose Close hooks aren't
+// implemented yet (audit emitter, metrics flusher). Logging the name
+// lets us prove the wiring is correct even before the real flushers
+// arrive. Once the real implementations land in their respective
+// issues, this helper goes away.
+func noopCloser(name string) shutdown.Closer {
+	return func(_ context.Context) error {
+		// Intentionally silent — the orchestrator already logs every
+		// step with its duration. A no-op closer adds no useful
+		// information beyond "I was registered correctly".
+		_ = name
+		return nil
 	}
 }

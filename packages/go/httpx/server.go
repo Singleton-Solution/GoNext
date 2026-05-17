@@ -202,6 +202,29 @@ func (s *Server) Ready() <-chan struct{} {
 	return s.readyCh
 }
 
+// Shutdown gracefully drains the underlying http.Server using the
+// supplied ctx as the deadline. This is the integration point for
+// the shutdown orchestrator (packages/go/shutdown), which prefers to
+// own the signal handling and budget itself.
+//
+// When the orchestrator drives shutdown, callers typically wire it
+// like so in main():
+//
+//	go func() { _ = srv.Run(serverCtx) }()
+//	orch.Register("http.server", srv.Shutdown)
+//
+// where serverCtx is canceled by the orchestrator just before it
+// invokes srv.Shutdown. That ordering — cancel Run's context to break
+// its own signal wait, then Shutdown for the actual drain — keeps the
+// existing single-binary behavior working and lets the orchestrator
+// take over when the binary has more than HTTP to drain.
+//
+// Shutdown forwards to http.Server.Shutdown verbatim and never blocks
+// past ctx's deadline.
+func (s *Server) Shutdown(ctx context.Context) error {
+	return s.srv.Shutdown(ctx)
+}
+
 // Addr returns the bound listener address. Only meaningful after Ready
 // fires (before then, returns the configured address which may have a
 // port of 0).
