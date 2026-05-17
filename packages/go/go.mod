@@ -1,8 +1,10 @@
 module github.com/Singleton-Solution/GoNext/packages/go
 
-go 1.24
+go 1.25.0
 
 require (
+	github.com/coreos/go-oidc/v3 v3.18.0
+	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/minio/minio-go/v7 v7.1.0
@@ -13,6 +15,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.42.0
 	github.com/testcontainers/testcontainers-go/modules/redis v0.42.0
 	golang.org/x/crypto v0.51.0
+	golang.org/x/oauth2 v0.36.0
 )
 
 require (
