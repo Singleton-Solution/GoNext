@@ -1,0 +1,240 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "GoNext API",
+    "summary": "GoNext core HTTP API surface.",
+    "description": "OpenAPI 3.1 description of the GoNext core HTTP API. This is the scaffold delivered by issue #29 — only the identity endpoint (GET /) is described concretely. Resource sections for posts, pages, users, and comments are reserved with empty schemas and will be filled in by subsequent issues that ship the corresponding handlers (see docs/05-admin-api.md §3 for the canonical surface design).",
+    "version": "0.0.0",
+    "license": {
+      "name": "FSL-1.1-Apache-2.0",
+      "identifier": "FSL-1.1-Apache-2.0"
+    },
+    "contact": {
+      "name": "GoNext maintainers",
+      "url": "https://github.com/Singleton-Solution/GoNext"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local development server (default httpx bind)."
+    }
+  ],
+  "tags": [
+    { "name": "meta", "description": "Server identity and health." },
+    { "name": "posts", "description": "Post content type. Reserved — handlers not yet shipped." },
+    { "name": "pages", "description": "Page content type. Reserved — handlers not yet shipped." },
+    { "name": "users", "description": "User accounts and profiles. Reserved — handlers not yet shipped." },
+    { "name": "comments", "description": "Comment threads. Reserved — handlers not yet shipped." }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "tags": ["meta"],
+        "summary": "Server identity",
+        "description": "Returns the server identity payload: name, version, and commit. This is the only endpoint shipped by issue #2 (root handler) and is the concrete example for this scaffold.",
+        "operationId": "getRoot",
+        "responses": {
+          "200": {
+            "description": "Identity payload.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Identity" },
+                "examples": {
+                  "default": {
+                    "summary": "Typical local response",
+                    "value": {
+                      "name": "gonext",
+                      "version": "dev",
+                      "commit": "unknown"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Identity": {
+        "type": "object",
+        "description": "Server identity returned by GET /. Mirrors the JSON written by apps/api/cmd/server/main.go.",
+        "required": ["name", "version", "commit"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Service name. Always 'gonext' for this binary.",
+            "examples": ["gonext"]
+          },
+          "version": {
+            "type": "string",
+            "description": "Semantic version string injected at build time (defaults to 'dev').",
+            "examples": ["v0.1.0", "dev"]
+          },
+          "commit": {
+            "type": "string",
+            "description": "Git commit SHA the binary was built from (defaults to 'unknown').",
+            "examples": ["abc1234", "unknown"]
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "description": "RFC 7807-flavoured error envelope (see docs/05-admin-api.md §3.1 Errors).",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["status", "code", "title"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "format": "uri",
+                "description": "A URI reference identifying the problem type."
+              },
+              "title": {
+                "type": "string",
+                "description": "A short, human-readable summary of the problem."
+              },
+              "status": {
+                "type": "integer",
+                "minimum": 400,
+                "maximum": 599,
+                "description": "HTTP status code."
+              },
+              "code": {
+                "type": "string",
+                "description": "Stable machine-readable error code."
+              },
+              "detail": {
+                "type": "string",
+                "description": "Human-readable explanation specific to this occurrence."
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "description": "Per-field validation errors keyed by field name."
+              },
+              "trace_id": {
+                "type": "string",
+                "description": "Server-side trace ID for correlating logs."
+              }
+            }
+          }
+        }
+      },
+      "_PostsPlaceholder": {
+        "description": "Reserved — see docs/05-admin-api.md §3.1 for the canonical Post resource shape. Will be populated when the posts handler issue lands.",
+        "type": "object"
+      },
+      "_PagesPlaceholder": {
+        "description": "Reserved — see docs/05-admin-api.md §3.1 for the canonical Page resource shape. Will be populated when the pages handler issue lands.",
+        "type": "object"
+      },
+      "_UsersPlaceholder": {
+        "description": "Reserved — see docs/05-admin-api.md §3.1 for the canonical User resource shape. Will be populated when the users handler issue lands.",
+        "type": "object"
+      },
+      "_CommentsPlaceholder": {
+        "description": "Reserved — see docs/05-admin-api.md §3.1 for the canonical Comment resource shape. Will be populated when the comments handler issue lands.",
+        "type": "object"
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Malformed request: invalid JSON, missing required fields, or values that fail validation.",
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+        }
+      },
+      "Unauthorized": {
+        "description": "Authentication required or the supplied credentials are invalid/expired.",
+        "headers": {
+          "WWW-Authenticate": {
+            "description": "Which auth schemes the server will accept.",
+            "schema": { "type": "string" }
+          }
+        },
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+        }
+      },
+      "Forbidden": {
+        "description": "The caller is authenticated but lacks the capability required for this operation.",
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found, or not visible to the caller.",
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Rate limit exceeded (see docs/05-admin-api.md §3.5).",
+        "headers": {
+          "Retry-After": {
+            "description": "Seconds until the caller may retry.",
+            "schema": { "type": "integer", "minimum": 0 }
+          },
+          "RateLimit-Limit": { "schema": { "type": "integer" } },
+          "RateLimit-Remaining": { "schema": { "type": "integer" } },
+          "RateLimit-Reset": { "schema": { "type": "integer" } }
+        },
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+        }
+      },
+      "InternalError": {
+        "description": "Unexpected server error. Includes a trace_id for log correlation.",
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+        }
+      }
+    },
+    "securitySchemes": {
+      "CookieSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-gn_session",
+        "description": "Admin-UI cookie session. HTTPOnly, SameSite=Lax, signed with HMAC. Paired with the __Host-gn_csrf double-submit token + X-CSRF-Token header on mutating requests."
+      },
+      "BearerJWT": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Short-lived (15m) JWT access token used by first-party scripts, CLIs, and the dashboard's API client. Refreshed via POST /api/v1/auth/refresh."
+      },
+      "ApplicationPassword": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "WordPress-compatible Application Password (HTTP Basic) for programmatic clients that already speak the WP REST API. Backed by long-lived API keys stored hashed in Postgres."
+      }
+    },
+    "parameters": {
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" },
+        "description": "Opaque pagination cursor, as returned in the previous response's page.next / page.prev."
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 25 },
+        "description": "Maximum number of items to return."
+      }
+    }
+  },
+  "security": []
+}
