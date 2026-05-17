@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`core/quote > snapshot: large quote with citation 1`] = `"<blockquote class="gn-block-quote is-style-large"><p>A line</p><cite>A. Person</cite></blockquote>"`;
+
+exports[`core/quote > snapshot: plain quote 1`] = `"<blockquote class="gn-block-quote"><p>A line</p></blockquote>"`;
