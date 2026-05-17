@@ -20,11 +20,16 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+	goredis "github.com/redis/go-redis/v9"
+
+	"github.com/Singleton-Solution/GoNext/apps/api/internal/healthz"
 	"github.com/Singleton-Solution/GoNext/packages/go/buildinfo"
 	"github.com/Singleton-Solution/GoNext/packages/go/config"
 	"github.com/Singleton-Solution/GoNext/packages/go/db"
 	"github.com/Singleton-Solution/GoNext/packages/go/httpx"
 	"github.com/Singleton-Solution/GoNext/packages/go/log"
+	redisclient "github.com/Singleton-Solution/GoNext/packages/go/redis"
 )
 
 const serviceName = "api"
@@ -70,7 +75,13 @@ func run(ctx context.Context) error {
 	}
 	defer pool.Close()
 
-	mux := buildRouter(cfg)
+	rdb, err := redisclient.New(ctx, cfg.Redis, logger)
+	if err != nil {
+		return fmt.Errorf("redis: %w", err)
+	}
+	defer func() { _ = rdb.Close() }()
+
+	mux := buildRouter(cfg, pool, rdb)
 
 	srv, err := httpx.New(httpx.Options{
 		Config:  cfg.Server,
@@ -91,8 +102,13 @@ func run(ctx context.Context) error {
 
 // buildRouter assembles the HTTP route table. Subsequent issues mount
 // real routes here; for now we serve a single root endpoint that returns
-// the binary's identity, as required by issue #2's AC.
-func buildRouter(_ *config.Config) http.Handler {
+// the binary's identity, as required by issue #2's AC, plus the
+// operational health endpoints introduced in #8.
+//
+// pool and rdb are threaded in so the readiness handler can probe them.
+// They are NOT consulted for liveness — liveness must never depend on
+// anything external (see internal/healthz/doc.go).
+func buildRouter(_ *config.Config, pool *pgxpool.Pool, rdb *goredis.Client) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
@@ -103,6 +119,15 @@ func buildRouter(_ *config.Config) http.Handler {
 			"commit":  bi.Commit,
 		})
 	})
+
+	// Operational health endpoints. Both are excluded from the Logger
+	// middleware's per-request log line (see httpx.Logger skipPaths in
+	// run()) so Kubernetes probe traffic doesn't drown the request log.
+	mux.Handle("GET /healthz", healthz.Liveness())
+	mux.Handle("GET /readyz", healthz.Readiness(
+		healthz.DBCheck(pool),
+		healthz.RedisCheck(rdb),
+	))
 
 	return mux
 }
