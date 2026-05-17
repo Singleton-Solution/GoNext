@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Singleton-Solution/GoNext/cli/gonext/cmd/theme"
 	"github.com/Singleton-Solution/GoNext/packages/go/buildinfo"
 )
 
@@ -26,6 +27,8 @@ func main() {
 		}
 	case args[0] == "help", args[0] == "--help", args[0] == "-h":
 		fmt.Println(usage)
+	case args[0] == "theme":
+		os.Exit(theme.Run(args[1:], os.Stdout, os.Stderr))
 	default:
 		fmt.Fprintf(os.Stderr, "gonext: unknown command %q\n\n%s\n", args[0], usage)
 		os.Exit(2)
@@ -48,4 +51,5 @@ Commands (planned):
   version    Print version information
 
 Available now:
+  theme test Run the theme contract suite against a theme on disk
   version    Print build info`
