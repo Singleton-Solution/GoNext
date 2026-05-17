@@ -4,11 +4,14 @@ Reference themes shipped in the GoNext monorepo. Each is a separate workspace me
 
 See [docs/03-theme-system.md](../docs/03-theme-system.md) and [proposal S8](../docs/proposals/14-proposals-strategic.md).
 
+## Shipped
+
+- **[`gn-hello/`](./gn-hello)** — classic theme, minimal blog reference. Exercises the `theme.json` v1 manifest and the template hierarchy resolver with the smallest theme that's still useful. Default new-site theme until `gn-pro` lands.
+
 ## Planned
 
-- **`gn-hello/`** — block theme. Minimal, fast, demonstrates full-site editing. Default new-site theme.
-- **`gn-pro/`** — classic theme (code-defined templates). Demonstrates the theme SDK for developers who want full control.
+- **`gn-pro/`** — block theme demonstrating full-site editing, patterns, block style variations, dark-mode override, and Customizer surfaces. The end-to-end SDK showcase.
 
 ## Status
 
-Empty — these are P3 deliverables (template hierarchy + theme installer exist first).
+`gn-hello` ships with #28 (this PR). `gn-pro` is a P3 deliverable that follows the theme installer.
