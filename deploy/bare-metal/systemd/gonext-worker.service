@@ -1,0 +1,64 @@
+[Unit]
+# GoNext background worker.
+#
+# Drains the asynq/Redis-backed job queue (media transcodes, webhooks, ISR
+# revalidation triggers, plugin async hooks). See docs/12-jobs-cron.md.
+#
+# Sibling unit to gonext-api.service — same hardening, no listening sockets.
+Description=GoNext background worker
+Documentation=https://github.com/Singleton-Solution/GoNext/blob/main/docs/12-jobs-cron.md
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gonext
+Group=gonext
+
+EnvironmentFile=/etc/gonext/.env
+
+# Worker mode. The same binary may also expose --mode=cron (see
+# gonext-cron.service) — we keep one binary on disk to simplify upgrades.
+ExecStart=/usr/local/bin/gonext-worker --mode=worker
+
+Restart=on-failure
+RestartSec=5s
+
+KillSignal=SIGTERM
+# Workers may be holding a long-running job; give them a generous drain
+# window before SIGKILL.
+TimeoutStopSec=120
+
+LimitNOFILE=65536
+
+# ---------------------------------------------------------------------------
+# Security hardening (mirrors gonext-api.service)
+# ---------------------------------------------------------------------------
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/gonext
+
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target

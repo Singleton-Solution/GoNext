@@ -1,0 +1,131 @@
+# GoNext — Caddy reverse-proxy configuration.
+#
+# Caddy is preferred over Nginx for bare-metal self-host because it bundles
+# an ACME client and obtains/renews Let's Encrypt certificates automatically
+# the first time each hostname is served. No extra cron jobs, no certbot.
+#
+# How to use this file:
+#
+#   1. Copy to /etc/caddy/Caddyfile.
+#   2. Replace `example.com` and `admin.example.com` with the hostnames you
+#      pointed at the server's A/AAAA records.
+#   3. Replace the `tls` email with a real address — Let's Encrypt sends
+#      expiry warnings there.
+#   4. `sudo caddy validate --config /etc/caddy/Caddyfile`
+#   5. `sudo systemctl reload caddy`
+#
+# Caddy listens on :80 (redirects to :443) and :443 by default. Upstreams:
+#
+#   127.0.0.1:8080  — gonext-api      (Go binary, JSON + GraphQL)
+#   127.0.0.1:3000  — public Next.js  (the marketing/front-of-house site)
+#   127.0.0.1:3001  — admin Next.js   (the CMS dashboard)
+#
+# All three are loopback-only; only Caddy is exposed on the public network.
+
+# ---------------------------------------------------------------------------
+# Global options
+# ---------------------------------------------------------------------------
+{
+	# Replace with a real address you monitor.
+	email admin@example.com
+
+	# Default servers: HTTP/2 + HTTP/3 (QUIC) on :443, redirects on :80.
+	# Uncomment to opt out of HTTP/3 if your firewall blocks UDP.
+	# servers {
+	#     protocol {
+	#         experimental_http3 false
+	#     }
+	# }
+}
+
+# ---------------------------------------------------------------------------
+# Public site — example.com
+# ---------------------------------------------------------------------------
+example.com {
+	encode zstd gzip
+
+	# Structured access log. Caddy rotates by size; configure rotation in the
+	# `log` directive below if you want different thresholds.
+	log {
+		output file /var/log/caddy/example.com.access.log {
+			roll_size 100mb
+			roll_keep 7
+		}
+		format json
+	}
+
+	# Security headers. See docs/13-security-baseline.md for the full set.
+	header {
+		# HTTPS only, for a year, including subdomains.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		# Block MIME-sniffing attacks.
+		X-Content-Type-Options "nosniff"
+		# Don't leak the referring page off-site.
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Disable powerful features by default.
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# Remove the Server: Caddy banner.
+		-Server
+	}
+
+	# API and GraphQL endpoints proxy to the Go API on :8080.
+	@api {
+		path /api/* /graphql /graphql/*
+	}
+	reverse_proxy @api 127.0.0.1:8080 {
+		# Stream Server-Sent Events / large uploads without buffering.
+		flush_interval -1
+		transport http {
+			read_timeout 60s
+			write_timeout 60s
+		}
+	}
+
+	# Everything else goes to the public Next.js app.
+	reverse_proxy 127.0.0.1:3000 {
+		flush_interval -1
+	}
+}
+
+# ---------------------------------------------------------------------------
+# Admin dashboard — admin.example.com
+# ---------------------------------------------------------------------------
+admin.example.com {
+	encode zstd gzip
+
+	log {
+		output file /var/log/caddy/admin.example.com.access.log {
+			roll_size 100mb
+			roll_keep 7
+		}
+		format json
+	}
+
+	# Stricter headers for the admin surface.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'"
+		-Server
+	}
+
+	# Admin proxies the same API to /api/* — same backend, same auth cookie
+	# scope (set domain=.example.com if you want SSO across both hosts).
+	@api {
+		path /api/* /graphql /graphql/*
+	}
+	reverse_proxy @api 127.0.0.1:8080 {
+		flush_interval -1
+		transport http {
+			read_timeout 60s
+			write_timeout 60s
+		}
+	}
+
+	reverse_proxy 127.0.0.1:3001 {
+		flush_interval -1
+	}
+}
