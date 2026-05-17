@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0"
+  xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/"
+  xmlns:content="http://purl.org/rss/1.0/modules/content/"
+  xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:wp="http://wordpress.org/export/1.2/">
+<channel>
+  <title>Rich Blog</title>
+  <link>https://rich.example.com</link>
+  <description>A test blog with everything</description>
+  <pubDate>Thu, 14 Mar 2024 12:34:56 +0000</pubDate>
+  <language>en-US</language>
+  <wp:wxr_version>1.2</wp:wxr_version>
+  <wp:base_site_url>https://rich.example.com</wp:base_site_url>
+  <wp:base_blog_url>https://rich.example.com</wp:base_blog_url>
+  <generator>https://wordpress.org/?v=6.4.2</generator>
+
+  <wp:author>
+    <wp:author_id>1</wp:author_id>
+    <wp:author_login><![CDATA[alice]]></wp:author_login>
+    <wp:author_email><![CDATA[alice@rich.example.com]]></wp:author_email>
+    <wp:author_display_name><![CDATA[Alice]]></wp:author_display_name>
+    <wp:author_first_name><![CDATA[Alice]]></wp:author_first_name>
+    <wp:author_last_name><![CDATA[Liddell]]></wp:author_last_name>
+  </wp:author>
+
+  <wp:category>
+    <wp:term_id>2</wp:term_id>
+    <wp:category_nicename><![CDATA[news]]></wp:category_nicename>
+    <wp:category_parent><![CDATA[]]></wp:category_parent>
+    <wp:cat_name><![CDATA[News]]></wp:cat_name>
+    <wp:category_description><![CDATA[Site news]]></wp:category_description>
+  </wp:category>
+
+  <wp:category>
+    <wp:term_id>3</wp:term_id>
+    <wp:category_nicename><![CDATA[announcements]]></wp:category_nicename>
+    <wp:category_parent><![CDATA[news]]></wp:category_parent>
+    <wp:cat_name><![CDATA[Announcements]]></wp:cat_name>
+    <wp:category_description><![CDATA[]]></wp:category_description>
+  </wp:category>
+
+  <wp:tag>
+    <wp:term_id>10</wp:term_id>
+    <wp:tag_slug><![CDATA[golang]]></wp:tag_slug>
+    <wp:tag_name><![CDATA[Go]]></wp:tag_name>
+    <wp:tag_description><![CDATA[The Go programming language]]></wp:tag_description>
+  </wp:tag>
+
+  <item>
+    <title>A Post With Everything</title>
+    <link>https://rich.example.com/everything/</link>
+    <pubDate>Fri, 15 Mar 2024 09:00:00 +0000</pubDate>
+    <dc:creator><![CDATA[alice]]></dc:creator>
+    <description></description>
+    <content:encoded><![CDATA[<p>This is a <em>rich</em> post with <code>&lt;script&gt;</code> tags &amp; entities preserved.</p>]]></content:encoded>
+    <excerpt:encoded><![CDATA[A short excerpt.]]></excerpt:encoded>
+    <wp:post_id>100</wp:post_id>
+    <wp:post_date><![CDATA[2024-03-15 09:00:00]]></wp:post_date>
+    <wp:post_date_gmt><![CDATA[2024-03-15 09:00:00]]></wp:post_date_gmt>
+    <wp:comment_status><![CDATA[open]]></wp:comment_status>
+    <wp:ping_status><![CDATA[open]]></wp:ping_status>
+    <wp:post_name><![CDATA[everything]]></wp:post_name>
+    <wp:status><![CDATA[publish]]></wp:status>
+    <wp:post_parent>0</wp:post_parent>
+    <wp:menu_order>0</wp:menu_order>
+    <wp:post_type><![CDATA[post]]></wp:post_type>
+    <wp:post_password><![CDATA[]]></wp:post_password>
+    <wp:is_sticky>0</wp:is_sticky>
+    <category domain="category" nicename="news"><![CDATA[News]]></category>
+    <category domain="category" nicename="announcements"><![CDATA[Announcements]]></category>
+    <category domain="category" nicename="updates"><![CDATA[Updates]]></category>
+    <category domain="category" nicename="releases"><![CDATA[Releases]]></category>
+    <category domain="category" nicename="general"><![CDATA[General]]></category>
+    <category domain="post_tag" nicename="golang"><![CDATA[Go]]></category>
+    <wp:postmeta>
+      <wp:meta_key><![CDATA[_yoast_seo_title]]></wp:meta_key>
+      <wp:meta_value><![CDATA[Custom SEO Title]]></wp:meta_value>
+    </wp:postmeta>
+    <wp:postmeta>
+      <wp:meta_key><![CDATA[_yoast_seo_desc]]></wp:meta_key>
+      <wp:meta_value><![CDATA[Custom SEO description with <strong>HTML</strong>]]></wp:meta_value>
+    </wp:postmeta>
+    <wp:postmeta>
+      <wp:meta_key><![CDATA[_thumbnail_id]]></wp:meta_key>
+      <wp:meta_value><![CDATA[42]]></wp:meta_value>
+    </wp:postmeta>
+    <wp:postmeta>
+      <wp:meta_key><![CDATA[_edit_lock]]></wp:meta_key>
+      <wp:meta_value><![CDATA[1710494400:1]]></wp:meta_value>
+    </wp:postmeta>
+    <wp:postmeta>
+      <wp:meta_key><![CDATA[_edit_last]]></wp:meta_key>
+      <wp:meta_value><![CDATA[1]]></wp:meta_value>
+    </wp:postmeta>
+    <wp:postmeta>
+      <wp:meta_key><![CDATA[acf_field_one]]></wp:meta_key>
+      <wp:meta_value><![CDATA[value one]]></wp:meta_value>
+    </wp:postmeta>
+    <wp:postmeta>
+      <wp:meta_key><![CDATA[acf_field_two]]></wp:meta_key>
+      <wp:meta_value><![CDATA[value two]]></wp:meta_value>
+    </wp:postmeta>
+    <wp:postmeta>
+      <wp:meta_key><![CDATA[acf_field_three]]></wp:meta_key>
+      <wp:meta_value><![CDATA[value three]]></wp:meta_value>
+    </wp:postmeta>
+    <wp:postmeta>
+      <wp:meta_key><![CDATA[acf_field_four]]></wp:meta_key>
+      <wp:meta_value><![CDATA[value four]]></wp:meta_value>
+    </wp:postmeta>
+    <wp:postmeta>
+      <wp:meta_key><![CDATA[acf_field_five]]></wp:meta_key>
+      <wp:meta_value><![CDATA[value five]]></wp:meta_value>
+    </wp:postmeta>
+    <wp:postmeta>
+      <wp:meta_key><![CDATA[acf_field_six]]></wp:meta_key>
+      <wp:meta_value><![CDATA[value six]]></wp:meta_value>
+    </wp:postmeta>
+    <wp:postmeta>
+      <wp:meta_key><![CDATA[acf_field_seven]]></wp:meta_key>
+      <wp:meta_value><![CDATA[value seven]]></wp:meta_value>
+    </wp:postmeta>
+    <wp:postmeta>
+      <wp:meta_key><![CDATA[acf_field_eight]]></wp:meta_key>
+      <wp:meta_value><![CDATA[value eight]]></wp:meta_value>
+    </wp:postmeta>
+    <wp:postmeta>
+      <wp:meta_key><![CDATA[acf_field_nine]]></wp:meta_key>
+      <wp:meta_value><![CDATA[value nine]]></wp:meta_value>
+    </wp:postmeta>
+    <wp:postmeta>
+      <wp:meta_key><![CDATA[acf_field_ten]]></wp:meta_key>
+      <wp:meta_value><![CDATA[value ten]]></wp:meta_value>
+    </wp:postmeta>
+    <wp:postmeta>
+      <wp:meta_key><![CDATA[acf_field_eleven]]></wp:meta_key>
+      <wp:meta_value><![CDATA[value eleven]]></wp:meta_value>
+    </wp:postmeta>
+    <wp:postmeta>
+      <wp:meta_key><![CDATA[acf_field_twelve]]></wp:meta_key>
+      <wp:meta_value><![CDATA[value twelve]]></wp:meta_value>
+    </wp:postmeta>
+    <wp:postmeta>
+      <wp:meta_key><![CDATA[acf_field_thirteen]]></wp:meta_key>
+      <wp:meta_value><![CDATA[value thirteen]]></wp:meta_value>
+    </wp:postmeta>
+    <wp:postmeta>
+      <wp:meta_key><![CDATA[acf_field_fourteen]]></wp:meta_key>
+      <wp:meta_value><![CDATA[value fourteen]]></wp:meta_value>
+    </wp:postmeta>
+    <wp:postmeta>
+      <wp:meta_key><![CDATA[acf_field_fifteen]]></wp:meta_key>
+      <wp:meta_value><![CDATA[value fifteen]]></wp:meta_value>
+    </wp:postmeta>
+    <wp:comment>
+      <wp:comment_id>1</wp:comment_id>
+      <wp:comment_author><![CDATA[Bob]]></wp:comment_author>
+      <wp:comment_author_email><![CDATA[bob@example.com]]></wp:comment_author_email>
+      <wp:comment_author_url><![CDATA[https://bob.example.com]]></wp:comment_author_url>
+      <wp:comment_author_IP><![CDATA[192.0.2.1]]></wp:comment_author_IP>
+      <wp:comment_date><![CDATA[2024-03-15 10:00:00]]></wp:comment_date>
+      <wp:comment_date_gmt><![CDATA[2024-03-15 10:00:00]]></wp:comment_date_gmt>
+      <wp:comment_content><![CDATA[Great post!]]></wp:comment_content>
+      <wp:comment_approved><![CDATA[1]]></wp:comment_approved>
+      <wp:comment_type><![CDATA[]]></wp:comment_type>
+      <wp:comment_parent>0</wp:comment_parent>
+      <wp:comment_user_id>0</wp:comment_user_id>
+    </wp:comment>
+    <wp:comment>
+      <wp:comment_id>2</wp:comment_id>
+      <wp:comment_author><![CDATA[Alice]]></wp:comment_author>
+      <wp:comment_author_email><![CDATA[alice@rich.example.com]]></wp:comment_author_email>
+      <wp:comment_author_url><![CDATA[]]></wp:comment_author_url>
+      <wp:comment_author_IP><![CDATA[192.0.2.2]]></wp:comment_author_IP>
+      <wp:comment_date><![CDATA[2024-03-15 10:30:00]]></wp:comment_date>
+      <wp:comment_date_gmt><![CDATA[2024-03-15 10:30:00]]></wp:comment_date_gmt>
+      <wp:comment_content><![CDATA[Thanks Bob!]]></wp:comment_content>
+      <wp:comment_approved><![CDATA[1]]></wp:comment_approved>
+      <wp:comment_type><![CDATA[]]></wp:comment_type>
+      <wp:comment_parent>1</wp:comment_parent>
+      <wp:comment_user_id>1</wp:comment_user_id>
+    </wp:comment>
+    <wp:comment>
+      <wp:comment_id>3</wp:comment_id>
+      <wp:comment_author><![CDATA[Carol]]></wp:comment_author>
+      <wp:comment_author_email><![CDATA[carol@example.com]]></wp:comment_author_email>
+      <wp:comment_author_url><![CDATA[]]></wp:comment_author_url>
+      <wp:comment_author_IP><![CDATA[192.0.2.3]]></wp:comment_author_IP>
+      <wp:comment_date><![CDATA[2024-03-15 11:00:00]]></wp:comment_date>
+      <wp:comment_date_gmt><![CDATA[2024-03-15 11:00:00]]></wp:comment_date_gmt>
+      <wp:comment_content><![CDATA[Comment 3]]></wp:comment_content>
+      <wp:comment_approved><![CDATA[1]]></wp:comment_approved>
+      <wp:comment_type><![CDATA[]]></wp:comment_type>
+      <wp:comment_parent>0</wp:comment_parent>
+      <wp:comment_user_id>0</wp:comment_user_id>
+    </wp:comment>
+    <wp:comment>
+      <wp:comment_id>4</wp:comment_id>
+      <wp:comment_author><![CDATA[Dave]]></wp:comment_author>
+      <wp:comment_author_email><![CDATA[dave@example.com]]></wp:comment_author_email>
+      <wp:comment_author_url><![CDATA[]]></wp:comment_author_url>
+      <wp:comment_author_IP><![CDATA[192.0.2.4]]></wp:comment_author_IP>
+      <wp:comment_date><![CDATA[2024-03-15 12:00:00]]></wp:comment_date>
+      <wp:comment_date_gmt><![CDATA[2024-03-15 12:00:00]]></wp:comment_date_gmt>
+      <wp:comment_content><![CDATA[Comment 4]]></wp:comment_content>
+      <wp:comment_approved><![CDATA[0]]></wp:comment_approved>
+      <wp:comment_type><![CDATA[]]></wp:comment_type>
+      <wp:comment_parent>0</wp:comment_parent>
+      <wp:comment_user_id>0</wp:comment_user_id>
+    </wp:comment>
+    <wp:comment>
+      <wp:comment_id>5</wp:comment_id>
+      <wp:comment_author><![CDATA[Eve]]></wp:comment_author>
+      <wp:comment_author_email><![CDATA[eve@example.com]]></wp:comment_author_email>
+      <wp:comment_author_url><![CDATA[]]></wp:comment_author_url>
+      <wp:comment_author_IP><![CDATA[192.0.2.5]]></wp:comment_author_IP>
+      <wp:comment_date><![CDATA[2024-03-15 13:00:00]]></wp:comment_date>
+      <wp:comment_date_gmt><![CDATA[2024-03-15 13:00:00]]></wp:comment_date_gmt>
+      <wp:comment_content><![CDATA[Spam comment]]></wp:comment_content>
+      <wp:comment_approved><![CDATA[spam]]></wp:comment_approved>
+      <wp:comment_type><![CDATA[]]></wp:comment_type>
+      <wp:comment_parent>0</wp:comment_parent>
+      <wp:comment_user_id>0</wp:comment_user_id>
+    </wp:comment>
+    <wp:comment>
+      <wp:comment_id>6</wp:comment_id>
+      <wp:comment_author><![CDATA[A Pingback Source]]></wp:comment_author>
+      <wp:comment_author_email><![CDATA[]]></wp:comment_author_email>
+      <wp:comment_author_url><![CDATA[https://other.example.com/ref]]></wp:comment_author_url>
+      <wp:comment_author_IP><![CDATA[192.0.2.6]]></wp:comment_author_IP>
+      <wp:comment_date><![CDATA[2024-03-15 14:00:00]]></wp:comment_date>
+      <wp:comment_date_gmt><![CDATA[2024-03-15 14:00:00]]></wp:comment_date_gmt>
+      <wp:comment_content><![CDATA[Referenced from other.example.com]]></wp:comment_content>
+      <wp:comment_approved><![CDATA[1]]></wp:comment_approved>
+      <wp:comment_type><![CDATA[pingback]]></wp:comment_type>
+      <wp:comment_parent>0</wp:comment_parent>
+      <wp:comment_user_id>0</wp:comment_user_id>
+    </wp:comment>
+    <wp:comment>
+      <wp:comment_id>7</wp:comment_id>
+      <wp:comment_author><![CDATA[Frank]]></wp:comment_author>
+      <wp:comment_author_email><![CDATA[frank@example.com]]></wp:comment_author_email>
+      <wp:comment_author_url><![CDATA[]]></wp:comment_author_url>
+      <wp:comment_author_IP><![CDATA[192.0.2.7]]></wp:comment_author_IP>
+      <wp:comment_date><![CDATA[2024-03-15 15:00:00]]></wp:comment_date>
+      <wp:comment_date_gmt><![CDATA[2024-03-15 15:00:00]]></wp:comment_date_gmt>
+      <wp:comment_content><![CDATA[Comment 7]]></wp:comment_content>
+      <wp:comment_approved><![CDATA[1]]></wp:comment_approved>
+      <wp:comment_type><![CDATA[]]></wp:comment_type>
+      <wp:comment_parent>0</wp:comment_parent>
+      <wp:comment_user_id>0</wp:comment_user_id>
+    </wp:comment>
+    <wp:comment>
+      <wp:comment_id>8</wp:comment_id>
+      <wp:comment_author><![CDATA[Grace]]></wp:comment_author>
+      <wp:comment_author_email><![CDATA[grace@example.com]]></wp:comment_author_email>
+      <wp:comment_author_url><![CDATA[]]></wp:comment_author_url>
+      <wp:comment_author_IP><![CDATA[192.0.2.8]]></wp:comment_author_IP>
+      <wp:comment_date><![CDATA[2024-03-15 16:00:00]]></wp:comment_date>
+      <wp:comment_date_gmt><![CDATA[2024-03-15 16:00:00]]></wp:comment_date_gmt>
+      <wp:comment_content><![CDATA[Comment 8]]></wp:comment_content>
+      <wp:comment_approved><![CDATA[1]]></wp:comment_approved>
+      <wp:comment_type><![CDATA[]]></wp:comment_type>
+      <wp:comment_parent>0</wp:comment_parent>
+      <wp:comment_user_id>0</wp:comment_user_id>
+    </wp:comment>
+    <wp:comment>
+      <wp:comment_id>9</wp:comment_id>
+      <wp:comment_author><![CDATA[Heidi]]></wp:comment_author>
+      <wp:comment_author_email><![CDATA[heidi@example.com]]></wp:comment_author_email>
+      <wp:comment_author_url><![CDATA[]]></wp:comment_author_url>
+      <wp:comment_author_IP><![CDATA[192.0.2.9]]></wp:comment_author_IP>
+      <wp:comment_date><![CDATA[2024-03-15 17:00:00]]></wp:comment_date>
+      <wp:comment_date_gmt><![CDATA[2024-03-15 17:00:00]]></wp:comment_date_gmt>
+      <wp:comment_content><![CDATA[Comment 9]]></wp:comment_content>
+      <wp:comment_approved><![CDATA[1]]></wp:comment_approved>
+      <wp:comment_type><![CDATA[]]></wp:comment_type>
+      <wp:comment_parent>0</wp:comment_parent>
+      <wp:comment_user_id>0</wp:comment_user_id>
+    </wp:comment>
+    <wp:comment>
+      <wp:comment_id>10</wp:comment_id>
+      <wp:comment_author><![CDATA[Ivan]]></wp:comment_author>
+      <wp:comment_author_email><![CDATA[ivan@example.com]]></wp:comment_author_email>
+      <wp:comment_author_url><![CDATA[]]></wp:comment_author_url>
+      <wp:comment_author_IP><![CDATA[192.0.2.10]]></wp:comment_author_IP>
+      <wp:comment_date><![CDATA[2024-03-15 18:00:00]]></wp:comment_date>
+      <wp:comment_date_gmt><![CDATA[2024-03-15 18:00:00]]></wp:comment_date_gmt>
+      <wp:comment_content><![CDATA[Comment 10]]></wp:comment_content>
+      <wp:comment_approved><![CDATA[1]]></wp:comment_approved>
+      <wp:comment_type><![CDATA[]]></wp:comment_type>
+      <wp:comment_parent>0</wp:comment_parent>
+      <wp:comment_user_id>0</wp:comment_user_id>
+    </wp:comment>
+  </item>
+
+  <item>
+    <title>An Attachment</title>
+    <link>https://rich.example.com/wp-content/uploads/2024/03/photo.jpg</link>
+    <pubDate>Fri, 15 Mar 2024 09:30:00 +0000</pubDate>
+    <dc:creator><![CDATA[alice]]></dc:creator>
+    <description></description>
+    <content:encoded><![CDATA[]]></content:encoded>
+    <excerpt:encoded><![CDATA[]]></excerpt:encoded>
+    <wp:post_id>200</wp:post_id>
+    <wp:post_date><![CDATA[2024-03-15 09:30:00]]></wp:post_date>
+    <wp:post_date_gmt><![CDATA[2024-03-15 09:30:00]]></wp:post_date_gmt>
+    <wp:comment_status><![CDATA[open]]></wp:comment_status>
+    <wp:ping_status><![CDATA[closed]]></wp:ping_status>
+    <wp:post_name><![CDATA[photo]]></wp:post_name>
+    <wp:status><![CDATA[inherit]]></wp:status>
+    <wp:post_parent>100</wp:post_parent>
+    <wp:menu_order>0</wp:menu_order>
+    <wp:post_type><![CDATA[attachment]]></wp:post_type>
+    <wp:post_password><![CDATA[]]></wp:post_password>
+    <wp:is_sticky>0</wp:is_sticky>
+    <wp:attachment_url><![CDATA[https://rich.example.com/wp-content/uploads/2024/03/photo.jpg]]></wp:attachment_url>
+  </item>
+</channel>
+</rss>

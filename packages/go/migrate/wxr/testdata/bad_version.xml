@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0"
+  xmlns:wp="http://wordpress.org/export/1.1/">
+<channel>
+  <title>Old Blog</title>
+  <link>https://old.example.com</link>
+  <description>An old export</description>
+  <wp:wxr_version>1.1</wp:wxr_version>
+  <item>
+    <title>Old Post</title>
+  </item>
+</channel>
+</rss>
