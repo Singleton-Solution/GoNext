@@ -1,0 +1,69 @@
+# Ignored when building from this directory's context. Note: per
+# docs/09-deployment-ops.md the canonical build is from the repo root with
+# `-f apps/admin/Dockerfile`, so the root context applies — but ship this
+# alongside to keep per-app builds clean too.
+
+# Dependencies and build artifacts
+node_modules
+**/node_modules
+.next
+**/.next
+dist
+**/dist
+build
+**/build
+out
+**/out
+coverage
+**/coverage
+
+# VCS and editor
+.git
+.gitignore
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env files (never bake secrets into the image)
+.env
+.env.*
+!.env.example
+
+# Logs and tmp
+*.log
+npm-debug.log*
+yarn-debug.log*
+.dev
+tmp
+
+# Test artifacts
+test-results
+playwright-report
+.nyc_output
+
+# Docs and meta — not needed inside the image
+README.md
+CONTRIBUTING.md
+SECURITY.md
+CODE_OF_CONDUCT.md
+HISTORY.md
+ROADMAP.md
+LICENSE
+adr
+docs
+
+# Other apps and tooling not needed for this image's build
+apps/api
+apps/worker
+cli
+plugins
+themes
+migrations
+go.work
+go.work.sum
+**/*.go
