@@ -74,7 +74,8 @@ func (s *PostgresStore) now() time.Time {
 // insertSnapshotSQL is the canonical INSERT for a snapshot row.
 // Column list is locked against docs/01-core-cms.md §10.6 plus the
 // extra denormalized fields (excerpt, content_blocks_hash) the editor
-// needs for its revisions-list UI.
+// needs for its revisions-list UI and the is_permanent flag the
+// retention pruner respects (issue #169).
 const insertSnapshotSQL = `
 INSERT INTO post_revisions (
     post_id,
@@ -85,11 +86,12 @@ INSERT INTO post_revisions (
     title,
     excerpt,
     content_blocks_hash,
-    comment
+    comment,
+    is_permanent
 ) VALUES (
     $1, NULLIF($2::TEXT, '')::UUID, $3, $4,
     $5, NULLIF($6, ''), NULLIF($7, ''),
-    NULLIF($8, '\x'::BYTEA), NULLIF($9, '')
+    NULLIF($8, '\x'::BYTEA), NULLIF($9, ''), $10
 ) RETURNING id::TEXT
 `
 
@@ -105,11 +107,12 @@ INSERT INTO post_revisions (
     title,
     excerpt,
     content_blocks_hash,
-    comment
+    comment,
+    is_permanent
 ) VALUES (
     $1, NULLIF($2::TEXT, '')::UUID, $3, $4,
     $5, $6, NULLIF($7, ''), NULLIF($8, ''),
-    NULLIF($9, '\x'::BYTEA), NULLIF($10, '')
+    NULLIF($9, '\x'::BYTEA), NULLIF($10, ''), $11
 ) RETURNING id::TEXT
 `
 
@@ -127,7 +130,8 @@ SELECT
     COALESCE(delta_from::TEXT, ''),
     delta,
     snapshot,
-    COALESCE(comment, '')
+    COALESCE(comment, ''),
+    is_permanent
 FROM post_revisions
 WHERE id = $1
 `
@@ -148,7 +152,8 @@ SELECT
     COALESCE(delta_from::TEXT, ''),
     delta,
     snapshot,
-    COALESCE(comment, '')
+    COALESCE(comment, ''),
+    is_permanent
 FROM post_revisions
 WHERE post_id = $1
   AND ($2::TIMESTAMPTZ IS NULL OR created_at >= $2)
@@ -175,7 +180,8 @@ SELECT
     COALESCE(delta_from::TEXT, ''),
     delta,
     snapshot,
-    COALESCE(comment, '')
+    COALESCE(comment, ''),
+    is_permanent
 FROM post_revisions
 WHERE post_id = $1 AND kind = $2
 ORDER BY created_at DESC, id DESC
@@ -334,6 +340,7 @@ func (s *PostgresStore) Save(ctx context.Context, r Revision, opts ...SaveOption
 			r.Excerpt,
 			r.ContentBlocksHash,
 			r.Comment,
+			r.IsPermanent,
 		)
 	} else {
 		row = s.db.QueryRow(ctx, insertDeltaSQL,
@@ -347,6 +354,7 @@ func (s *PostgresStore) Save(ctx context.Context, r Revision, opts ...SaveOption
 			r.Excerpt,
 			r.ContentBlocksHash,
 			r.Comment,
+			r.IsPermanent,
 		)
 	}
 	if err := row.Scan(&idText); err != nil {
@@ -477,9 +485,10 @@ func (s *PostgresStore) materializeWithDepth(ctx context.Context, id uuid.UUID, 
 }
 
 // pruneListSQL pulls the (id, kind, author_id, created_at,
-// is_snapshot, delta_from) tuples Prune needs to make decisions.
-// We deliberately do NOT pull snapshot/delta payloads — Prune doesn't
-// need the JSON, and skipping it keeps the row size small.
+// is_snapshot, delta_from, is_permanent) tuples Prune needs to make
+// decisions. We deliberately do NOT pull snapshot/delta payloads —
+// Prune doesn't need the JSON, and skipping it keeps the row size
+// small.
 const pruneListSQL = `
 SELECT
     id::TEXT,
@@ -487,7 +496,8 @@ SELECT
     created_at,
     kind,
     (snapshot IS NOT NULL) AS is_snapshot,
-    COALESCE(delta_from::TEXT, '')
+    COALESCE(delta_from::TEXT, ''),
+    is_permanent
 FROM post_revisions
 WHERE post_id = $1
 ORDER BY created_at ASC, id ASC
@@ -495,12 +505,13 @@ ORDER BY created_at ASC, id ASC
 
 // pruneCandidate is the minimal projection used by Prune.
 type pruneCandidate struct {
-	id         uuid.UUID
-	authorID   uuid.UUID
-	createdAt  time.Time
-	kind       RevisionKind
-	isSnapshot bool
-	deltaFrom  uuid.UUID
+	id          uuid.UUID
+	authorID    uuid.UUID
+	createdAt   time.Time
+	kind        RevisionKind
+	isSnapshot  bool
+	deltaFrom   uuid.UUID
+	isPermanent bool
 }
 
 // Prune applies retention to one post and returns the count of rows
@@ -522,7 +533,7 @@ func (s *PostgresStore) Prune(ctx context.Context, postID uuid.UUID, retention R
 			idStr, authorStr, deltaFromStr string
 			c                              pruneCandidate
 		)
-		if err := rows.Scan(&idStr, &authorStr, &c.createdAt, &c.kind, &c.isSnapshot, &deltaFromStr); err != nil {
+		if err := rows.Scan(&idStr, &authorStr, &c.createdAt, &c.kind, &c.isSnapshot, &deltaFromStr, &c.isPermanent); err != nil {
 			return 0, fmt.Errorf("revisions: prune scan: %w", err)
 		}
 		id, err := uuid.Parse(idStr)
@@ -585,6 +596,13 @@ func classifyForPrune(candidates []pruneCandidate, policy RetentionPolicy, now t
 	exempt := make(map[uuid.UUID]bool) // MinKeepAll exemption
 
 	for _, c := range candidates {
+		// Pinned revisions are never eligible — they short-circuit
+		// every cap and every age check, matching the contract in
+		// docs/01-core-cms.md §4.3 and the Pruner in pruner.go.
+		if c.isPermanent {
+			exempt[c.id] = true
+			continue
+		}
 		if policy.MinKeepAll > 0 && now.Sub(c.createdAt) < policy.MinKeepAll {
 			exempt[c.id] = true
 			continue
@@ -614,6 +632,9 @@ func classifyForPrune(candidates []pruneCandidate, policy RetentionPolicy, now t
 	if policy.MaxAgeAutosave > 0 {
 		for _, c := range candidates {
 			if c.kind != Autosave {
+				continue
+			}
+			if c.isPermanent {
 				continue
 			}
 			if now.Sub(c.createdAt) >= policy.MaxAgeAutosave {
@@ -687,6 +708,7 @@ func scanRevision(row rowScanner) (Revision, error) {
 		&r.CreatedAt, &kindStr,
 		&r.Title, &r.Excerpt, &r.ContentBlocksHash,
 		&deltaFromStr, &delta, &snapshot, &r.Comment,
+		&r.IsPermanent,
 	); err != nil {
 		return Revision{}, err
 	}

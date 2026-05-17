@@ -113,6 +113,14 @@ type Revision struct {
 	// "Restored from revision X" tag the restore flow writes (doc 01
 	// §4.4) or an editor-supplied "renamed section" annotation.
 	Comment string
+
+	// IsPermanent pins a revision so the retention pruner
+	// (packages/go/revisions/pruner.go, issue #169) never deletes it.
+	// Operators flip this on legal-hold revisions, "first published"
+	// milestones, or anything the editor lets a user mark as
+	// permanent. Default false so the bulk of revisions remain
+	// eligible for the normal retention sweep.
+	IsPermanent bool
 }
 
 // isSnapshot reports whether r is a snapshot revision (vs a delta).
