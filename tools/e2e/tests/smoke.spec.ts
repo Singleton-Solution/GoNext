@@ -10,7 +10,7 @@ import { test, expect } from '../fixtures/server';
 
 test.describe('smoke', () => {
   test('home page responds 200', async ({ serverRequest, baseURL }) => {
-    const response = await serverRequest.get(baseURL);
+    const response = await serverRequest.get(baseURL!);
     expect(
       response.status(),
       `GET ${baseURL} should return 200, got ${response.status()}`,

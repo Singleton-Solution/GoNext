@@ -16,12 +16,6 @@ import { test as base, expect, type APIRequestContext } from '@playwright/test';
 
 export type ServerFixtures = {
   /**
-   * The resolved base URL the stack is expected to be running at.
-   * Matches `use.baseURL` from playwright.config.ts.
-   */
-  baseURL: string;
-
-  /**
    * A pre-configured request context pointing at the stack. Useful for
    * API probes from inside a test.
    */
@@ -49,19 +43,16 @@ async function isStackReachable(
 }
 
 export const test = base.extend<ServerFixtures>({
-  baseURL: async ({ baseURL }, use) => {
+  serverRequest: async ({ playwright, baseURL }, use, testInfo) => {
     if (!baseURL) {
       throw new Error(
         'baseURL is not configured. Set E2E_BASE_URL or fix playwright.config.ts.',
       );
     }
-    await use(baseURL);
-  },
 
-  serverRequest: async ({ playwright, baseURL }, use, testInfo) => {
     const request = await playwright.request.newContext({ baseURL });
 
-    const reachable = await isStackReachable(request, baseURL!);
+    const reachable = await isStackReachable(request, baseURL);
     if (!reachable) {
       testInfo.skip(
         true,
