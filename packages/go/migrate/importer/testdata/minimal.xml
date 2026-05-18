@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0"
+  xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/"
+  xmlns:content="http://purl.org/rss/1.0/modules/content/"
+  xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:wp="http://wordpress.org/export/1.2/">
+<channel>
+  <title>Tiny Blog</title>
+  <link>https://tiny.example.com</link>
+  <description>A small blog</description>
+  <pubDate>Thu, 14 Mar 2024 12:34:56 +0000</pubDate>
+  <language>en-US</language>
+  <wp:wxr_version>1.2</wp:wxr_version>
+  <wp:base_site_url>https://tiny.example.com</wp:base_site_url>
+  <wp:base_blog_url>https://tiny.example.com</wp:base_blog_url>
+  <generator>https://wordpress.org/?v=6.4.2</generator>
+
+  <wp:author>
+    <wp:author_id>1</wp:author_id>
+    <wp:author_login><![CDATA[admin]]></wp:author_login>
+    <wp:author_email><![CDATA[admin@tiny.example.com]]></wp:author_email>
+    <wp:author_display_name><![CDATA[Admin User]]></wp:author_display_name>
+    <wp:author_first_name><![CDATA[Admin]]></wp:author_first_name>
+    <wp:author_last_name><![CDATA[User]]></wp:author_last_name>
+  </wp:author>
+
+  <wp:category>
+    <wp:term_id>2</wp:term_id>
+    <wp:category_nicename><![CDATA[news]]></wp:category_nicename>
+    <wp:category_parent><![CDATA[]]></wp:category_parent>
+    <wp:cat_name><![CDATA[News]]></wp:cat_name>
+    <wp:category_description><![CDATA[Latest news]]></wp:category_description>
+  </wp:category>
+
+  <wp:tag>
+    <wp:term_id>3</wp:term_id>
+    <wp:tag_slug><![CDATA[welcome]]></wp:tag_slug>
+    <wp:tag_name><![CDATA[Welcome]]></wp:tag_name>
+    <wp:tag_description><![CDATA[Welcome tag]]></wp:tag_description>
+  </wp:tag>
+
+  <item>
+    <title>Hello World</title>
+    <link>https://tiny.example.com/hello-world/</link>
+    <pubDate>Thu, 14 Mar 2024 13:00:00 +0000</pubDate>
+    <dc:creator><![CDATA[admin]]></dc:creator>
+    <description></description>
+    <content:encoded><![CDATA[<p>Welcome to <strong>WordPress</strong>.</p><p>This is a second paragraph.</p>]]></content:encoded>
+    <excerpt:encoded><![CDATA[Welcome excerpt]]></excerpt:encoded>
+    <wp:post_id>10</wp:post_id>
+    <wp:post_date><![CDATA[2024-03-14 13:00:00]]></wp:post_date>
+    <wp:post_date_gmt><![CDATA[2024-03-14 13:00:00]]></wp:post_date_gmt>
+    <wp:comment_status><![CDATA[open]]></wp:comment_status>
+    <wp:ping_status><![CDATA[closed]]></wp:ping_status>
+    <wp:post_name><![CDATA[hello-world]]></wp:post_name>
+    <wp:status><![CDATA[publish]]></wp:status>
+    <wp:post_parent>0</wp:post_parent>
+    <wp:menu_order>0</wp:menu_order>
+    <wp:post_type><![CDATA[post]]></wp:post_type>
+    <wp:post_password><![CDATA[]]></wp:post_password>
+    <wp:is_sticky>0</wp:is_sticky>
+    <category domain="category" nicename="news"><![CDATA[News]]></category>
+    <category domain="post_tag" nicename="welcome"><![CDATA[Welcome]]></category>
+    <wp:comment>
+      <wp:comment_id>100</wp:comment_id>
+      <wp:comment_author><![CDATA[Jane]]></wp:comment_author>
+      <wp:comment_author_email><![CDATA[jane@example.com]]></wp:comment_author_email>
+      <wp:comment_author_url><![CDATA[]]></wp:comment_author_url>
+      <wp:comment_author_IP><![CDATA[]]></wp:comment_author_IP>
+      <wp:comment_date><![CDATA[2024-03-14 14:00:00]]></wp:comment_date>
+      <wp:comment_date_gmt><![CDATA[2024-03-14 14:00:00]]></wp:comment_date_gmt>
+      <wp:comment_content><![CDATA[Great post!]]></wp:comment_content>
+      <wp:comment_approved><![CDATA[1]]></wp:comment_approved>
+      <wp:comment_type><![CDATA[]]></wp:comment_type>
+      <wp:comment_parent>0</wp:comment_parent>
+      <wp:comment_user_id>0</wp:comment_user_id>
+    </wp:comment>
+  </item>
+</channel>
+</rss>
