@@ -218,6 +218,16 @@ func Load(opts ...LoadOption) (*Config, error) {
 	}
 	cfg.Plugins.DevToken = getString(e, "GONEXT_PLUGINS_DEV_TOKEN", "")
 
+	// ---- Performance ----
+	// EarlyHints defaults to true: the 103 path is a pure win for the
+	// vast majority of deployments and operators can opt out with a
+	// single env var if an upstream proxy mishandles 1xx.
+	if b, err := getBool(e, "GONEXT_PERFORMANCE_EARLY_HINTS", true); err != nil {
+		errs = append(errs, err)
+	} else {
+		cfg.Performance.EarlyHints = b
+	}
+
 	if len(errs) > 0 {
 		return cfg, joinErrs(errs)
 	}

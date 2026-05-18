@@ -12,10 +12,10 @@ import (
 // individual keys via the map literal.
 func fixture(overrides ...map[string]string) map[string]string {
 	m := map[string]string{
-		"DATABASE_URL":              "postgres://gonext:dev@localhost:5432/gonext_dev?sslmode=disable",
-		"GONEXT_AUTH_PEPPER":        strings.Repeat("a", 32),
+		"DATABASE_URL":               "postgres://gonext:dev@localhost:5432/gonext_dev?sslmode=disable",
+		"GONEXT_AUTH_PEPPER":         strings.Repeat("a", 32),
 		"GONEXT_AUTH_SESSION_SECRET": strings.Repeat("b", 32),
-		"GONEXT_AUTH_CSRF_SECRET":   strings.Repeat("c", 32),
+		"GONEXT_AUTH_CSRF_SECRET":    strings.Repeat("c", 32),
 	}
 	for _, o := range overrides {
 		for k, v := range o {
@@ -72,17 +72,17 @@ func TestLoad_Defaults(t *testing.T) {
 
 func TestLoad_OverridesHonored(t *testing.T) {
 	cfg, err := Load(WithEnv(fixture(map[string]string{
-		"GONEXT_ENV":              "production",
-		"PORT":                    "9090",
-		"GONEXT_LOG_LEVEL":        "WARN",
-		"GONEXT_LOG_FORMAT":       "text",
-		"GONEXT_LOG_ADDSRC":       "true",
-		"GONEXT_DB_MAX_OPEN_CONNS": "50",
+		"GONEXT_ENV":                     "production",
+		"PORT":                           "9090",
+		"GONEXT_LOG_LEVEL":               "WARN",
+		"GONEXT_LOG_FORMAT":              "text",
+		"GONEXT_LOG_ADDSRC":              "true",
+		"GONEXT_DB_MAX_OPEN_CONNS":       "50",
 		"GONEXT_SERVER_SHUTDOWN_TIMEOUT": "45s",
-		"REDIS_URL":               "redis://cache.internal:6379/3",
-		"AWS_REGION":              "eu-west-2",
-		"GONEXT_S3_BUCKET":         "prod-media",
-		"GONEXT_S3_PATH_STYLE":     "true",
+		"REDIS_URL":                      "redis://cache.internal:6379/3",
+		"AWS_REGION":                     "eu-west-2",
+		"GONEXT_S3_BUCKET":               "prod-media",
+		"GONEXT_S3_PATH_STYLE":           "true",
 	})))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -116,7 +116,7 @@ func TestLoad_OverridesHonored(t *testing.T) {
 
 func TestLoad_ServerAddrTakesPrecedenceOverPORT(t *testing.T) {
 	cfg, err := Load(WithEnv(fixture(map[string]string{
-		"PORT":                "9090",
+		"PORT":               "9090",
 		"GONEXT_SERVER_ADDR": "0.0.0.0:7000",
 	})))
 	if err != nil {
@@ -269,10 +269,10 @@ func TestParseEnv(t *testing.T) {
 func TestLoad_BadEnvVarsListAll(t *testing.T) {
 	// Multiple parse errors should be aggregated, not short-circuited.
 	_, err := Load(WithEnv(fixture(map[string]string{
-		"GONEXT_DB_MAX_OPEN_CONNS":      "x",
-		"GONEXT_REDIS_POOL_SIZE":        "y",
-		"GONEXT_SERVER_WRITE_TIMEOUT":   "z",
-		"GONEXT_LOG_ADDSRC":             "maybe",
+		"GONEXT_DB_MAX_OPEN_CONNS":    "x",
+		"GONEXT_REDIS_POOL_SIZE":      "y",
+		"GONEXT_SERVER_WRITE_TIMEOUT": "z",
+		"GONEXT_LOG_ADDSRC":           "maybe",
 	})))
 	if err == nil {
 		t.Fatal("expected aggregated parse errors")

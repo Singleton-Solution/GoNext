@@ -36,6 +36,7 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/httpx"
 	"github.com/Singleton-Solution/GoNext/packages/go/log"
 	gonextmetrics "github.com/Singleton-Solution/GoNext/packages/go/metrics"
+	"github.com/Singleton-Solution/GoNext/packages/go/middleware/earlyhints"
 	httpmetrics "github.com/Singleton-Solution/GoNext/packages/go/middleware/metrics"
 	"github.com/Singleton-Solution/GoNext/packages/go/plugins/lifecycle"
 	redisclient "github.com/Singleton-Solution/GoNext/packages/go/redis"
@@ -189,16 +190,50 @@ func run(ctx context.Context) error {
 
 	mux := buildRouter(cfg, pool, rdb, logger)
 
+	// Build the middleware chain. Early Hints (issue #122) sits AFTER
+	// Recovery (so a panicking hints provider doesn't crash the
+	// server) but BEFORE Logger and metrics. The 103 we emit is about
+	// the request, not its final 200, so we want it on the wire as
+	// soon as possible — before any per-request bookkeeping work.
+	//
+	// When cfg.Performance.EarlyHints is false the middleware is
+	// omitted from the chain entirely rather than being a runtime
+	// no-op; the disabled path costs zero per-request overhead this
+	// way. Operators flip GONEXT_PERFORMANCE_EARLY_HINTS=false to
+	// disable without recompiling.
+	mws := []httpx.Middleware{
+		httpx.Recovery(logger),
+	}
+	if cfg.Performance.EarlyHints {
+		// Static provider seeded from the seeded theme's known URL.
+		// Subsequent wiring (issue #11 follow-ups) replaces this with
+		// a ThemeAwareProvider backed by the live theme store. For
+		// now the static map covers the common /index + /blog roots
+		// served by the seeded theme.
+		hintsProvider := earlyhints.NewStaticProvider(map[string][]earlyhints.Hint{
+			"/": {
+				{
+					URL:           "/themes/active/style.css",
+					As:            "style",
+					FetchPriority: "high",
+				},
+			},
+		})
+		mws = append(mws, earlyhints.Middleware(hintsProvider, earlyhints.Options{
+			Logger: logger,
+		}))
+	}
+	mws = append(mws,
+		httpx.RequestID(),
+		httpx.Logger(logger, "/healthz", "/readyz"),
+		httpmetrics.Middleware(metricsReg.Prometheus()),
+	)
+
 	srv, err := httpx.New(httpx.Options{
-		Config:  cfg.Server,
-		Log:     logger,
-		Handler: mux,
-		Middlewares: []httpx.Middleware{
-			httpx.Recovery(logger),
-			httpx.RequestID(),
-			httpx.Logger(logger, "/healthz", "/readyz"),
-			httpmetrics.Middleware(metricsReg.Prometheus()),
-		},
+		Config:      cfg.Server,
+		Log:         logger,
+		Handler:     mux,
+		Middlewares: mws,
 	})
 	if err != nil {
 		return fmt.Errorf("server: %w", err)
