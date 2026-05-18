@@ -19,6 +19,7 @@ jobs:
       go: ${{ steps.filter.outputs.go }}
       web: ${{ steps.filter.outputs.web }}
       docs: ${{ steps.filter.outputs.docs }}
+      dashboards: ${{ steps.filter.outputs.dashboards }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -45,6 +46,9 @@ jobs:
               - 'docs/**'
               - 'adr/**'
               - '*.md'
+            dashboards:
+              - 'deploy/grafana/**'
+              - 'tools/dashboards/**'
 
   lint-docs:
     needs: changes
@@ -179,9 +183,33 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
 
+  lint-dashboards:
+    needs: changes
+    if: needs.changes.outputs.dashboards == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'tools/dashboards/go.mod'
+          cache: false
+      - name: Validate dashboard JSON
+        # Run the validator outside the workspace (GOWORK=off) so the
+        # job doesn't have to sync the rest of the workspace's modules
+        # just to lint five JSON files.
+        env:
+          GOWORK: 'off'
+        run: |
+          go run ./tools/dashboards/validate.go deploy/grafana/dashboards
+      - name: Test validator
+        env:
+          GOWORK: 'off'
+        run: |
+          cd tools/dashboards && go test ./...
+
   # Aggregate gate. Required check on the branch protection rule.
   ci:
-    needs: [lint-docs, lint-go, test-go, lint-web, test-web]
+    needs: [lint-docs, lint-go, test-go, lint-web, test-web, lint-dashboards]
     if: always()
     runs-on: ubuntu-latest
     steps:

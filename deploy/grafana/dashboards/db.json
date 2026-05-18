@@ -1,0 +1,189 @@
+{
+  "title": "GoNext — Database",
+  "uid": "gonext-db",
+  "tags": ["gonext", "db", "postgres"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "time": {"from": "now-1h", "to": "now"},
+  "refresh": "30s",
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {"text": "Prometheus", "value": "Prometheus"},
+        "hide": 0,
+        "refresh": 1
+      },
+      {
+        "name": "env",
+        "label": "Environment",
+        "type": "query",
+        "datasource": {"type": "prometheus", "uid": "${datasource}"},
+        "query": "label_values(gonext_db_pool_open_connections, env)",
+        "current": {"text": "All", "value": "$__all"},
+        "includeAll": true,
+        "multi": false,
+        "refresh": 2,
+        "sort": 1
+      },
+      {
+        "name": "db",
+        "label": "DB",
+        "type": "query",
+        "datasource": {"type": "prometheus", "uid": "${datasource}"},
+        "query": "label_values(gonext_db_pool_open_connections{env=~\"$env\"}, db)",
+        "current": {"text": "All", "value": "$__all"},
+        "includeAll": true,
+        "multi": true,
+        "refresh": 2,
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Pool size: open / in-use / idle",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "fieldConfig": {"defaults": {"unit": "short"}},
+      "options": {"legend": {"displayMode": "table", "placement": "right"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (db) (gonext_db_pool_open_connections{env=~\"$env\",db=~\"$db\"})",
+          "legendFormat": "open {{db}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (db) (gonext_db_pool_in_use{env=~\"$env\",db=~\"$db\"})",
+          "legendFormat": "in-use {{db}}"
+        },
+        {
+          "refId": "C",
+          "expr": "sum by (db) (gonext_db_pool_idle{env=~\"$env\",db=~\"$db\"})",
+          "legendFormat": "idle {{db}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Pool utilization",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "max": 1,
+          "min": 0
+        }
+      },
+      "options": {"legend": {"displayMode": "table", "placement": "right"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (db) (gonext_db_pool_in_use{env=~\"$env\",db=~\"$db\"}) / clamp_min(sum by (db) (gonext_db_pool_open_connections{env=~\"$env\",db=~\"$db\"}), 1)",
+          "legendFormat": "{{db}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Pool wait rate",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "fieldConfig": {"defaults": {"unit": "ops"}},
+      "options": {"legend": {"displayMode": "table", "placement": "right"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (db) (rate(gonext_db_pool_wait_count_total{env=~\"$env\",db=~\"$db\"}[5m]))",
+          "legendFormat": "{{db}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Pool wait seconds",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "options": {"legend": {"displayMode": "table", "placement": "right"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (db) (rate(gonext_db_pool_wait_seconds_total{env=~\"$env\",db=~\"$db\"}[5m]))",
+          "legendFormat": "{{db}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Query duration percentiles",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "options": {"legend": {"displayMode": "table", "placement": "right"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(gonext_db_query_duration_seconds_bucket{env=~\"$env\"}[5m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(gonext_db_query_duration_seconds_bucket{env=~\"$env\"}[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(gonext_db_query_duration_seconds_bucket{env=~\"$env\"}[5m])))",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "DB errors by kind",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "fieldConfig": {"defaults": {"unit": "ops"}},
+      "options": {"legend": {"displayMode": "table", "placement": "right"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (kind) (rate(gonext_db_errors_total{env=~\"$env\"}[5m]))",
+          "legendFormat": "{{kind}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Replication lag (seconds)",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24},
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "options": {"legend": {"displayMode": "table", "placement": "right"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (replica) (gonext_db_replication_lag_seconds{env=~\"$env\"})",
+          "legendFormat": "{{replica}}"
+        }
+      ]
+    }
+  ]
+}

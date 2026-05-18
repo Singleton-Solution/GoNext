@@ -1,0 +1,168 @@
+{
+  "title": "GoNext — HTTP",
+  "uid": "gonext-http",
+  "tags": ["gonext", "http"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "time": {"from": "now-1h", "to": "now"},
+  "refresh": "30s",
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {"text": "Prometheus", "value": "Prometheus"},
+        "hide": 0,
+        "refresh": 1
+      },
+      {
+        "name": "env",
+        "label": "Environment",
+        "type": "query",
+        "datasource": {"type": "prometheus", "uid": "${datasource}"},
+        "query": "label_values(gonext_http_requests_total, env)",
+        "current": {"text": "All", "value": "$__all"},
+        "includeAll": true,
+        "multi": false,
+        "refresh": 2,
+        "sort": 1
+      },
+      {
+        "name": "route",
+        "label": "Route",
+        "type": "query",
+        "datasource": {"type": "prometheus", "uid": "${datasource}"},
+        "query": "label_values(gonext_http_requests_total{env=~\"$env\"}, route)",
+        "current": {"text": "All", "value": "$__all"},
+        "includeAll": true,
+        "multi": true,
+        "refresh": 2,
+        "sort": 1
+      },
+      {
+        "name": "method",
+        "label": "Method",
+        "type": "query",
+        "datasource": {"type": "prometheus", "uid": "${datasource}"},
+        "query": "label_values(gonext_http_requests_total{env=~\"$env\"}, method)",
+        "current": {"text": "All", "value": "$__all"},
+        "includeAll": true,
+        "multi": true,
+        "refresh": 2,
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Request rate by route",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "fieldConfig": {"defaults": {"unit": "reqps"}},
+      "options": {"legend": {"displayMode": "table", "placement": "right"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (route) (rate(gonext_http_requests_total{env=~\"$env\",route=~\"$route\",method=~\"$method\"}[1m]))",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Status-code split",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "fieldConfig": {"defaults": {"unit": "reqps"}},
+      "options": {"legend": {"displayMode": "table", "placement": "right"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (status) (rate(gonext_http_requests_total{env=~\"$env\",route=~\"$route\",method=~\"$method\"}[1m]))",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "heatmap",
+      "title": "Latency heatmap (all routes)",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 8},
+      "options": {
+        "calculate": false,
+        "color": {"mode": "scheme", "scheme": "Spectral", "steps": 64},
+        "yAxis": {"unit": "s"}
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (le) (rate(gonext_http_request_duration_seconds_bucket{env=~\"$env\",route=~\"$route\",method=~\"$method\"}[1m]))",
+          "format": "heatmap",
+          "legendFormat": "{{le}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "p95 latency by route",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 18},
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "options": {"legend": {"displayMode": "table", "placement": "right"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, route) (rate(gonext_http_request_duration_seconds_bucket{env=~\"$env\",route=~\"$route\",method=~\"$method\"}[5m])))",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Inflight by route",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 18},
+      "fieldConfig": {"defaults": {"unit": "short"}},
+      "options": {"legend": {"displayMode": "table", "placement": "right"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (route) (gonext_http_inflight_requests{env=~\"$env\",route=~\"$route\",method=~\"$method\"})",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Top routes by error rate",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 26},
+      "options": {
+        "showHeader": true,
+        "sortBy": [{"displayName": "Value", "desc": true}]
+      },
+      "fieldConfig": {"defaults": {"unit": "percentunit"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(20, sum by (route) (rate(gonext_http_requests_total{env=~\"$env\",route=~\"$route\",status=~\"5..\"}[5m])) / clamp_min(sum by (route) (rate(gonext_http_requests_total{env=~\"$env\",route=~\"$route\"}[5m])), 1))",
+          "instant": true,
+          "format": "table",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    }
+  ]
+}
