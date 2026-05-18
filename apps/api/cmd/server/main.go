@@ -27,6 +27,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	goredis "github.com/redis/go-redis/v9"
 
+	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/rum"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/healthz"
 	plugindev "github.com/Singleton-Solution/GoNext/apps/api/internal/plugins/dev"
 	"github.com/Singleton-Solution/GoNext/packages/go/audit"
@@ -39,6 +40,7 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/middleware/earlyhints"
 	httpmetrics "github.com/Singleton-Solution/GoNext/packages/go/middleware/metrics"
 	"github.com/Singleton-Solution/GoNext/packages/go/plugins/lifecycle"
+	"github.com/Singleton-Solution/GoNext/packages/go/policy"
 	redisclient "github.com/Singleton-Solution/GoNext/packages/go/redis"
 	"github.com/Singleton-Solution/GoNext/packages/go/shutdown"
 	"github.com/Singleton-Solution/GoNext/packages/go/theme/seed"
@@ -321,6 +323,25 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, lo
 		healthz.DBCheck(pool),
 		healthz.RedisCheck(rdb),
 	))
+
+	// In-house RUM (issue #132). The beacon endpoint is mounted
+	// unconditionally — the public theme respects cfg.RUM.Enabled
+	// before it emits scripts, and an off-by-default flag at the
+	// theme layer is the right level for this knob. The read
+	// endpoints are policy-gated and inherit the same wiring as
+	// the other admin surfaces.
+	if err := rum.Mount(mux, "/_/rum/beacon", "/api/v1/admin/rum", rum.Deps{
+		Store:  rum.NewMemoryStore(),
+		Policy: policy.NewBasicPolicy(policy.DefaultRoleCapabilities()),
+		Logger: logger,
+	}); err != nil {
+		logger.Warn("rum: failed to mount routes", slog.Any("err", err))
+	} else {
+		logger.Info("rum: routes mounted",
+			slog.String("beacon", "/_/rum/beacon"),
+			slog.String("read", "/api/v1/admin/rum"),
+		)
+	}
 
 	if cfg.Plugins.DevMode {
 		// Dev plugin install endpoint. Used by the `gonext plugin dev`

@@ -1,0 +1,35 @@
+{
+  "name": "@gonext/rum-beacon",
+  "version": "0.0.0",
+  "private": false,
+  "description": "GoNext in-house RUM beacon. Subscribes to Core Web Vitals via the `web-vitals` library, batches them in a 5-second window, and ships them to a first-party beacon endpoint via navigator.sendBeacon (with a fetch fallback for browsers without the API). Designed to be inlined into the public theme as a tiny module script. Apache-2.0. Issue #132.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "echo '@gonext/rum-beacon: source-only package, no build step'",
+    "lint": "echo '@gonext/rum-beacon lint: not yet implemented'",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "web-vitals": "^4.2.4"
+  },
+  "devDependencies": {
+    "@gonext/test-config": "workspace:*",
+    "@vitest/coverage-v8": "^1.6.0",
+    "jsdom": "^24.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^1.6.0"
+  }
+}

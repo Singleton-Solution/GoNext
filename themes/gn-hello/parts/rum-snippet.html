@@ -1,0 +1,22 @@
+<!--
+  RUM beacon snippet for the gn-hello theme. Issue #132.
+
+  This template part is injected into <head> by the public-theme HTML
+  emitter when Config.RUM.Enabled is true. When the flag is false (the
+  default) the renderer skips it entirely so no <script> tag reaches
+  the visitor's browser — the in-house Real User Monitoring is
+  fully off, no beacons, no extra bytes.
+
+  The module imports the bundled rum-beacon library (served as a
+  static asset under /static/rum-beacon.js) and calls initRUM with
+  the same-origin beacon URL. Same-origin keeps the request out of a
+  CORS preflight (sendBeacon doesn't support preflight) and lets the
+  reverse-proxy layer apply per-IP rate limiting.
+
+  Operators with a CDN in front of the API should ensure the
+  /_/rum/beacon path is forwarded to the origin, NOT cached.
+-->
+<script type="module">
+  import { initRUM } from "/static/rum-beacon.js";
+  initRUM({ beaconUrl: "/_/rum/beacon" });
+</script>

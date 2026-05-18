@@ -1,0 +1,17 @@
+<!--
+  RUM beacon snippet for the gn-pro theme. Issue #132.
+
+  Identical contents to themes/gn-hello/parts/rum-snippet.html on
+  purpose — the snippet has no theme-specific styling, and we want
+  the gn-pro -> gn-hello upgrade path to leave RUM behaviour
+  unchanged. If a future theme needs to override the beacon URL or
+  attach extra metadata, copy this part and edit the import.
+
+  Injection rule: when Config.RUM.Enabled is true, the renderer
+  inlines this part into the page <head>. When false, the part is
+  not rendered at all — no beacons, no extra bytes.
+-->
+<script type="module">
+  import { initRUM } from "/static/rum-beacon.js";
+  initRUM({ beaconUrl: "/_/rum/beacon" });
+</script>
