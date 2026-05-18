@@ -35,3 +35,19 @@ export {
   headingBlock,
   paragraphBlock,
 } from './default-core-blocks.ts';
+
+export {
+  LockBanner,
+  RecoveryDialog,
+  useAutosave,
+  usePostLock,
+  type AutosavePayload,
+  type AutosaveResponse,
+  type AutosaveState,
+  type AutosaveStatus,
+  type LockBannerProps,
+  type PostLockHolder,
+  type PostLockState,
+  type RecoveryDialogProps,
+  type UseAutosaveOptions,
+} from './autosave/index.ts';
