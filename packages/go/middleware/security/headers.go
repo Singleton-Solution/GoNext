@@ -87,6 +87,21 @@ type Options struct {
 	// Disable* sibling to opt out explicitly.
 	StripIdentifyingHeaders        bool
 	DisableStripIdentifyingHeaders bool
+
+	// Strict, when true, forces COEP to "require-corp" regardless of the
+	// COEP field's value (a non-empty COEP override still wins; an empty
+	// COEP combined with Strict=true emits require-corp). The intent is to
+	// give callers a single, intent-revealing high-level toggle for the
+	// strictest cross-origin isolation profile — appropriate for
+	// marketing pages, admin UIs, and any surface that never embeds
+	// third-party iframes. Off by default because require-corp can break
+	// embeds (oEmbed, ads, fonts loaded without CORS), which is the
+	// majority of public-content surfaces.
+	//
+	// Strict does NOT affect any other header. Callers wanting to relax
+	// other policies (e.g. CORP for media) should still do so via the
+	// per-header fields.
+	Strict bool
 }
 
 // HSTSOptions models the Strict-Transport-Security directive components
@@ -197,6 +212,14 @@ func RESTAPI() Options {
 // overwrite any of them by calling w.Header().Set after the middleware
 // has run.
 //
+// Headers are applied to ALL responses regardless of status code —
+// including 3xx redirects, 4xx errors, and 5xx server errors. Browsers
+// honor security headers on these responses (and arguably need them
+// MORE on error pages, which often render attacker-controlled content
+// in detail strings). Per OWASP Secure Headers and MDN, there is no
+// status-class exclusion in any of the headers this package writes; we
+// emit unconditionally.
+//
 // The middleware is stateless and goroutine-safe: opts is read-only
 // after construction.
 func Headers(opts Options) func(http.Handler) http.Handler {
@@ -240,7 +263,11 @@ func Headers(opts Options) func(http.Handler) http.Handler {
 		}
 		headers = append(headers, resolved{"Cross-Origin-Opener-Policy", v})
 	}
-	if !opts.DisableCOEP {
+	// COEP emission rule:
+	//   Strict=true        → always emit; override (if any) wins, else "require-corp"
+	//   DisableCOEP=false  → emit (override wins, else "require-corp")
+	//   DisableCOEP=true   → omit unless Strict=true overrides
+	if opts.Strict || !opts.DisableCOEP {
 		v := opts.COEP
 		if v == "" {
 			v = "require-corp"
