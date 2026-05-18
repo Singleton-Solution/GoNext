@@ -2137,6 +2137,116 @@ A plugin imports from `"@host/sdk"`; the import map resolves to the host's serve
 
 ---
 
+## Appendix A — WordPress hook aliases
+
+This appendix is the authoritative table used by the `wpcompat` bridge
+in `packages/go/hooks/wpcompat`. Every row is exposed both as a WordPress-
+familiar name (the left column, what plugin authors reach for by reflex
+after porting from WP) and as the GoNext canonical name (the middle
+column, what core code dispatches on). The bridge installs forwarders
+both directions so that whichever side a subscriber listens on, they
+hear the event — see `wpcompat/bridge.go` for the install logic.
+
+### A.1 Filter aliases
+
+Filters transform a value through a chain. Each entry below is dispatched
+via `Bus.ApplyFilters` on the canonical name; subscribers registered via
+the WP name receive the same value (after the payload adapter, if any,
+runs).
+
+| WP name          | GoNext canonical name              | Adapter | Notes                                                                |
+|------------------|------------------------------------|---------|----------------------------------------------------------------------|
+| `the_content`    | `core.filter.the_content`          | —       | Post body HTML being prepared for the rendered page.                 |
+| `the_title`      | `core.filter.the_title`            | —       | Post or page title being prepared for output.                        |
+| `the_excerpt`    | `core.filter.the_excerpt`          | —       | Post excerpt HTML rendered above-the-fold on archive pages.          |
+| `the_permalink`  | `core.filter.the_permalink`        | —       | URL string built for a post or page permalink.                       |
+| `wp_title`       | `core.filter.wp_title`             | —       | Document `<title>` being assembled for the response.                 |
+| `body_class`     | `core.filter.body_class`           | —       | Space-separated CSS classes applied to the `<body>` element.         |
+| `post_class`     | `core.filter.post_class`           | —       | Space-separated CSS classes applied to a post wrapper element.       |
+| `comment_text`   | `core.filter.comment_text`         | —       | Comment body HTML being rendered for display.                        |
+| `get_avatar`     | `core.filter.get_avatar`           | —       | Avatar `<img>` markup being prepared for output.                     |
+| `login_redirect` | `core.filter.login_redirect`       | —       | Post-login redirect URL chosen for the user.                         |
+
+### A.2 Action aliases
+
+Actions are fire-and-forget side-effect hooks. Subscribers receive the
+adapted payload (if an adapter is listed) and return no value; errors
+are aggregated by `Bus.Do`.
+
+| WP name                 | GoNext canonical name                 | Adapter           | Notes                                                                   |
+|-------------------------|---------------------------------------|-------------------|-------------------------------------------------------------------------|
+| `init`                  | `core.lifecycle.init`                 | —                 | Once-per-process initialisation point, before any request handling.     |
+| `wp_loaded`             | `core.lifecycle.loaded`               | —                 | All plugins, themes, and core have finished loading.                    |
+| `wp_head`               | `core.render.head`                    | —                 | Emit tags into the `<head>` of the rendered HTML response.              |
+| `wp_footer`             | `core.render.footer`                  | —                 | Emit markup just before `</body>` of the rendered HTML response.        |
+| `wp_enqueue_scripts`    | `core.assets.enqueue`                 | —                 | Register CSS/JS assets the frontend needs for the current request.      |
+| `admin_enqueue_scripts` | `core.assets.enqueue_admin`           | —                 | Register CSS/JS assets for the admin dashboard.                         |
+| `template_redirect`     | `core.render.template_redirect`       | —                 | Fired before the response template is selected; redirect window.        |
+| `save_post`             | `core.post.saved`                     | `WPPost`          | Post inserted or updated. Native args `(ID, Post, Update)` → `WPPost`.  |
+| `publish_post`          | `core.post.published`                 | `WPPost`          | Post transitions to the 'published' state.                              |
+| `delete_post`           | `core.post.deleted`                   | `WPPost`          | Post permanently deleted.                                               |
+| `user_register`         | `core.user.created`                   | `WPUser`          | New user account created.                                               |
+| `profile_update`        | `core.user.updated`                   | `WPUser`          | Existing user profile updated.                                          |
+| `comment_post`          | `core.comment.created`                | `WPComment`       | New comment submitted on a post.                                        |
+
+### A.3 Payload-adapter shapes
+
+When the **Adapter** column lists a struct name, the bridge translates
+the native positional args into a single WP-shaped struct before the
+WP-side handler sees them. The structs live in `packages/go/hooks/wpcompat`:
+
+```go
+type WPPost struct {
+    ID     string
+    Post   any  // the native Post (caller-supplied type from packages/go/posts)
+    Update bool
+}
+
+type WPUser struct {
+    ID   string
+    User any
+}
+
+type WPComment struct {
+    ID      string
+    Comment any
+    Approve bool
+}
+```
+
+A nil adapter (the `—` rows) means the payload flows through unchanged;
+the WP-side handler sees the same args the native dispatch was called
+with.
+
+### A.4 Forwarder priority
+
+The bridge registers its forwarders at priority **1000** on the native
+name. This is well clear of the WP-default priority of 10, so WP-side
+subscribers see the **final** post-core value (filters) or are notified
+**after** the canonical chain has settled (actions). Plugin authors who
+need to run before a specific core handler should subscribe to the
+canonical name directly; the WP alias is for the "WP plugin author who
+expects the value the page renderer would actually emit" use case.
+
+### A.5 Extending the table
+
+Adding a new alias is a deliberate, reviewed change:
+
+1. Add the row to `var Aliases` in `packages/go/hooks/wpcompat/aliases.go`.
+2. If the WP payload shape differs from the native args, add an adapter
+   function next to it and a `WP*` struct if it needs a typed surface.
+3. Add the row to A.1 or A.2 above.
+4. Add a presence assertion in `TestAliases_TopHooksPresent`.
+
+We do not aim for full WP coverage — the long-tail WP hooks
+(`the_meta`, `get_avatar_data`, `all_admin_notices`, ...) are
+intentionally not in the table. A plugin that needs one of them can
+register on the canonical native name directly via `Bus.RegisterFilter`
+/ `Bus.RegisterAction`; the alias table is for the names plugin authors
+reach for by reflex.
+
+---
+
 ## End
 
 Two things to repeat, because they are the foundation of every other decision in this doc:
