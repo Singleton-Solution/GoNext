@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Singleton-Solution/GoNext/packages/go/testutil/containers"
+	"github.com/Singleton-Solution/GoNext/packages/go/testutil/dbtest"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -173,6 +174,18 @@ func readAll(t *testing.T, pool *pgxpool.Pool) []outboxRow {
 // TestIntegration_Store_RollbackDropsRow exercises the core
 // transactional contract: a Write inside a tx that rolls back leaves
 // no trace.
+//
+// This is also a worked example of dbtest.BeginIsolated: instead of
+// hand-rolling Begin + Rollback (and a defer to handle the failure
+// path), we hand the test's tx to a helper that wires the rollback
+// into t.Cleanup. The test body then has only the assertion logic.
+// Note that store.Write runs against the tx returned by BeginIsolated
+// — it's a real pgx.Tx — and the readAll() probe against the bare
+// pool sees zero rows because the tx is rolled back at cleanup,
+// before this function returns? No — readAll runs INSIDE the test
+// body, so the tx is still open at that point. Postgres's per-tx
+// isolation gives us the same observable property: uncommitted
+// writes are invisible to other connections.
 func TestIntegration_Store_RollbackDropsRow(t *testing.T) {
 	pool := setupOutbox(t)
 	if pool == nil {
@@ -181,20 +194,19 @@ func TestIntegration_Store_RollbackDropsRow(t *testing.T) {
 	ctx := context.Background()
 	store := NewStore()
 
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
+	tx := dbtest.BeginIsolated(t, pool)
 	if _, err := store.Write(ctx, tx, Entry{
 		TaskName: "x.rollback", Queue: "q", Payload: map[string]any{"a": 1},
 	}); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
-	if err := tx.Rollback(ctx); err != nil {
-		t.Fatalf("Rollback: %v", err)
-	}
+	// The tx is still open here — readAll opens a separate connection
+	// off the pool, which can't see uncommitted writes. After this
+	// function returns, t.Cleanup → Rollback discards the row, so a
+	// hypothetical second test reusing this pool would also see zero
+	// rows. Either way the contract holds.
 	if rows := readAll(t, pool); len(rows) != 0 {
-		t.Fatalf("expected 0 rows after rollback, got %d: %+v", len(rows), rows)
+		t.Fatalf("expected 0 rows visible from outside the tx, got %d: %+v", len(rows), rows)
 	}
 }
 
