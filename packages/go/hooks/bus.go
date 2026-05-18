@@ -87,6 +87,14 @@ type chain []registration
 //
 // Async only applies to actions; it is ignored for filters (where the
 // chain has to run synchronously for the value to flow).
+//
+// source/before/after are the optional declarative-ordering fields that
+// supplement the numeric priority. source names this subscriber so other
+// subscribers can refer to it; before/after name the subscribers this one
+// must run before/after. An empty source is fine (the subscriber simply
+// can't be the target of anyone else's constraint); an empty before/after
+// is the common case (priority-only ordering, identical to pre-#265
+// behavior).
 type registration struct {
 	token    uint64
 	priority int
@@ -95,6 +103,9 @@ type registration struct {
 	active   *atomic.Bool
 	action   ActionHandler
 	filter   FilterHandler
+	source   string
+	before   []string
+	after    []string
 }
 
 // NewBus returns a ready-to-use Bus.
@@ -182,6 +193,36 @@ const (
 	kindFilterCall
 )
 
+// RegisterOptions carries the declarative-ordering metadata a subscriber
+// can supply alongside (or in place of) a numeric priority. See issue
+// #265 — numeric priority alone forces plugin authors to play games with
+// magic numbers when they want to express "I must run after plugin X";
+// before/after lets them say so directly and have the scheduler resolve
+// the partial order via a topological sort.
+//
+// Source is this subscriber's identifier, the name other subscribers
+// reference in their Before/After lists. Convention is "plugin-slug" or
+// "plugin-slug/hook-tag" — anything stable, unique enough to be a
+// useful constraint target, and meaningful in error messages.
+//
+// Before and After are the constraint lists. "Before: [\"foo\"]" means
+// "this subscriber must run before every subscriber whose Source is
+// \"foo\"". "After: [\"bar\"]" is the symmetric form. Constraints that
+// reference a Source no subscriber currently has are silently dropped
+// at sort time (with a slog warning) — this matches the WordPress
+// expectation that an "after some-other-plugin" registration is best-
+// effort when that plugin isn't installed.
+//
+// Priority is the numeric fallback that breaks ties the constraint graph
+// doesn't pin. Zero is the documented default; lower runs first; ties
+// preserve registration order, identical to the pre-#265 contract.
+type RegisterOptions struct {
+	Source   string
+	Before   []string
+	After    []string
+	Priority int
+}
+
 // RegisterAction registers an action listener and returns an unsubscribe
 // function. Calling the returned function more than once is a no-op.
 //
@@ -195,7 +236,29 @@ const (
 // Registering while a Do is in flight is safe: the new handler does not
 // join the in-flight dispatch; it participates in the next Do call.
 func (b *Bus) RegisterAction(name string, priority int, handler ActionHandler) func() {
-	return b.register(name, priority, kindActionCall, false, handler, nil)
+	off, _ := b.register(name, kindActionCall, false, handler, nil, RegisterOptions{Priority: priority})
+	return off
+}
+
+// RegisterActionWithOptions registers an action listener with the full
+// declarative-ordering metadata of RegisterOptions, returning an
+// unsubscribe function and any registration error.
+//
+// Errors:
+//
+//   - ErrSelfConstraint: this subscriber's Source appears in its own
+//     Before or After list. Always a typo; the registration is rejected
+//     and the returned unsubscribe is a no-op.
+//   - ErrCycle: adding this subscriber would create a cycle in the
+//     constraint graph for the hook. The registration is rejected, the
+//     existing chain is unchanged, and the returned unsubscribe is a
+//     no-op.
+//
+// On any other error (none currently) the registration is also rejected.
+// On success, the returned unsubscribe is the same idempotent closure
+// RegisterAction returns.
+func (b *Bus) RegisterActionWithOptions(name string, opts RegisterOptions, handler ActionHandler) (func(), error) {
+	return b.register(name, kindActionCall, false, handler, nil, opts)
 }
 
 // RegisterAsync registers an action listener that runs in its own
@@ -207,7 +270,15 @@ func (b *Bus) RegisterAction(name string, priority int, handler ActionHandler) f
 // email, indexing a document, posting to a webhook. Synchronous handlers
 // are preferred for anything whose failure should fail the request.
 func (b *Bus) RegisterAsync(name string, priority int, handler ActionHandler) func() {
-	return b.register(name, priority, kindActionCall, true, handler, nil)
+	off, _ := b.register(name, kindActionCall, true, handler, nil, RegisterOptions{Priority: priority})
+	return off
+}
+
+// RegisterAsyncWithOptions is the declarative-ordering variant of
+// RegisterAsync. See RegisterActionWithOptions for the error cases —
+// they are identical here.
+func (b *Bus) RegisterAsyncWithOptions(name string, opts RegisterOptions, handler ActionHandler) (func(), error) {
+	return b.register(name, kindActionCall, true, handler, nil, opts)
 }
 
 // RegisterFilter registers a filter handler and returns an unsubscribe
@@ -220,31 +291,60 @@ func (b *Bus) RegisterAsync(name string, priority int, handler ActionHandler) fu
 // ApplyFilters. There is no async filter mode because the chain has to
 // thread a value through synchronously.
 func (b *Bus) RegisterFilter(name string, priority int, handler FilterHandler) func() {
-	return b.register(name, priority, kindFilterCall, false, nil, handler)
+	off, _ := b.register(name, kindFilterCall, false, nil, handler, RegisterOptions{Priority: priority})
+	return off
+}
+
+// RegisterFilterWithOptions is the declarative-ordering variant of
+// RegisterFilter. See RegisterActionWithOptions for the error cases —
+// they are identical here.
+func (b *Bus) RegisterFilterWithOptions(name string, opts RegisterOptions, handler FilterHandler) (func(), error) {
+	return b.register(name, kindFilterCall, false, nil, handler, opts)
 }
 
 // register is the shared implementation for the three exported registrars.
 // It allocates a registration, inserts it into the per-name slot's chain
-// under the slot's mutex, then publishes the new chain via atomic store.
+// under the slot's mutex, runs the priority sort + topological sort to
+// resolve before/after constraints, then publishes the new chain via
+// atomic store.
+//
+// Returning (func, error) rather than panicking on a malformed
+// registration is a deliberate API choice for the *WithOptions surface:
+// a cycle is almost always a misconfiguration the operator wants to see
+// at startup as a typed error, not a runtime panic that takes down the
+// process. The error is also surfaced through the legacy non-options
+// RegisterAction/RegisterFilter callers — but those can't pass
+// constraints, so they will never trigger a non-nil error and the
+// generated unsubscribe closure is always returned.
 func (b *Bus) register(
 	name string,
-	priority int,
 	kind callKind,
 	async bool,
 	action ActionHandler,
 	filter FilterHandler,
-) func() {
+	opts RegisterOptions,
+) (func(), error) {
 	token := b.regSeq.Add(1)
 	active := &atomic.Bool{}
 	active.Store(true)
 	reg := registration{
 		token:    token,
-		priority: priority,
+		priority: opts.Priority,
 		regOrder: token, // token doubles as regOrder (monotonic)
 		async:    async,
 		active:   active,
 		action:   action,
 		filter:   filter,
+		source:   opts.Source,
+		before:   opts.Before,
+		after:    opts.After,
+	}
+
+	// Self-constraint check happens before we touch the slot — it does
+	// not depend on the rest of the chain and rejecting early keeps the
+	// hot path branch-free.
+	if err := validateSelfConstraints(reg); err != nil {
+		return noopUnsub, err
 	}
 
 	slot := b.slot(name, kind)
@@ -260,13 +360,39 @@ func (b *Bus) register(
 		}
 	}
 	next = append(next, reg)
+	// Pre-sort by (priority, regOrder). This stable order is both the
+	// fallback for subscribers without constraints and the deterministic
+	// tie-break topoSort uses when multiple roots have in-degree zero.
 	sort.SliceStable(next, func(i, j int) bool {
 		if next[i].priority != next[j].priority {
 			return next[i].priority < next[j].priority
 		}
 		return next[i].regOrder < next[j].regOrder
 	})
-	slot.chain.Store(&next)
+	// Topological pass resolves before/after constraints. The fast path
+	// (no constraints anywhere in the chain) is detected up front so we
+	// can skip the O(n^2) Kahn loop for the common case — most chains
+	// will be priority-only.
+	ordered, err := orderChain(next)
+	if err != nil {
+		// Cycle (or any future ordering error) → reject this
+		// registration, leave the existing chain untouched. The
+		// unsubscribe we hand back is a no-op so callers who ignore the
+		// error don't accidentally unregister an unrelated handler.
+		slot.mu.Unlock()
+		b.log().Warn("hook registration rejected: ordering constraints invalid",
+			slog.String("hook", name),
+			slog.String("source", opts.Source),
+			slog.Any("err", err),
+		)
+		return noopUnsub, err
+	}
+	// Warn (once, at registration time) about constraints that point at
+	// Sources nobody registered. The constraint still drops silently at
+	// sort time — this is just the operator-visible signal so a typo or
+	// a missing-plugin scenario doesn't go unnoticed.
+	b.warnUnknownConstraints(name, reg, next)
+	slot.chain.Store(&ordered)
 	slot.mu.Unlock()
 
 	// The unsubscribe closure flips the active flag, then rebuilds the
@@ -274,6 +400,15 @@ func (b *Bus) register(
 	// in-flight readers stop calling this handler immediately, even
 	// before the chain rebuild publishes. sync.Once guarantees idempotence
 	// on repeated unsubscribe calls.
+	//
+	// Removing a node cannot introduce a cycle, but it does invalidate
+	// the cached topological order in one specific way: a Before/After
+	// constraint pointing at the removed Source becomes "dangling" and
+	// the remaining order may now violate some other implicit constraint
+	// the removed node was sitting between. We re-run orderChain on the
+	// pruned slice to keep the cache consistent — the resort is cheap
+	// (chain sizes are small) and avoids subtle bugs where a removed
+	// listener leaves the rest of the chain in a stale order.
 	var once sync.Once
 	return func() {
 		once.Do(func() {
@@ -290,10 +425,89 @@ func (b *Bus) register(
 				}
 				pruned = append(pruned, r)
 			}
+			// Re-order after removal. A successful prior order means the
+			// graph has no cycles; removing a node cannot introduce one,
+			// so the only error case is theoretical and we fall back to
+			// the pre-topo order if it somehow fires.
+			ordered, err := orderChain(pruned)
+			if err == nil {
+				pruned = ordered
+			}
 			slot.chain.Store(&pruned)
 			slot.mu.Unlock()
 		})
+	}, nil
+}
+
+// orderChain runs the topological sort over a priority-pre-sorted chain.
+// The fast path — no subscriber in the chain has any before/after
+// constraint — skips the Kahn allocation altogether and returns the
+// input unchanged. The slow path delegates to topoSort.
+//
+// This split lives here (not in order.go) so the fast-path branch can
+// stay tight: a chain with zero constraints walks the slice once and
+// returns. order.go owns the actual algorithm.
+func orderChain(c chain) (chain, error) {
+	hasConstraints := false
+	for i := range c {
+		if len(c[i].before) > 0 || len(c[i].after) > 0 {
+			hasConstraints = true
+			break
+		}
 	}
+	if !hasConstraints {
+		// No constraints: the priority+regOrder sort already done by
+		// the caller is the final order. Hand back the slice as-is.
+		return c, nil
+	}
+	out, err := topoSort([]registration(c))
+	if err != nil {
+		return nil, err
+	}
+	return chain(out), nil
+}
+
+// noopUnsub is the unsubscribe handle returned alongside a non-nil
+// registration error. Calling it is a no-op — there is nothing to
+// unregister because the registration was rejected. We give callers a
+// non-nil closure so the common pattern of `defer off()` doesn't panic
+// when they ignore the error.
+func noopUnsub() {}
+
+// warnUnknownConstraints logs a warning for each Before/After target in
+// reg that doesn't match any Source currently in chain. Called inside
+// the slot's mutex so the snapshot is consistent.
+//
+// We log rather than fail because "after X" referring to an absent X is
+// a perfectly reasonable best-effort declaration — if X gets installed
+// later the constraint resolves itself. But the operator deserves a
+// heads-up at startup so a missing-plugin issue doesn't masquerade as
+// "ordering quietly does the wrong thing."
+func (b *Bus) warnUnknownConstraints(hook string, reg registration, c chain) {
+	if len(reg.before) == 0 && len(reg.after) == 0 {
+		return
+	}
+	known := make(map[string]struct{}, len(c))
+	for i := range c {
+		if c[i].source != "" {
+			known[c[i].source] = struct{}{}
+		}
+	}
+	check := func(targets []string, kind string) {
+		for _, t := range targets {
+			if _, ok := known[t]; ok {
+				continue
+			}
+			b.log().Warn("hook ordering constraint references unknown source",
+				slog.String("hook", hook),
+				slog.String("source", reg.source),
+				slog.String("constraint", kind),
+				slog.String("target", t),
+			)
+		}
+	}
+	check(reg.before, "before")
+	check(reg.after, "after")
 }
 
 // Do fires the action `name`, running every registered handler in priority
