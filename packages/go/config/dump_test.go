@@ -228,6 +228,7 @@ func TestDump_Golden(t *testing.T) {
 		Redis:    RedisConfig{URL: redisURL, PoolSize: 20, MinIdleConns: 2, DialTimeout: 5 * time.Second, ReadTimeout: 3 * time.Second, WriteTimeout: 3 * time.Second},
 		Storage:  StorageConfig{Endpoint: "", Region: "us-east-1", Bucket: "media", AccessKey: accessKey, SecretKey: secretKey, UseSSL: true, PathStyle: false},
 		Auth:     AuthConfig{Pepper: pepper, SessionSecret: session, CSRFSecret: csrf, SessionTTL: 30 * 24 * time.Hour, SessionIdleTTL: 7 * 24 * time.Hour},
+		Plugins:  PluginsConfig{DevMode: false, DevToken: ""},
 	}
 
 	want := strings.Join([]string{
@@ -247,6 +248,8 @@ func TestDump_Golden(t *testing.T) {
 		"Log.AddSource=false",
 		"Log.Format=json",
 		"Log.Level=INFO",
+		"Plugins.DevMode=false",
+		"Plugins.DevToken=" + expectedMask(""),
 		"Redis.DialTimeout=5s",
 		"Redis.MinIdleConns=2",
 		"Redis.PoolSize=20",
