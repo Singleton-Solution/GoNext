@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0"
+  xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/"
+  xmlns:content="http://purl.org/rss/1.0/modules/content/"
+  xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:wp="http://wordpress.org/export/1.2/">
+<channel>
+  <title>Ten Posts Blog</title>
+  <link>https://ten.example.com</link>
+  <description>Ten-post fixture for verifier round-trip tests</description>
+  <pubDate>Thu, 14 Mar 2024 12:34:56 +0000</pubDate>
+  <language>en-US</language>
+  <wp:wxr_version>1.2</wp:wxr_version>
+  <wp:base_site_url>https://ten.example.com</wp:base_site_url>
+  <wp:base_blog_url>https://ten.example.com</wp:base_blog_url>
+  <generator>https://wordpress.org/?v=6.4.2</generator>
+
+  <wp:author>
+    <wp:author_id>1</wp:author_id>
+    <wp:author_login><![CDATA[verifier-admin]]></wp:author_login>
+    <wp:author_email><![CDATA[admin@ten.example.com]]></wp:author_email>
+    <wp:author_display_name><![CDATA[Verifier Admin]]></wp:author_display_name>
+    <wp:author_first_name><![CDATA[Verifier]]></wp:author_first_name>
+    <wp:author_last_name><![CDATA[Admin]]></wp:author_last_name>
+  </wp:author>
+
+  <wp:category>
+    <wp:term_id>2</wp:term_id>
+    <wp:category_nicename><![CDATA[news]]></wp:category_nicename>
+    <wp:category_parent><![CDATA[]]></wp:category_parent>
+    <wp:cat_name><![CDATA[News]]></wp:cat_name>
+    <wp:category_description><![CDATA[Latest news]]></wp:category_description>
+  </wp:category>
+
+  <wp:tag>
+    <wp:term_id>3</wp:term_id>
+    <wp:tag_slug><![CDATA[welcome]]></wp:tag_slug>
+    <wp:tag_name><![CDATA[Welcome]]></wp:tag_name>
+    <wp:tag_description><![CDATA[Welcome tag]]></wp:tag_description>
+  </wp:tag>
+
+  <item>
+    <title>Post One</title>
+    <link>https://ten.example.com/post-one/</link>
+    <pubDate>Thu, 14 Mar 2024 13:00:00 +0000</pubDate>
+    <dc:creator><![CDATA[verifier-admin]]></dc:creator>
+    <description></description>
+    <content:encoded><![CDATA[<p>First post body.</p>]]></content:encoded>
+    <excerpt:encoded><![CDATA[]]></excerpt:encoded>
+    <wp:post_id>11</wp:post_id>
+    <wp:post_date><![CDATA[2024-03-14 13:00:00]]></wp:post_date>
+    <wp:post_date_gmt><![CDATA[2024-03-14 13:00:00]]></wp:post_date_gmt>
+    <wp:comment_status><![CDATA[open]]></wp:comment_status>
+    <wp:ping_status><![CDATA[closed]]></wp:ping_status>
+    <wp:post_name><![CDATA[post-one]]></wp:post_name>
+    <wp:status><![CDATA[publish]]></wp:status>
+    <wp:post_parent>0</wp:post_parent>
+    <wp:menu_order>0</wp:menu_order>
+    <wp:post_type><![CDATA[post]]></wp:post_type>
+    <wp:post_password><![CDATA[]]></wp:post_password>
+    <wp:is_sticky>0</wp:is_sticky>
+    <category domain="category" nicename="news"><![CDATA[News]]></category>
+    <category domain="post_tag" nicename="welcome"><![CDATA[Welcome]]></category>
+    <wp:comment>
+      <wp:comment_id>1001</wp:comment_id>
+      <wp:comment_author><![CDATA[Alice]]></wp:comment_author>
+      <wp:comment_author_email><![CDATA[alice@example.com]]></wp:comment_author_email>
+      <wp:comment_author_url><![CDATA[]]></wp:comment_author_url>
+      <wp:comment_author_IP><![CDATA[]]></wp:comment_author_IP>
+      <wp:comment_date><![CDATA[2024-03-14 14:00:00]]></wp:comment_date>
+      <wp:comment_date_gmt><![CDATA[2024-03-14 14:00:00]]></wp:comment_date_gmt>
+      <wp:comment_content><![CDATA[First!]]></wp:comment_content>
+      <wp:comment_approved><![CDATA[1]]></wp:comment_approved>
+      <wp:comment_type><![CDATA[]]></wp:comment_type>
+      <wp:comment_parent>0</wp:comment_parent>
+      <wp:comment_user_id>0</wp:comment_user_id>
+    </wp:comment>
+    <wp:comment>
+      <wp:comment_id>1002</wp:comment_id>
+      <wp:comment_author><![CDATA[Bob]]></wp:comment_author>
+      <wp:comment_author_email><![CDATA[bob@example.com]]></wp:comment_author_email>
+      <wp:comment_author_url><![CDATA[]]></wp:comment_author_url>
+      <wp:comment_author_IP><![CDATA[]]></wp:comment_author_IP>
+      <wp:comment_date><![CDATA[2024-03-14 14:30:00]]></wp:comment_date>
+      <wp:comment_date_gmt><![CDATA[2024-03-14 14:30:00]]></wp:comment_date_gmt>
+      <wp:comment_content><![CDATA[Reply to first.]]></wp:comment_content>
+      <wp:comment_approved><![CDATA[1]]></wp:comment_approved>
+      <wp:comment_type><![CDATA[]]></wp:comment_type>
+      <wp:comment_parent>1001</wp:comment_parent>
+      <wp:comment_user_id>0</wp:comment_user_id>
+    </wp:comment>
+    <wp:comment>
+      <wp:comment_id>1003</wp:comment_id>
+      <wp:comment_author><![CDATA[Carol]]></wp:comment_author>
+      <wp:comment_author_email><![CDATA[carol@example.com]]></wp:comment_author_email>
+      <wp:comment_author_url><![CDATA[]]></wp:comment_author_url>
+      <wp:comment_author_IP><![CDATA[]]></wp:comment_author_IP>
+      <wp:comment_date><![CDATA[2024-03-14 15:00:00]]></wp:comment_date>
+      <wp:comment_date_gmt><![CDATA[2024-03-14 15:00:00]]></wp:comment_date_gmt>
+      <wp:comment_content><![CDATA[Deep reply.]]></wp:comment_content>
+      <wp:comment_approved><![CDATA[1]]></wp:comment_approved>
+      <wp:comment_type><![CDATA[]]></wp:comment_type>
+      <wp:comment_parent>1002</wp:comment_parent>
+      <wp:comment_user_id>0</wp:comment_user_id>
+    </wp:comment>
+  </item>
+
+  <item>
+    <title>Post Two</title>
+    <link>https://ten.example.com/post-two/</link>
+    <dc:creator><![CDATA[verifier-admin]]></dc:creator>
+    <content:encoded><![CDATA[<p>Second post body.</p>]]></content:encoded>
+    <wp:post_id>12</wp:post_id>
+    <wp:post_date><![CDATA[2024-03-15 13:00:00]]></wp:post_date>
+    <wp:post_date_gmt><![CDATA[2024-03-15 13:00:00]]></wp:post_date_gmt>
+    <wp:post_name><![CDATA[post-two]]></wp:post_name>
+    <wp:status><![CDATA[publish]]></wp:status>
+    <wp:post_type><![CDATA[post]]></wp:post_type>
+  </item>
+
+  <item>
+    <title>Post Three</title>
+    <link>https://ten.example.com/post-three/</link>
+    <dc:creator><![CDATA[verifier-admin]]></dc:creator>
+    <content:encoded><![CDATA[<p>Third post body.</p>]]></content:encoded>
+    <wp:post_id>13</wp:post_id>
+    <wp:post_date><![CDATA[2024-03-16 13:00:00]]></wp:post_date>
+    <wp:post_date_gmt><![CDATA[2024-03-16 13:00:00]]></wp:post_date_gmt>
+    <wp:post_name><![CDATA[post-three]]></wp:post_name>
+    <wp:status><![CDATA[publish]]></wp:status>
+    <wp:post_type><![CDATA[post]]></wp:post_type>
+  </item>
+
+  <item>
+    <title>Post Four</title>
+    <link>https://ten.example.com/post-four/</link>
+    <dc:creator><![CDATA[verifier-admin]]></dc:creator>
+    <content:encoded><![CDATA[<p>Fourth post body.</p>]]></content:encoded>
+    <wp:post_id>14</wp:post_id>
+    <wp:post_date><![CDATA[2024-03-17 13:00:00]]></wp:post_date>
+    <wp:post_date_gmt><![CDATA[2024-03-17 13:00:00]]></wp:post_date_gmt>
+    <wp:post_name><![CDATA[post-four]]></wp:post_name>
+    <wp:status><![CDATA[publish]]></wp:status>
+    <wp:post_type><![CDATA[post]]></wp:post_type>
+  </item>
+
+  <item>
+    <title>Post Five</title>
+    <link>https://ten.example.com/post-five/</link>
+    <dc:creator><![CDATA[verifier-admin]]></dc:creator>
+    <content:encoded><![CDATA[<p>Fifth post body.</p>]]></content:encoded>
+    <wp:post_id>15</wp:post_id>
+    <wp:post_date><![CDATA[2024-03-18 13:00:00]]></wp:post_date>
+    <wp:post_date_gmt><![CDATA[2024-03-18 13:00:00]]></wp:post_date_gmt>
+    <wp:post_name><![CDATA[post-five]]></wp:post_name>
+    <wp:status><![CDATA[publish]]></wp:status>
+    <wp:post_type><![CDATA[post]]></wp:post_type>
+  </item>
+
+  <item>
+    <title>Post Six</title>
+    <link>https://ten.example.com/post-six/</link>
+    <dc:creator><![CDATA[verifier-admin]]></dc:creator>
+    <content:encoded><![CDATA[<p>Sixth post body.</p>]]></content:encoded>
+    <wp:post_id>16</wp:post_id>
+    <wp:post_date><![CDATA[2024-03-19 13:00:00]]></wp:post_date>
+    <wp:post_date_gmt><![CDATA[2024-03-19 13:00:00]]></wp:post_date_gmt>
+    <wp:post_name><![CDATA[post-six]]></wp:post_name>
+    <wp:status><![CDATA[publish]]></wp:status>
+    <wp:post_type><![CDATA[post]]></wp:post_type>
+  </item>
+
+  <item>
+    <title>Post Seven</title>
+    <link>https://ten.example.com/post-seven/</link>
+    <dc:creator><![CDATA[verifier-admin]]></dc:creator>
+    <content:encoded><![CDATA[<p>Seventh post body.</p>]]></content:encoded>
+    <wp:post_id>17</wp:post_id>
+    <wp:post_date><![CDATA[2024-03-20 13:00:00]]></wp:post_date>
+    <wp:post_date_gmt><![CDATA[2024-03-20 13:00:00]]></wp:post_date_gmt>
+    <wp:post_name><![CDATA[post-seven]]></wp:post_name>
+    <wp:status><![CDATA[publish]]></wp:status>
+    <wp:post_type><![CDATA[post]]></wp:post_type>
+  </item>
+
+  <item>
+    <title>Post Eight</title>
+    <link>https://ten.example.com/post-eight/</link>
+    <dc:creator><![CDATA[verifier-admin]]></dc:creator>
+    <content:encoded><![CDATA[<p>Eighth post body.</p>]]></content:encoded>
+    <wp:post_id>18</wp:post_id>
+    <wp:post_date><![CDATA[2024-03-21 13:00:00]]></wp:post_date>
+    <wp:post_date_gmt><![CDATA[2024-03-21 13:00:00]]></wp:post_date_gmt>
+    <wp:post_name><![CDATA[post-eight]]></wp:post_name>
+    <wp:status><![CDATA[publish]]></wp:status>
+    <wp:post_type><![CDATA[post]]></wp:post_type>
+  </item>
+
+  <item>
+    <title>Post Nine</title>
+    <link>https://ten.example.com/post-nine/</link>
+    <dc:creator><![CDATA[verifier-admin]]></dc:creator>
+    <content:encoded><![CDATA[<p>Ninth post body.</p>]]></content:encoded>
+    <wp:post_id>19</wp:post_id>
+    <wp:post_date><![CDATA[2024-03-22 13:00:00]]></wp:post_date>
+    <wp:post_date_gmt><![CDATA[2024-03-22 13:00:00]]></wp:post_date_gmt>
+    <wp:post_name><![CDATA[post-nine]]></wp:post_name>
+    <wp:status><![CDATA[publish]]></wp:status>
+    <wp:post_type><![CDATA[post]]></wp:post_type>
+  </item>
+
+  <item>
+    <title>Post Ten</title>
+    <link>https://ten.example.com/post-ten/</link>
+    <dc:creator><![CDATA[verifier-admin]]></dc:creator>
+    <content:encoded><![CDATA[<p>Tenth post body.</p>]]></content:encoded>
+    <wp:post_id>20</wp:post_id>
+    <wp:post_date><![CDATA[2024-03-23 13:00:00]]></wp:post_date>
+    <wp:post_date_gmt><![CDATA[2024-03-23 13:00:00]]></wp:post_date_gmt>
+    <wp:post_name><![CDATA[post-ten]]></wp:post_name>
+    <wp:status><![CDATA[publish]]></wp:status>
+    <wp:post_type><![CDATA[post]]></wp:post_type>
+  </item>
+</channel>
+</rss>
