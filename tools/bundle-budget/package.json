@@ -1,0 +1,44 @@
+{
+  "name": "@gonext/bundle-budget",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bundle size budget checker for GoNext Next.js apps. Parses Next.js build output (.next/build-manifest.json + per-route assets), computes per-chunk gzipped sizes, and gates CI against budgets declared in a YAML file. See tools/bundle-budget/README.md and adr/* for the rationale. Issue #126.",
+  "license": "Apache-2.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./check": "./src/check.ts",
+    "./budget": "./src/budget.ts"
+  },
+  "bin": {
+    "gonext-bundle-budget": "./bin/check.js"
+  },
+  "files": [
+    "src",
+    "bin",
+    "budgets.yaml",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "echo '@gonext/bundle-budget: source-only package, no build step'",
+    "lint": "echo '@gonext/bundle-budget lint: not yet implemented'",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "check": "node --import tsx ./bin/check.js"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@gonext/test-config": "workspace:*",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^1.6.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.6.0",
+    "vitest": "^1.6.0"
+  }
+}

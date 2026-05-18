@@ -2,3 +2,4 @@ packages:
   - 'apps/web'
   - 'apps/admin'
   - 'packages/ts/*'
+  - 'tools/bundle-budget'

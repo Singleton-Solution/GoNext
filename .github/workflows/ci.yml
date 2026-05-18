@@ -206,8 +206,44 @@ jobs:
           GOWORK: 'off'
         run: |
           cd tools/dashboards && go test ./...
+  # Bundle size budget enforcement (issue #126).
+  #
+  # Builds the admin app, then runs @gonext/bundle-budget to check each route
+  # against the per-class (JS/CSS/font) and global transfer ceilings declared
+  # in tools/bundle-budget/budgets.yaml.
+  #
+  # Advisory only for the first batch — `continue-on-error: true` keeps the
+  # gate from blocking PRs while we shake out noise from the early signal.
+  # A follow-up issue will flip the job to required on the branch protection
+  # rule once the budgets are stable.
+  bundle-budget:
+    needs: [changes, lint-web]
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      # Build the admin app so the .next/ build manifest exists.
+      - name: Build @gonext/admin
+        run: pnpm --filter @gonext/admin run build
+      # The checker is a Node-only TS package; we run it through tsx so we
+      # don't need a separate build step for a CI utility.
+      - name: Bundle budget check (admin)
+        run: |
+          pnpm --filter @gonext/bundle-budget exec \
+            node --import tsx ./bin/check.js \
+              --app admin \
+              --next ../../apps/admin/.next \
+              --summary "$GITHUB_STEP_SUMMARY"
 
   # Aggregate gate. Required check on the branch protection rule.
+  # bundle-budget is intentionally NOT in `needs:` while it remains advisory.
   ci:
     needs: [lint-docs, lint-go, test-go, lint-web, test-web, lint-dashboards]
     if: always()

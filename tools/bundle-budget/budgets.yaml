@@ -1,0 +1,55 @@
+# GoNext bundle size budgets (issue #126).
+#
+# Sizes are gzipped kilobytes (1 KB = 1000 bytes — the unit the browser
+# DevTools Network panel reports). Each route lists the per-asset-class
+# ceiling; the global block applies to every route as a transferred-total cap.
+#
+# Editing rules:
+#  - Raise a budget only with a written justification in the PR description
+#    referencing the user-visible feature that earned the bytes. The CI gate
+#    exists to make creep deliberate, not to be silently inflated away.
+#  - The `app` field names a Next.js workspace (`admin`, `web`).
+#  - The `route` field is the route key as it appears in Next.js'
+#    `.next/app-build-manifest.json` (App Router) or `build-manifest.json`
+#    (Pages Router). App Router segments include the trailing `/page` or
+#    `/layout` token, e.g. `/page` (the home), `/posts/[id]/edit/page`.
+#  - Routes not listed here emit a warning when seen in the manifest — not
+#    a failure. Add them once their surface stabilises and the budget number
+#    is informed by at least one measurement.
+
+global:
+  # Total transferred bytes per route (HTML + JS + CSS + fonts).
+  # Anything over this and we have a problem regardless of which class
+  # of asset blew through.
+  maxTransferKb: 1000
+
+routes:
+  # Admin homepage (App Router root `/` renders as `/page` in the manifest).
+  - app: admin
+    route: /page
+    maxJsKb: 250
+    maxCssKb: 40
+    maxFontKb: 100
+
+  # Block editor route. Aspirational until the route lands (issue #384
+  # introduced the editor; this is the budget it must fit inside). Until
+  # the manifest names this route, it will simply not appear in CI output —
+  # which is fine.
+  - app: admin
+    route: /posts/[id]/edit/page
+    # Block editor pulls in the rich-text engine, drag-and-drop, image
+    # cropping — every byte here is load-bearing for the authoring
+    # surface. The 600 KB ceiling matches the back-of-envelope budget
+    # in docs/12-performance.md.
+    maxJsKb: 600
+    maxCssKb: 60
+    maxFontKb: 100
+
+  # Public homepage on apps/web. Once the web app actually builds (issue #6)
+  # this becomes the marquee budget.
+  - app: web
+    route: /page
+    # Public homepage is the marquee path — must stay tiny.
+    maxJsKb: 80
+    maxCssKb: 30
+    maxFontKb: 100

@@ -12,6 +12,12 @@ out/
 bin/
 target/
 
+# bin/ above is a coarse build-output exclude. The bundle-budget CLI
+# wrapper is checked in and is the only hand-written `bin/` entry, so
+# undo the ignore for it explicitly.
+!tools/bundle-budget/bin/
+!tools/bundle-budget/bin/**
+
 # Logs
 *.log
 npm-debug.log*
