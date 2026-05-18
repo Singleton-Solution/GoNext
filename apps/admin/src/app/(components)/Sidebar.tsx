@@ -32,6 +32,13 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: '/users', label: 'Users', icon: 'U' },
   { href: '/plugins', label: 'Plugins', icon: 'Pl' },
   { href: '/settings', label: 'Settings', icon: 'S' },
+  // System Status is the operator surface (issue #221). It sits at the
+  // bottom of the IA so it doesn't compete with the content-authoring
+  // sections that occupy the rest of the sidebar. Access is gated
+  // server-side via the system_read capability; the link itself is
+  // visible to every signed-in user (a non-admin clicking through gets
+  // a 403 on the API call and the page renders the error state).
+  { href: '/status', label: 'System Status', icon: 'St' },
 ];
 
 function isActive(currentPath: string, href: string): boolean {

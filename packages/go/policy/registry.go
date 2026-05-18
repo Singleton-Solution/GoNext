@@ -158,6 +158,7 @@ func builtinCapabilityDescriptions() []registeredCapability {
 		// Site.
 		{CapManageOptions, "Edit site settings."},
 		{CapManageInstall, "Run migrations and manage the install on disk."},
+		{CapSystemRead, "View the System Status page (DB, Redis, queues, migrations, themes, plugins, disk, build info)."},
 
 		// Plugins / themes.
 		{CapInstallPlugins, "Install new plugins."},
