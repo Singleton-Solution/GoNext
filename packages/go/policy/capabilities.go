@@ -74,6 +74,12 @@ const (
 	// Comments.
 	CapModerateComments Capability = "moderate_comments"
 	CapEditComment      Capability = "edit_comment"
+
+	// Background jobs / DLQ administration. Holders can list archived
+	// (dead-letter) tasks, replay them onto the active queue, discard
+	// them, and apply redaction masks to sensitive payload fields before
+	// display in the admin UI. Issue #262.
+	CapJobsAdmin Capability = "jobs.admin"
 )
 
 // CapabilitySet is the resolved set of capabilities a Principal holds.

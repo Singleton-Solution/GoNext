@@ -173,5 +173,8 @@ func builtinCapabilityDescriptions() []registeredCapability {
 		// Comments.
 		{CapModerateComments, "Approve, mark spam, or delete comments."},
 		{CapEditComment, "Edit a comment's content."},
+
+		// Background jobs.
+		{CapJobsAdmin, "Inspect, replay, discard, or redact archived background jobs."},
 	}
 }
