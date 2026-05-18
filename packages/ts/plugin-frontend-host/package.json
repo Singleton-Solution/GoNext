@@ -1,0 +1,48 @@
+{
+  "name": "@gonext/plugin-frontend-host",
+  "version": "0.0.0",
+  "private": false,
+  "description": "Frontend-host hardening for plugin-contributed JavaScript in the GoNext admin. Provides a Trusted Types policy (`gn-plugin`), Subresource Integrity (SRI) helpers, an allowlisted import-map generator, and a React <PluginScript> component that emits SRI-checked script tags inside the import-map sandbox. Pairs with packages/go/middleware/csp so plugin JS in the admin runs under the strictest CSP shape the platform supports. Apache-2.0.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./trusted-types": "./src/trusted-types.ts",
+    "./sri": "./src/sri.ts",
+    "./import-map": "./src/import-map.ts",
+    "./script-tag": "./src/script-tag.tsx"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "echo '@gonext/plugin-frontend-host: source-only package, no build step'",
+    "lint": "echo '@gonext/plugin-frontend-host lint: not yet implemented'",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "isomorphic-dompurify": "^3.13.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@gonext/test-config": "workspace:*",
+    "@testing-library/jest-dom": "^6.4.0",
+    "@testing-library/react": "^16.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitest/coverage-v8": "^1.6.0",
+    "jsdom": "^24.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^1.6.0"
+  }
+}

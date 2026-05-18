@@ -30,6 +30,7 @@
   "include": [
     "next-env.d.ts",
     "next.config.ts",
+    "middleware.ts",
     "src/**/*.ts",
     "src/**/*.tsx",
     ".next/types/**/*.ts",
