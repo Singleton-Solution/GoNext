@@ -32,6 +32,23 @@ type Options struct {
 	// edge-injected nonces, …). The hook MUST be fast and allocation-free
 	// on the hot path; it runs on every request.
 	NonceFromContext func(*http.Request) string
+
+	// RequireTrustedTypes, when non-empty, forces every emitted CSP to
+	// carry `require-trusted-types-for 'script'` plus a `trusted-types`
+	// directive listing the named policies.
+	//
+	// The names supplied here are MERGED with whatever the underlying
+	// Policy already declares in TrustedTypes — duplicates are dropped.
+	// Sinks are always set to {"script"} when the slice is non-empty;
+	// callers needing a different sink set should configure the Policy
+	// directly.
+	//
+	// This is the recommended way to require Trusted Types for
+	// plugin-contributed JS in the admin: declare the host policy names
+	// (e.g. "gn-plugin", "dompurify") here and the middleware will
+	// guarantee they appear on every response regardless of the
+	// underlying Policy shape.
+	RequireTrustedTypes []string
 }
 
 // headerName returns the response-header name to set.
@@ -85,10 +102,21 @@ func Middleware(p *Policy, opts Options) httpx.Middleware {
 		}
 	}
 
+	// Fold Options.RequireTrustedTypes into the source Policy ONCE at
+	// construction time. The merged policy is the new effective baseline
+	// — per-request work only adds the nonce on top.
+	effective := p
+	if len(opts.RequireTrustedTypes) > 0 {
+		effective = p.WithTrustedTypes(TrustedTypesOptions{
+			Sinks:    []string{"script"},
+			Policies: opts.RequireTrustedTypes,
+		})
+	}
+
 	// Pre-serialize the policy WITHOUT a nonce so the no-nonce branch is
 	// allocation-free on the hot path. The per-request branch must
 	// build a fresh string because the nonce is unique per request.
-	baseHeaderValue := p.String()
+	baseHeaderValue := effective.String()
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -103,7 +131,7 @@ func Middleware(p *Policy, opts Options) httpx.Middleware {
 			// Fold the per-request nonce into script-src / style-src and
 			// emit. The Clone happens inside WithNonce so the source
 			// Policy remains untouched.
-			value := p.WithNonce(nonce).String()
+			value := effective.WithNonce(nonce).String()
 			if value != "" {
 				w.Header().Set(header, value)
 			}
