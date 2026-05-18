@@ -28,6 +28,7 @@ describe('Sidebar', () => {
       ['Comments', '/comments'],
       ['Media', '/media'],
       ['Users', '/users'],
+      ['Plugins', '/plugins'],
       ['Settings', '/settings'],
     ];
 

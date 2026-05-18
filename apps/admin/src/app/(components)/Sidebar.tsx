@@ -30,6 +30,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: '/comments', label: 'Comments', icon: 'C' },
   { href: '/media', label: 'Media', icon: 'M' },
   { href: '/users', label: 'Users', icon: 'U' },
+  { href: '/plugins', label: 'Plugins', icon: 'Pl' },
   { href: '/settings', label: 'Settings', icon: 'S' },
 ];
 
