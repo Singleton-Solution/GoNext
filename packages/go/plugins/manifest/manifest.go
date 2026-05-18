@@ -85,6 +85,14 @@ type Manifest struct {
 	// callers.
 	Requires *Requires `json:"requires,omitempty"`
 
+	// Depends is the inter-plugin dependency list. Each entry pins
+	// another plugin slug to a semver range; the lifecycle Activate
+	// gate refuses to flip this plugin to Active unless every entry is
+	// installed, in the Active state, and reports a version inside the
+	// range. Install is not gated — Depends only blocks activation.
+	// See plugins/depends for the resolver implementation.
+	Depends []Dependency `json:"depends,omitempty"`
+
 	// Signature is the detached ed25519 signature over the canonical
 	// bundle bytes, lowercase hex (64 bytes => 128 hex chars). Optional
 	// in v1.
@@ -109,6 +117,21 @@ type Hooks struct {
 // object is present; the schema enforces that.
 type Requires struct {
 	Host string `json:"host"`
+}
+
+// Dependency is one entry of the manifest's depends[] array. Name is
+// the dependency's plugin slug; Version is a semver range (npm-style:
+// ^1.2.0, ~1.0.0, >=1.0.0 <2.0.0) the dependency's installed version
+// must satisfy. The schema enforces both shapes.
+//
+// The typed struct lives in the manifest package because the manifest
+// is the canonical source of truth for what the schema accepts. The
+// resolver in plugins/depends consumes this exact shape — it does not
+// duplicate the definition, to keep the two halves of the contract
+// from drifting.
+type Dependency struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
 }
 
 // ValidationError is one issue surfaced by Validate. Path is a

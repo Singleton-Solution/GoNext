@@ -1,0 +1,10 @@
+{
+  "apiVersion": "gonext.io/v1",
+  "name": "gn-seo",
+  "version": "1.0.0",
+  "entry": "plugin.wasm",
+  "depends": [
+    {"name": "gn-core", "version": "^1.0.0"},
+    {"name": "gn-i18n", "version": ">=2.0.0 <3.0.0"}
+  ]
+}

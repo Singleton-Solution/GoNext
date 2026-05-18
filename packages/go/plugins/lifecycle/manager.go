@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Singleton-Solution/GoNext/packages/go/audit"
+	"github.com/Singleton-Solution/GoNext/packages/go/plugins/depends"
 	"github.com/Singleton-Solution/GoNext/packages/go/plugins/manifest"
 )
 
@@ -137,12 +138,13 @@ func (NoopMigrator) MigrateDown(_ context.Context, _ string) error { return nil 
 // it provides the necessary CAS. Read-heavy operations (Get, List) go
 // straight to Storage.
 type Manager struct {
-	storage  Storage
-	runtime  Runtime
-	migrator Migrator
-	emitter  *audit.Emitter
-	logger   *slog.Logger
-	now      func() time.Time
+	storage     Storage
+	runtime     Runtime
+	migrator    Migrator
+	emitter     *audit.Emitter
+	logger      *slog.Logger
+	now         func() time.Time
+	dependGate  *depends.Gate
 }
 
 // ManagerOption configures a Manager at construction time. Functional
@@ -189,6 +191,23 @@ func WithNowFunc(fn func() time.Time) ManagerOption {
 	return func(m *Manager) {
 		if fn != nil {
 			m.now = fn
+		}
+	}
+}
+
+// WithDependencyGate wires the inter-plugin dependency gate (issue
+// #251). Activate consults the gate before flipping the row to Active;
+// on failure the manager surfaces a *depends.DependencyError and the
+// state stays unchanged (the plugin is fine, its environment isn't).
+//
+// If unset, the gate is skipped — every plugin activates regardless of
+// its depends[] manifest entries. This matches the legacy behaviour
+// from before #251 so a Manager constructed without the option keeps
+// working unchanged.
+func WithDependencyGate(g *depends.Gate) ManagerOption {
+	return func(m *Manager) {
+		if g != nil {
+			m.dependGate = g
 		}
 	}
 }
@@ -308,6 +327,13 @@ func (m *Manager) Install(ctx context.Context, bundle io.Reader) (string, error)
 //
 // Returns ErrInvalidTransition (wrapped) if the row is in any other
 // state, or if a concurrent Activate already won the race.
+//
+// If a dependency gate has been wired via WithDependencyGate, Activate
+// consults it before calling Runtime.Load. A gate failure returns the
+// gate's typed *depends.DependencyError and leaves the row untouched —
+// the plugin itself is fine, its environment isn't, so we do NOT park
+// it in Errored. The operator fixes the dependency situation and
+// retries.
 func (m *Manager) Activate(ctx context.Context, slug string) error {
 	current, err := m.storage.Get(ctx, slug)
 	if err != nil {
@@ -321,6 +347,23 @@ func (m *Manager) Activate(ctx context.Context, slug string) error {
 		return transitionError(slug, "Activate",
 			StateInstalled, // any of {Installed, Inactive} would print fine; pick one for the error text
 			current.State)
+	}
+
+	// Dependency gate runs BEFORE Runtime.Load so a failing gate
+	// doesn't waste a WASM instantiation. We parse the manifest
+	// blob the row carries; if it isn't a gonext.io/v1 manifest the
+	// gate is skipped (legacy plugins predate depends[]).
+	if m.dependGate != nil && len(current.Manifest) > 0 {
+		if mf, parseErr := manifest.Validate(current.Manifest); parseErr == nil && mf != nil {
+			if depErr := m.dependGate.AllowActivate(mf); depErr != nil {
+				return fmt.Errorf("lifecycle: Activate %q: %w", slug, depErr)
+			}
+		}
+		// A parse error here is silently ignored: legacy manifests
+		// (no apiVersion) won't survive manifest.Validate but also
+		// can't declare depends[], so they have nothing for the
+		// gate to check. The Install path is responsible for
+		// surfacing schema errors at install time.
 	}
 
 	// Load FIRST, then CAS. Two callers reading Installed will both
