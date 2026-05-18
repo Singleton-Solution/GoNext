@@ -1,7 +1,7 @@
 /**
  * @gonext/blocks-core — public entry point.
  *
- * Ships the ten **core** blocks every GoNext install relies on:
+ * Ships the sixteen **core** blocks every GoNext install relies on:
  *
  *  - `core/paragraph` — plain narrative text
  *  - `core/heading`   — h1..h6 with optional anchor
@@ -13,6 +13,12 @@
  *  - `core/spacer`    — vertical whitespace
  *  - `core/columns`   — N-column layout container
  *  - `core/group`     — generic wrapper container
+ *  - `core/table`     — tabular data with optional thead/tfoot/caption
+ *  - `core/gallery`   — image grid with reorder + crop
+ *  - `core/video`     — `<figure><video/></figure>` with playback flags
+ *  - `core/button`    — call-to-action link styled as a button
+ *  - `core/file`      — downloadable file link + button
+ *  - `core/embed`     — provider-aware oEmbed wrapper
  *
  * Every block exposes:
  *  - **`definition`** — `BlockTypeDefinition` for the registry
@@ -39,6 +45,12 @@ import { separator } from './separator/index.ts';
 import { spacer } from './spacer/index.ts';
 import { columns } from './columns/index.ts';
 import { group } from './group/index.ts';
+import { table } from './table/index.ts';
+import { gallery } from './gallery/index.ts';
+import { video } from './video/index.ts';
+import { button } from './button/index.ts';
+import { file } from './file/index.ts';
+import { embed } from './embed/index.ts';
 
 // Per-block re-exports so consumers can `import { paragraph } from
 // '@gonext/blocks-core'` and reach into `paragraph.definition`,
@@ -53,6 +65,12 @@ export { separator } from './separator/index.ts';
 export { spacer } from './spacer/index.ts';
 export { columns } from './columns/index.ts';
 export { group } from './group/index.ts';
+export { table } from './table/index.ts';
+export { gallery } from './gallery/index.ts';
+export { video } from './video/index.ts';
+export { button } from './button/index.ts';
+export { file } from './file/index.ts';
+export { embed } from './embed/index.ts';
 
 // Edit components are re-exported so app code that wants to mount a single
 // block in isolation (e.g. a focused review surface) can do so without
@@ -67,6 +85,12 @@ export { SeparatorEdit } from './separator/index.ts';
 export { SpacerEdit } from './spacer/index.ts';
 export { ColumnsEdit } from './columns/index.ts';
 export { GroupEdit } from './group/index.ts';
+export { TableEdit } from './table/index.ts';
+export { GalleryEdit } from './gallery/index.ts';
+export { VideoEdit } from './video/index.ts';
+export { ButtonEdit } from './button/index.ts';
+export { FileEdit } from './file/index.ts';
+export { EmbedEdit } from './embed/index.ts';
 
 // Per-block attribute types.
 export type { ParagraphAttributes } from './paragraph/index.ts';
@@ -79,6 +103,16 @@ export type { SeparatorAttributes } from './separator/index.ts';
 export type { SpacerAttributes } from './spacer/index.ts';
 export type { ColumnsAttributes } from './columns/index.ts';
 export type { GroupAttributes } from './group/index.ts';
+export type { TableAttributes, TableRow } from './table/index.ts';
+export type { GalleryAttributes, GalleryImage } from './gallery/index.ts';
+export type { VideoAttributes } from './video/index.ts';
+export type { ButtonAttributes } from './button/index.ts';
+export type { FileAttributes } from './file/index.ts';
+export type { EmbedAttributes, EmbedProvider } from './embed/index.ts';
+
+// Embed provider detection — exposed so the editor's URL-paste handler
+// can compute the slug before persisting it on the block.
+export { detectProvider, EMBED_PROVIDERS } from './embed/index.ts';
 
 // Container-block inner-HTML sentinels — exposed so the Go walker's TS
 // counterpart (the editor's full save pipeline) knows where to splice
@@ -102,6 +136,12 @@ export const CORE_BLOCKS = [
   spacer,
   columns,
   group,
+  table,
+  gallery,
+  video,
+  button,
+  file,
+  embed,
 ] as const;
 
 /**

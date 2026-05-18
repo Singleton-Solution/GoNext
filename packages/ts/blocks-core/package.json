@@ -2,7 +2,7 @@
   "name": "@gonext/blocks-core",
   "version": "0.0.0",
   "private": false,
-  "description": "Core block registrations for GoNext — paragraph, heading, list, image, quote, code, separator, spacer, columns, group. Each block ships a BlockTypeDefinition (with JSON Schema attributes), an Edit React component, a Save serializer, and a server-render hint consumed by the Go block render walker. Authors of plugin blocks should treat these definitions as the reference implementation. Apache-2.0.",
+  "description": "Core block registrations for GoNext — paragraph, heading, list, image, quote, code, separator, spacer, columns, group, table, gallery, video, button, file, embed. Each block ships a BlockTypeDefinition (with JSON Schema attributes), an Edit React component, a Save serializer, and a server-render hint consumed by the Go block render walker. Authors of plugin blocks should treat these definitions as the reference implementation. Apache-2.0.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./src/index.ts",

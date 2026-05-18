@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`core/table > snapshot: full table (head + body + foot + caption + styles) 1`] = `"<table class="gn-block-table is-style-stripes is-style-borders"><caption>Leaderboard</caption><thead><tr><th>Name</th><th>Score</th></tr></thead><tbody><tr><td>Ada</td><td>99</td></tr><tr><td>Linus</td><td>88</td></tr></tbody><tfoot><tr><td>Total</td><td>187</td></tr></tfoot></table>"`;
+
+exports[`core/table > snapshot: minimal table (body only) 1`] = `"<table class="gn-block-table"><tbody><tr><td>1</td><td>2</td></tr></tbody></table>"`;

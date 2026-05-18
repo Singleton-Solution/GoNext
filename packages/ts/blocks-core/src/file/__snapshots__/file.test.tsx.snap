@@ -1,0 +1,7 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`core/file > snapshot: default file (both link + button) 1`] = `"<div class="wp-block-file"><a href="https://x/a.pdf">a.pdf</a><a href="https://x/a.pdf" class="wp-block-file__button" download>Download</a></div>"`;
+
+exports[`core/file > snapshot: file with download button disabled 1`] = `"<div class="wp-block-file"><a href="https://x/a.pdf">a.pdf</a></div>"`;
+
+exports[`core/file > snapshot: file with text link disabled (span fallback) 1`] = `"<div class="wp-block-file"><span>a.pdf</span><a href="https://x/a.pdf" class="wp-block-file__button" download>Download</a></div>"`;

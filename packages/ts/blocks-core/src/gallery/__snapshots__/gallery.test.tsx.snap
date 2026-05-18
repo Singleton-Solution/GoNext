@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`core/gallery > snapshot: 3-image cropped gallery with captions 1`] = `"<figure class="wp-block-gallery columns-3 is-cropped"><figure class="wp-block-image"><img src="https://x/a.png" alt="A" width="800" height="600"/><figcaption>first</figcaption></figure><figure class="wp-block-image"><img src="https://x/b.png" alt="B"/></figure><figure class="wp-block-image"><img src="https://x/c.png" alt="C"/><figcaption>last</figcaption></figure></figure>"`;
+
+exports[`core/gallery > snapshot: empty gallery 1`] = `"<figure class="wp-block-gallery columns-3 is-cropped"></figure>"`;

@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`core/embed > snapshot: YouTube embed with full options 1`] = `"<figure class="wp-block-embed is-provider-youtube wp-block-embed-youtube is-responsive wp-embed-aspect-16-9"><div class="wp-block-embed__wrapper">https://www.youtube.com/watch?v=dQw4w9WgXcQ</div></figure>"`;
+
+exports[`core/embed > snapshot: bare embed with no detected provider 1`] = `"<figure class="wp-block-embed is-responsive"><div class="wp-block-embed__wrapper">https://example.com/page</div></figure>"`;
