@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`core/video > snapshot: bare video output 1`] = `"<figure class="gn-block-video"><video src="https://x/v.mp4" controls></video></figure>"`;
+
+exports[`core/video > snapshot: video with poster, caption and all flags 1`] = `"<figure class="gn-block-video"><video src="https://x/v.mp4" poster="https://x/p.jpg" controls autoplay loop muted></video><figcaption>A clip</figcaption></figure>"`;

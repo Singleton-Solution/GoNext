@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`core/button > snapshot: bare button 1`] = `"<div class="wp-block-button"><a class="wp-block-button__link">Click</a></div>"`;
+
+exports[`core/button > snapshot: button with url + target + style + radius + align 1`] = `"<div class="wp-block-button is-style-fill has-text-align-center"><a class="wp-block-button__link" href="https://x" target="_blank" rel="noopener noreferrer" style="border-radius:12px">Read more</a></div>"`;
