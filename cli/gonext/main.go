@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Singleton-Solution/GoNext/cli/gonext/cmd/bench"
 	cmdconfig "github.com/Singleton-Solution/GoNext/cli/gonext/cmd/config"
 	"github.com/Singleton-Solution/GoNext/cli/gonext/cmd/migrate"
 	"github.com/Singleton-Solution/GoNext/cli/gonext/cmd/plugin"
@@ -41,6 +42,8 @@ func main() {
 		os.Exit(revisions.RunOS(args[1:]))
 	case args[0] == "config":
 		os.Exit(cmdconfig.RunOS(args[1:]))
+	case args[0] == "bench":
+		os.Exit(bench.RunOS(args[1:]))
 	default:
 		fmt.Fprintf(os.Stderr, "gonext: unknown command %q\n\n%s\n", args[0], usage)
 		os.Exit(2)
@@ -64,6 +67,7 @@ Commands (planned):
   version    Print version information
 
 Available now:
+  bench             Run synthetic load against a GoNext install
   config dump       Print the effective configuration with secrets masked
   migrate           Apply / roll back / inspect database migrations
   plugin test       Run the plugin contract checks against a bundle
