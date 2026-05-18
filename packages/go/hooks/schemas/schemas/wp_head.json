@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gonext.local/hooks/wp_head.json",
+  "title": "wp_head action payload",
+  "description": "WP-compat wp_head action. Emit tags into the <head>. No arguments.",
+  "type": "array",
+  "maxItems": 0
+}

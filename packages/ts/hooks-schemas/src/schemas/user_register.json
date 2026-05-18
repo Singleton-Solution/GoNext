@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gonext.local/hooks/user_register.json",
+  "title": "user_register action payload",
+  "description": "WP-compat user_register action. Plugin handlers see a single WPUser-shaped object: {ID, User}.",
+  "type": "object",
+  "required": ["ID"],
+  "properties": {
+    "ID": {"type": "string"},
+    "User": {}
+  }
+}

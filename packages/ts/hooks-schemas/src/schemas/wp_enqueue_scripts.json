@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gonext.local/hooks/wp_enqueue_scripts.json",
+  "title": "wp_enqueue_scripts action payload",
+  "description": "WP-compat wp_enqueue_scripts action. Register frontend CSS/JS. No arguments.",
+  "type": "array",
+  "maxItems": 0
+}

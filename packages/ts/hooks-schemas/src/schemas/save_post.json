@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gonext.local/hooks/save_post.json",
+  "title": "save_post action payload",
+  "description": "WP-compat save_post action. After the wpcompat adapter runs, plugin handlers see a single WPPost-shaped object: {ID, Post, Update}.",
+  "type": "object",
+  "required": ["ID", "Update"],
+  "properties": {
+    "ID": {
+      "type": "string",
+      "description": "Stable post identifier."
+    },
+    "Post": {
+      "description": "Native post payload (caller-supplied type from packages/go/posts). Plugin authors should not assume a fixed shape — pass through to native handlers."
+    },
+    "Update": {
+      "type": "boolean",
+      "description": "true when this is an update of an existing post, false for an insert."
+    }
+  }
+}

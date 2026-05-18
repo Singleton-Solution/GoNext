@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gonext.local/hooks/login_redirect.json",
+  "title": "login_redirect filter payload",
+  "description": "WP-compat login_redirect filter. Post-login redirect URL chosen for the user.",
+  "type": "string"
+}

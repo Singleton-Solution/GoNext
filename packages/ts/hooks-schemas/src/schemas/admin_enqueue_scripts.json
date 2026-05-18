@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gonext.local/hooks/admin_enqueue_scripts.json",
+  "title": "admin_enqueue_scripts action payload",
+  "description": "WP-compat admin_enqueue_scripts action. Register admin CSS/JS. Optional one argument: the current admin page hook suffix.",
+  "type": "array",
+  "minItems": 0,
+  "maxItems": 1,
+  "items": {"type": "string"}
+}

@@ -54,6 +54,12 @@ const (
 	metricHandlerError        = "gonext_hooks_handler_error_total"
 	metricHandlerPanic        = "gonext_hooks_handler_panic_total"
 	metricShortCircuit        = "gonext_hooks_filter_short_circuit_total"
+	// metricSchemaRejected counts dispatches refused by the
+	// SchemaEnforcer (see Bus.WithSchemas). The bus increments this
+	// before short-circuiting Do/ApplyFilters with the validator's
+	// error. Used by ops to spot misbehaving plugins firing
+	// malformed payloads.
+	metricSchemaRejected = "gonext_hooks_schema_rejected_total"
 
 	labelKind  = "kind"
 	labelHook  = "hook"

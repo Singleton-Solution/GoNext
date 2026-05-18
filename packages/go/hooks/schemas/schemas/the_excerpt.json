@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gonext.local/hooks/the_excerpt.json",
+  "title": "the_excerpt filter payload",
+  "description": "WP-compat the_excerpt filter. Post excerpt HTML rendered above-the-fold on archive pages.",
+  "type": "string"
+}

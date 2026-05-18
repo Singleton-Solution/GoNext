@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gonext.local/hooks/wp_loaded.json",
+  "title": "wp_loaded action payload",
+  "description": "WP-compat wp_loaded action. All plugins, themes, and core have finished loading. No arguments.",
+  "type": "array",
+  "maxItems": 0
+}

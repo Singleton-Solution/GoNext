@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gonext.local/hooks/template_redirect.json",
+  "title": "template_redirect action payload",
+  "description": "WP-compat template_redirect action. Fired before the response template is selected. No arguments.",
+  "type": "array",
+  "maxItems": 0
+}
