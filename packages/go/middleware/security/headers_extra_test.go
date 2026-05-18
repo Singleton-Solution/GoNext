@@ -3,6 +3,7 @@ package security
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -173,5 +174,152 @@ func TestHeaders_ZeroOptionsFallbacks(t *testing.T) {
 		if got := rec.Header().Get(k); got != v {
 			t.Errorf("%s: got %q, want %q", k, got, v)
 		}
+	}
+}
+
+// TestHeaders_NosniffAlwaysOnByDefault is the focused #43 acceptance
+// check: every preset must emit X-Content-Type-Options: nosniff. We
+// validate each preset independently so a regression in any single
+// constructor surfaces with a clear test name.
+func TestHeaders_NosniffAlwaysOnByDefault(t *testing.T) {
+	presets := map[string]Options{
+		"default": DefaultOptions(),
+		"public":  PublicSite(),
+		"admin":   Admin(),
+		"rest":    RESTAPI(),
+	}
+	for name, opts := range presets {
+		t.Run(name, func(t *testing.T) {
+			rec := serve(t, opts)
+			if got := rec.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+				t.Errorf("X-Content-Type-Options: got %q, want %q", got, "nosniff")
+			}
+		})
+	}
+}
+
+// TestHeaders_StrictForcesCOEPEvenWhenDisabled verifies the Strict
+// override: a caller who flips DisableCOEP=true still gets COEP set if
+// they also set Strict=true. This is the high-level "I want maximum
+// cross-origin isolation regardless of other knobs" toggle.
+func TestHeaders_StrictForcesCOEPEvenWhenDisabled(t *testing.T) {
+	opts := DefaultOptions()
+	opts.DisableCOEP = true // attempt to drop it
+	opts.Strict = true      // but Strict wins
+	rec := serve(t, opts)
+	if got := rec.Header().Get("Cross-Origin-Embedder-Policy"); got != "require-corp" {
+		t.Errorf("Strict should force COEP=require-corp, got %q", got)
+	}
+}
+
+// TestHeaders_StrictHonorsExplicitCOEPOverride verifies that Strict=true
+// pins COEP ON but does not stomp an explicit non-empty override. This
+// lets a marketing surface keep Strict semantics but loosen COEP to
+// "credentialless" for embed-friendliness on a single page.
+func TestHeaders_StrictHonorsExplicitCOEPOverride(t *testing.T) {
+	opts := DefaultOptions()
+	opts.Strict = true
+	opts.COEP = "credentialless"
+	rec := serve(t, opts)
+	if got := rec.Header().Get("Cross-Origin-Embedder-Policy"); got != "credentialless" {
+		t.Errorf("explicit COEP override should win over Strict default, got %q", got)
+	}
+}
+
+// TestHeaders_StrictOffByDefaultOnZeroOptions confirms the field
+// defaults to false on a hand-rolled Options{} — so callers who never
+// set it observe no behavior change.
+func TestHeaders_StrictOffByDefaultOnZeroOptions(t *testing.T) {
+	opts := Options{DisableHSTS: true, DisableCOEP: true}
+	rec := serve(t, opts)
+	if got := rec.Header().Get("Cross-Origin-Embedder-Policy"); got != "" {
+		t.Errorf("zero Options with DisableCOEP should omit COEP, got %q", got)
+	}
+}
+
+// TestHeaders_PermissionsPolicyDisablesInvasiveFeatures captures the
+// #43 acceptance promise: the default Permissions-Policy MUST deny
+// camera, microphone, and geolocation. Other features are tested
+// elsewhere; this is the explicit security-baseline contract.
+func TestHeaders_PermissionsPolicyDisablesInvasiveFeatures(t *testing.T) {
+	rec := serve(t, DefaultOptions())
+	pp := rec.Header().Get("Permissions-Policy")
+	if pp == "" {
+		t.Fatal("Permissions-Policy: missing")
+	}
+	for _, must := range []string{"camera=()", "microphone=()", "geolocation=()"} {
+		if !strings.Contains(pp, must) {
+			t.Errorf("Permissions-Policy missing %q in: %s", must, pp)
+		}
+	}
+}
+
+// TestHeaders_PermissionsPolicyCustomOverrideAppliedVerbatim verifies a
+// caller-supplied policy is emitted exactly as given — no normalization,
+// no merge with the deny list. This matches the documented contract on
+// the PermissionsPolicy field.
+func TestHeaders_PermissionsPolicyCustomOverrideAppliedVerbatim(t *testing.T) {
+	const custom = "camera=(), microphone=(), geolocation=(), fullscreen=(self)"
+	opts := DefaultOptions()
+	opts.PermissionsPolicy = custom
+	rec := serve(t, opts)
+	if got := rec.Header().Get("Permissions-Policy"); got != custom {
+		t.Errorf("Permissions-Policy: got %q, want %q (verbatim)", got, custom)
+	}
+}
+
+// TestHeaders_AppliedOnNon2xxResponses documents the policy that
+// security headers are emitted on every response — not just 2xx. 3xx
+// redirects and 4xx/5xx error pages frequently render
+// attacker-controlled content; omitting headers there would create a
+// soft spot. We assert on a 302 redirect and a 500 error.
+func TestHeaders_AppliedOnNon2xxResponses(t *testing.T) {
+	cases := []struct {
+		name   string
+		status int
+		extra  func(http.ResponseWriter)
+	}{
+		{
+			name:   "302 redirect",
+			status: http.StatusFound,
+			extra: func(w http.ResponseWriter) {
+				w.Header().Set("Location", "/elsewhere")
+			},
+		},
+		{
+			name:   "500 error",
+			status: http.StatusInternalServerError,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := Headers(DefaultOptions())(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if tc.extra != nil {
+					tc.extra(w)
+				}
+				w.WriteHeader(tc.status)
+			}))
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+
+			if rec.Code != tc.status {
+				t.Fatalf("status: got %d, want %d", rec.Code, tc.status)
+			}
+			// All canonical headers must be present even on non-2xx.
+			must := map[string]string{
+				"X-Content-Type-Options":     "nosniff",
+				"Cross-Origin-Opener-Policy": "same-origin",
+				"X-Frame-Options":            "DENY",
+				"Referrer-Policy":            "strict-origin-when-cross-origin",
+			}
+			for k, v := range must {
+				if got := rec.Header().Get(k); got != v {
+					t.Errorf("%s on %s: got %q, want %q", k, tc.name, got, v)
+				}
+			}
+			if got := rec.Header().Get("Strict-Transport-Security"); got == "" {
+				t.Errorf("HSTS should be present on %s", tc.name)
+			}
+		})
 	}
 }
