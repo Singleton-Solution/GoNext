@@ -230,6 +230,7 @@ func TestDump_Golden(t *testing.T) {
 		Auth:        AuthConfig{Pepper: pepper, SessionSecret: session, CSRFSecret: csrf, SessionTTL: 30 * 24 * time.Hour, SessionIdleTTL: 7 * 24 * time.Hour},
 		Plugins:     PluginsConfig{DevMode: false, DevToken: ""},
 		Performance: PerformanceConfig{EarlyHints: true},
+		RUM:         RUMConfig{Enabled: false, SampleRate: 1.0},
 	}
 
 	want := strings.Join([]string{
@@ -252,6 +253,8 @@ func TestDump_Golden(t *testing.T) {
 		"Performance.EarlyHints=true",
 		"Plugins.DevMode=false",
 		"Plugins.DevToken=" + expectedMask(""),
+		"RUM.Enabled=false",
+		"RUM.SampleRate=1",
 		"Redis.DialTimeout=5s",
 		"Redis.MinIdleConns=2",
 		"Redis.PoolSize=20",

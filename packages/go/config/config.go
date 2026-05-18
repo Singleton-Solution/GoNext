@@ -52,6 +52,12 @@ type Config struct {
 	// correctness — useful when a feature interacts badly with an
 	// upstream proxy or when an operator is bisecting a regression.
 	Performance PerformanceConfig
+
+	// RUM controls the in-house Real User Monitoring subsystem (issue
+	// #132). When Enabled is false (the default), the public theme
+	// will not emit beacon scripts and no rum_events rows are written
+	// — the table sits empty until an operator opts in.
+	RUM RUMConfig
 }
 
 // PerformanceConfig groups opt-out toggles for the performance
@@ -102,6 +108,28 @@ type PluginsConfig struct {
 	// uploads from arbitrary network peers. Honors
 	// GONEXT_PLUGINS_DEV_TOKEN.
 	DevToken string `redact:"true"`
+}
+
+// RUMConfig configures the in-house Real User Monitoring subsystem.
+//
+// The beacon endpoint (POST /_/rum/beacon) is always mounted; the
+// per-visitor beacon library only emits payloads when Enabled is true.
+// This means an operator who wants to A/B "is RUM costing us
+// anything" can flip the flag at runtime without re-deploying — the
+// public theme respects the flag on every render.
+//
+// SampleRate, when < 1.0, lets the public theme drop a fraction of
+// visitors at the browser level so a busy site doesn't write every
+// pageview's Core Web Vitals to Postgres. The default is 1.0 (every
+// visitor).
+type RUMConfig struct {
+	// Enabled toggles whether the public theme emits beacon scripts.
+	// Default false. Honors GONEXT_RUM_ENABLED.
+	Enabled bool
+
+	// SampleRate is the per-visitor sample probability in [0, 1].
+	// Default 1.0. Honors GONEXT_RUM_SAMPLE_RATE.
+	SampleRate float64
 }
 
 // ServerConfig configures the HTTP server in apps/api.

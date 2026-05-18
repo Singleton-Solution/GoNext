@@ -75,6 +75,21 @@ func getBool(e envSource, key string, def bool) (bool, error) {
 	return b, nil
 }
 
+// getFloat parses a float env value or returns def. Used for RUM
+// sample rate and similar [0,1] probabilities; the bounds check is
+// left to the caller because the right bounds are domain-specific.
+func getFloat(e envSource, key string, def float64) (float64, error) {
+	v, ok := e.get(key)
+	if !ok || v == "" {
+		return def, nil
+	}
+	f, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		return 0, fmt.Errorf("env var %s: %q is not a float", key, v)
+	}
+	return f, nil
+}
+
 // getDuration parses a duration env value or returns def. Accepts
 // time.ParseDuration syntax: "30s", "5m", "1h30m".
 func getDuration(e envSource, key string, def time.Duration) (time.Duration, error) {

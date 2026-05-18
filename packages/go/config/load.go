@@ -228,6 +228,24 @@ func Load(opts ...LoadOption) (*Config, error) {
 		cfg.Performance.EarlyHints = b
 	}
 
+	// ---- RUM ----
+	// Off by default. An operator who wants Core Web Vitals visibility
+	// flips Enabled=true; the beacon endpoint is mounted unconditionally
+	// (so the table is ready) but the public theme only emits scripts
+	// when this flag is true.
+	if b, err := getBool(e, "GONEXT_RUM_ENABLED", false); err != nil {
+		errs = append(errs, err)
+	} else {
+		cfg.RUM.Enabled = b
+	}
+	if f, err := getFloat(e, "GONEXT_RUM_SAMPLE_RATE", 1.0); err != nil {
+		errs = append(errs, err)
+	} else if f < 0 || f > 1 {
+		errs = append(errs, fmt.Errorf("GONEXT_RUM_SAMPLE_RATE must be between 0 and 1, got %g", f))
+	} else {
+		cfg.RUM.SampleRate = f
+	}
+
 	if len(errs) > 0 {
 		return cfg, joinErrs(errs)
 	}

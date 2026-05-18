@@ -39,6 +39,10 @@ const NAV_ITEMS: readonly NavItem[] = [
   // visible to every signed-in user (a non-admin clicking through gets
   // a 403 on the API call and the page renders the error state).
   { href: '/status', label: 'System Status', icon: 'St' },
+  // Performance is the Core Web Vitals operator surface fed by the
+  // in-house RUM beacon (issue #132). Same access posture as System
+  // Status: visible in the nav, server-side capability-gated.
+  { href: '/performance', label: 'Performance', icon: 'Pf' },
 ];
 
 function isActive(currentPath: string, href: string): boolean {

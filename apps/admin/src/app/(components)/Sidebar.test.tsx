@@ -31,6 +31,7 @@ describe('Sidebar', () => {
       ['Plugins', '/plugins'],
       ['Settings', '/settings'],
       ['System Status', '/status'],
+      ['Performance', '/performance'],
     ];
 
     for (const [label, href] of expected) {
