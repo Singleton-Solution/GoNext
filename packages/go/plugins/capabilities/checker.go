@@ -75,6 +75,11 @@ type Checker struct {
 	// one via WithAuditEmitter.
 	emitter auditEmitter
 
+	// denialObserver, if non-nil, is called once per denial
+	// alongside the audit emission. This is the seam the plugin
+	// health dashboard hangs its capability_denied counter off.
+	denialObserver DenialObserver
+
 	// mu guards granted from concurrent mutation if a caller decides
 	// to bolt on grant revocation later. v1 treats granted as
 	// effectively immutable; the mutex is here so a future revocation
@@ -92,6 +97,31 @@ type CheckerOption func(*Checker)
 // suitable for tests but not for production wiring.
 func WithAuditEmitter(e auditEmitter) CheckerOption {
 	return func(c *Checker) { c.emitter = e }
+}
+
+// DenialObserver is the narrow telemetry surface the Checker
+// publishes to on every MustAllow denial. Defining it as an
+// interface — rather than importing the health package — keeps the
+// capabilities package free of any Prometheus or metrics dependency.
+//
+// Implementations MUST be safe for concurrent use; the Checker may
+// be called from arbitrary goroutines and forwards into the
+// observer without taking its own mutex.
+type DenialObserver interface {
+	ObserveCapabilityDenied(capability string)
+}
+
+// WithDenialObserver installs the per-plugin denial telemetry hook.
+// One observer is shared across every Checker the host constructs
+// for the same plugin slug; the implementation is expected to be
+// pre-bound to the plugin slug (the same way WithAuditEmitter is).
+//
+// Nil is tolerated and disables emission. Without an observer the
+// audit row is still emitted (if WithAuditEmitter was set), so the
+// denial is never silent — only the Prometheus counter goes
+// un-incremented.
+func WithDenialObserver(o DenialObserver) CheckerOption {
+	return func(c *Checker) { c.denialObserver = o }
 }
 
 // NewChecker builds a Checker bound to the given Registry and
@@ -169,6 +199,9 @@ func (c *Checker) MustAllow(ctx context.Context, id string) error {
 	// Denial path. Record the audit row before returning so log /
 	// audit ordering matches caller expectations.
 	c.emitDenial(ctx, id)
+	if c.denialObserver != nil {
+		c.denialObserver.ObserveCapabilityDenied(id)
+	}
 	return Denied(id)
 }
 

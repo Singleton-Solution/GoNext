@@ -38,6 +38,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runTest(args[1:], stdout, stderr)
 	case "dev":
 		return runDev(args[1:], stdout, stderr)
+	case "replay":
+		return runReplay(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "gonext plugin: unknown subcommand %q\n\n%s\n", args[0], usage)
 		return ExitUsage
@@ -56,6 +58,7 @@ Usage:
 Subcommands:
   test       Run the plugin contract checks against a bundle.
   dev        Run the plugin author dev loop (auto-detect, build, upload, watch).
+  replay     Re-run a recorded plugin trap against the currently-loaded bytes.
 
 Subcommands planned (not yet implemented):
   install    Install a plugin bundle from path or marketplace.
