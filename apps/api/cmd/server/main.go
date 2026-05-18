@@ -37,6 +37,7 @@ import (
 	httpmetrics "github.com/Singleton-Solution/GoNext/packages/go/middleware/metrics"
 	redisclient "github.com/Singleton-Solution/GoNext/packages/go/redis"
 	"github.com/Singleton-Solution/GoNext/packages/go/shutdown"
+	"github.com/Singleton-Solution/GoNext/packages/go/theme/seed"
 )
 
 const serviceName = "api"
@@ -139,6 +140,34 @@ func run(ctx context.Context) error {
 	if regErr := orch.Register("redis.client", shutdown.CloserFromIO(rdb)); regErr != nil {
 		_ = rdb.Close()
 		return fmt.Errorf("register redis: %w", regErr)
+	}
+
+	// First-boot theme seed. Runs after migrations have been applied
+	// (which is the responsibility of either `gonext migrate up` or
+	// the deploy pipeline — main does not run migrations itself).
+	// EnsureDefault is idempotent: on every boot after the first it
+	// observes the options row and returns immediately. We make this
+	// a hard failure: a server that can't determine which theme is
+	// active would render an empty page, and "empty page" is a more
+	// confusing failure mode than "boot failed with a clear seed: ..."
+	// message in the operator's log.
+	//
+	// Theme directory comes from GONEXT_THEME_DIR with the same
+	// "./themes" default used by the CLI. It is intentionally NOT
+	// promoted into config.Config yet — the option lives on a small
+	// surface only the seeder consumes, and growing Config for one
+	// path increases the blast radius of every future config change.
+	themeDir := os.Getenv("GONEXT_THEME_DIR")
+	if themeDir == "" {
+		themeDir = "./themes"
+	}
+	if seedErr := (&seed.Seeder{
+		DB:       seed.PoolQuerier{Pool: pool},
+		ThemeDir: themeDir,
+		SourceFS: seed.BundledThemes,
+		Logger:   logger,
+	}).EnsureDefault(ctx); seedErr != nil {
+		return fmt.Errorf("theme seed: %w", seedErr)
 	}
 
 	// Metrics + audit are best-effort flush points. They're registered

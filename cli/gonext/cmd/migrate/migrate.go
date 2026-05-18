@@ -3,6 +3,7 @@ package migrate
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"io"
 	"log/slog"
@@ -10,8 +11,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/Singleton-Solution/GoNext/packages/go/config"
 	pkgmigrate "github.com/Singleton-Solution/GoNext/packages/go/migrate"
+	"github.com/Singleton-Solution/GoNext/packages/go/theme/seed"
 )
 
 // Exit codes shared with main.go and tests.
@@ -27,7 +31,11 @@ Usage:
   gonext migrate <subcommand> [args]
 
 Subcommands:
-  up               Apply every pending up migration. Idempotent.
+  up [flags]       Apply every pending up migration. Idempotent.
+                   Flags:
+                     --seed-default-theme=BOOL  Install the bundled default
+                                                theme (gn-hello) on first
+                                                boot. Default: true.
   down [N]         Roll back N migrations (default 1). Pass 0 to roll back ALL.
   status           Print the current schema version and dirty flag.
   wp               Import a WordPress WXR export. See 'migrate wp --help'.
@@ -35,6 +43,8 @@ Subcommands:
 Environment:
   DATABASE_URL              Required. Postgres DSN.
   GONEXT_MIGRATION_DIR      Migration directory. Default: ./migrations.
+  GONEXT_THEME_DIR          Runtime theme directory used by the seeder.
+                            Default: ./themes.
 
 Exit codes:
   0   success
@@ -71,10 +81,29 @@ func Run(args []string, stdout, stderr io.Writer) int {
 // RunOS is a convenience that wires Run to os.Stdout/os.Stderr.
 func RunOS(args []string) int { return Run(args, os.Stdout, os.Stderr) }
 
-// runUp applies all pending up migrations.
+// runUp applies all pending up migrations and, if --seed-default-theme
+// is on (the default), runs the theme seeder so a fresh deploy renders
+// a usable site.
+//
+// We put the seed step here — directly after the migration runner — so
+// the boot-time invariant "after this command, the DB is at the latest
+// schema AND a theme is active" holds for every operator path: kube
+// initContainers, `make up`, Compose, bare `gonext migrate up` on a
+// dev box. The seeder is idempotent, so re-running migrate up on an
+// already-seeded install is a no-op.
 func runUp(args []string, stdout, stderr io.Writer) int {
-	if len(args) > 0 {
-		fmt.Fprintf(stderr, "gonext migrate up: unexpected argument %q\n\n%s\n", args[0], usage)
+	fs := flag.NewFlagSet("migrate up", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	seedDefaultTheme := fs.Bool("seed-default-theme", true,
+		"install the bundled default theme (gn-hello) on first boot")
+	if err := fs.Parse(args); err != nil {
+		// flag.ContinueOnError already prints the error; emit usage so
+		// the operator sees the surrounding command help too.
+		fmt.Fprintln(stderr, usage)
+		return ExitUsage
+	}
+	if fs.NArg() > 0 {
+		fmt.Fprintf(stderr, "gonext migrate up: unexpected argument %q\n\n%s\n", fs.Arg(0), usage)
 		return ExitUsage
 	}
 	cfg, logger, code := loadConfig(stderr)
@@ -88,7 +117,43 @@ func runUp(args []string, stdout, stderr io.Writer) int {
 		return ExitFail
 	}
 	fmt.Fprintln(stdout, "migrate: up OK")
+
+	if !*seedDefaultTheme {
+		logger.Info("theme seed skipped via --seed-default-theme=false")
+		return ExitOK
+	}
+	if err := runThemeSeed(ctx, cfg, logger); err != nil {
+		fmt.Fprintf(stderr, "gonext migrate up: theme seed: %v\n", err)
+		return ExitFail
+	}
+	fmt.Fprintln(stdout, "migrate: theme seed OK")
 	return ExitOK
+}
+
+// runThemeSeed opens a transient pgxpool, constructs a Seeder, and
+// runs EnsureDefault. The pool is closed before return — the seed
+// step is a one-shot phase, not a long-lived resource.
+//
+// Errors are returned wrapped; the caller emits the user-facing
+// "gonext migrate up: theme seed: ..." prefix.
+func runThemeSeed(ctx context.Context, cfg config.DatabaseConfig, logger *slog.Logger) (retErr error) {
+	pool, err := pgxpool.New(ctx, cfg.URL)
+	if err != nil {
+		return fmt.Errorf("open pool: %w", err)
+	}
+	defer pool.Close()
+
+	themeDir := os.Getenv("GONEXT_THEME_DIR")
+	if themeDir == "" {
+		themeDir = "./themes"
+	}
+	s := &seed.Seeder{
+		DB:       seed.PoolQuerier{Pool: pool},
+		ThemeDir: themeDir,
+		SourceFS: seed.BundledThemes,
+		Logger:   logger,
+	}
+	return s.EnsureDefault(ctx)
 }
 
 // runDown rolls back N migrations (or all if 0). Default N is 1.
