@@ -27,7 +27,7 @@ type Inspector interface {
 }
 
 // RedactionStore persists per-task redaction records. Two backends:
-// in-memory for tests; Postgres for production (migration #000016).
+// in-memory for tests; Postgres for production (migration #000017).
 // Methods return ErrRedactionNotFound for missing rows so the listing
 // handler can branch cleanly.
 type RedactionStore interface {
