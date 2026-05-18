@@ -66,6 +66,7 @@ func DefaultRoleCapabilities() map[Role]CapabilitySet {
 	admin := editor.Union(NewCapabilitySet(
 		// Site.
 		CapManageOptions,
+		CapSystemRead,
 		// Users.
 		CapListUsers,
 		CapCreateUsers,

@@ -55,6 +55,11 @@ const (
 	// Site.
 	CapManageOptions Capability = "manage_options"
 	CapManageInstall Capability = "manage_install"
+	// CapSystemRead grants read-only access to the operator-facing System
+	// Status surface (DB/Redis/queue health, migration version, theme +
+	// plugin inventory, disk usage, build info). It is intentionally a
+	// READ capability — mutating system state is gated by manage_install.
+	CapSystemRead Capability = "system_read"
 
 	// Plugins / themes.
 	CapInstallPlugins       Capability = "install_plugins"
