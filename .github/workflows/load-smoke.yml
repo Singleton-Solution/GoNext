@@ -1,0 +1,45 @@
+name: Load smoke
+
+# k6 load-test smoke run.
+#
+# TODO(#248): wire this up once we have a way to spin up the full
+# Compose stack (Postgres + Redis + MinIO + api + web) on the runner.
+# Today the load scripts assume a running stack at K6_BASE_URL and
+# K6_WEB_BASE_URL, which means the workflow needs:
+#
+#   1. A `docker compose up -d` step that brings up the data services
+#      AND the app services (apps/api and apps/web) with seeded
+#      fixtures so the wp-json shim and homepage return real data.
+#   2. A wait-for-healthy step.
+#   3. A login fixture (K6_VALID_EMAIL / K6_VALID_PASSWORD) injected
+#      via repo secrets, or a generated dev user from a seed script.
+#   4. The k6 step itself:
+#        uses: grafana/setup-k6-action@v1
+#        run: cd tools/load/k6 && make ci-smoke
+#
+# Until that infrastructure lands, this workflow is a placeholder so
+# the path filter and structure are reviewed alongside the scripts.
+# It runs only on manual dispatch and is a no-op other than a notice.
+
+on:
+  workflow_dispatch:
+  # Intentionally NOT enabled on pull_request yet — see TODO above.
+  # When ready:
+  # pull_request:
+  #   branches: [main]
+  #   paths:
+  #     - 'apps/api/**'
+  #     - 'tools/load/k6/**'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pending stack-up wiring (see TODO in this file)
+        run: |
+          echo "::notice title=Load smoke pending::This workflow is a placeholder. See TODO in .github/workflows/load-smoke.yml — needs Compose stack-up + fixtures before it can run on PRs."
