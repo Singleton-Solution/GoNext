@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gonext.local/hooks/profile_update.json",
+  "title": "profile_update action payload",
+  "description": "WP-compat profile_update action. WPUser shape: {ID, User}.",
+  "type": "object",
+  "required": ["ID"],
+  "properties": {
+    "ID": {"type": "string"},
+    "User": {}
+  }
+}

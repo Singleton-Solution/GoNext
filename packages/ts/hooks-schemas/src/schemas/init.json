@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gonext.local/hooks/init.json",
+  "title": "init action payload",
+  "description": "WP-compat init action. Once-per-process initialisation point, before any request handling. Payload is the variadic args slice — empty for this action.",
+  "type": "array",
+  "maxItems": 0
+}

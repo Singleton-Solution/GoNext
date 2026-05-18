@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gonext.local/hooks/publish_post.json",
+  "title": "publish_post action payload",
+  "description": "WP-compat publish_post action. Same shape as save_post: {ID, Post, Update}.",
+  "type": "object",
+  "required": ["ID", "Update"],
+  "properties": {
+    "ID": {"type": "string"},
+    "Post": {},
+    "Update": {"type": "boolean"}
+  }
+}

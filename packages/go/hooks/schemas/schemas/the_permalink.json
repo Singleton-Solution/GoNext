@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gonext.local/hooks/the_permalink.json",
+  "title": "the_permalink filter payload",
+  "description": "WP-compat the_permalink filter. URL string built for a post or page permalink.",
+  "type": "string",
+  "format": "uri-reference"
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gonext.local/hooks/post_class.json",
+  "title": "post_class filter payload",
+  "description": "WP-compat post_class filter. Space-separated CSS classes applied to a post wrapper element. Accepts a string or an array of strings to mirror WP's polymorphic payload.",
+  "oneOf": [
+    {"type": "string"},
+    {"type": "array", "items": {"type": "string"}}
+  ]
+}

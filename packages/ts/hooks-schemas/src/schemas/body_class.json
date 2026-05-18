@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gonext.local/hooks/body_class.json",
+  "title": "body_class filter payload",
+  "description": "WP-compat body_class filter. Space-separated CSS classes applied to the <body> element. WP plugins often see either a string of classes OR an array of strings; we accept both.",
+  "oneOf": [
+    {"type": "string"},
+    {"type": "array", "items": {"type": "string"}}
+  ]
+}

@@ -10,6 +10,20 @@ import (
 	"time"
 )
 
+// SchemaEnforcer is the minimal surface the bus requires from a payload
+// validator. We declare it as an interface here (rather than importing
+// packages/go/hooks/schemas directly) so the hooks package stays free of
+// a hard dependency on jsonschema — packages that fire hooks without
+// validation pay no compile-time cost for the feature.
+//
+// The interface mirrors *schemas.Enforcer's Validate method. The bus
+// calls Validate once per Apply/Do invocation; the implementation is
+// expected to be cheap (compiled-schema reuse, no per-call allocation
+// beyond the JSON round-trip).
+type SchemaEnforcer interface {
+	Validate(hookName string, payload any) error
+}
+
 // Bus is the hook dispatcher.
 //
 // One Bus instance is expected per process — wire it into your DI graph and
@@ -73,6 +87,16 @@ type Bus struct {
 	// "create-once, read-many" without a sync.Once because the dispatcher
 	// owns a background reaper that needs to live for the bus's lifetime.
 	ordered atomic.Pointer[orderedDispatcher]
+
+	// schemas, when non-nil, is invoked from Do and ApplyFilters to
+	// validate the payload BEFORE any handler runs. A validation
+	// failure short-circuits the dispatch with the validator's error
+	// and bumps the schema_rejected counter on the metrics sink.
+	//
+	// Stored as atomic.Pointer so WithSchemas is hot-swappable without
+	// torn reads on concurrent in-flight Apply/Do calls — the same
+	// pattern used for logger and metrics.
+	schemas atomic.Pointer[SchemaEnforcer]
 }
 
 // chainSlot holds a single hook's handler chain plus the mutex that
@@ -153,6 +177,51 @@ func (b *Bus) WithMetrics(s Sink) *Bus {
 	}
 	b.metrics.Store(&s)
 	return b
+}
+
+// WithSchemas attaches a [SchemaEnforcer] to the bus. When set, every
+// [Bus.Do] and [Bus.ApplyFilters] call validates its payload against
+// the enforcer BEFORE running any handler. A validation failure
+// short-circuits dispatch with the validator's error, leaving no
+// handler observed and bumping the schema_rejected counter on the
+// metrics sink.
+//
+// The payload presented to the validator is shaped to match what plugin
+// authors see:
+//
+//   - For Do (actions), the validator receives args (the variadic slice
+//     as a single []any value) — handlers receive that slice spread, so
+//     the schema describes the slice itself. An action with zero args
+//     should declare `{"type": "array", "maxItems": 0}`.
+//
+//   - For ApplyFilters (filters), the validator receives `value` — the
+//     running value being threaded through the chain. Filter args... is
+//     NOT validated here because filters operate on `value`; args... is
+//     auxiliary context that varies per call site.
+//
+// Pass nil to remove a previously installed enforcer. The swap is
+// atomic — an in-flight Do/Apply sees either the old or the new
+// enforcer but never a torn read.
+//
+// Safe for concurrent use; returns b for chaining.
+func (b *Bus) WithSchemas(enf SchemaEnforcer) *Bus {
+	if enf == nil {
+		b.schemas.Store(nil)
+		return b
+	}
+	b.schemas.Store(&enf)
+	return b
+}
+
+// schemaEnforcer returns the configured [SchemaEnforcer] or nil. Hot
+// path — kept tiny so the no-validator case is one atomic load and a
+// nil check.
+func (b *Bus) schemaEnforcer() SchemaEnforcer {
+	p := b.schemas.Load()
+	if p == nil {
+		return nil
+	}
+	return *p
 }
 
 // log returns the configured slog.Logger, falling back to slog.Default
@@ -555,6 +624,32 @@ func (b *Bus) Do(ctx context.Context, name string, args ...any) error {
 			map[string]string{labelKind: kindAction, labelHook: name})
 	}()
 
+	// Validate before fan-out. Actions receive the variadic args slice
+	// as their payload — so we present args to the validator as a
+	// single []any. A misbehaving plugin firing the wrong shape is
+	// rejected before any listener observes the value, which is the
+	// whole point of issue #259's "validate on both sides" contract.
+	//
+	// Note on the empty-args case: when a caller invokes Do(ctx, name)
+	// with no varargs, Go materialises args as a nil slice. Marshalled
+	// to JSON that becomes "null", which fails type=array schemas
+	// (zero-args actions like init/wp_head). We normalise to a
+	// non-nil zero-length slice so the validator sees an empty array,
+	// which is the shape callers actually mean.
+	if enf := b.schemaEnforcer(); enf != nil {
+		payload := args
+		if payload == nil {
+			payload = []any{}
+		}
+		if err := enf.Validate(name, []any(payload)); err != nil {
+			sink.Counter(metricSchemaRejected, map[string]string{
+				labelKind: kindAction,
+				labelHook: name,
+			})
+			return err
+		}
+	}
+
 	slot, ok := b.actions.Load(name)
 	if !ok {
 		return nil
@@ -665,6 +760,24 @@ func (b *Bus) ApplyFilters(ctx context.Context, name string, value any, args ...
 		sink.Histogram(metricDispatchDuration, time.Since(start).Seconds(),
 			map[string]string{labelKind: kindFilter, labelHook: name})
 	}()
+
+	// Validate the running value BEFORE entering the chain. Filters
+	// thread `value` through each handler; the schema describes that
+	// value, not the args... auxiliary slice (which varies per call
+	// site and rarely has a stable shape).
+	//
+	// On rejection we return the input value unchanged plus the
+	// validator error — matching the "last accepted value" convention
+	// used elsewhere in ApplyFilters for non-short-circuit errors.
+	if enf := b.schemaEnforcer(); enf != nil {
+		if err := enf.Validate(name, value); err != nil {
+			sink.Counter(metricSchemaRejected, map[string]string{
+				labelKind: kindFilter,
+				labelHook: name,
+			})
+			return value, err
+		}
+	}
 
 	slot, ok := b.filters.Load(name)
 	if !ok {

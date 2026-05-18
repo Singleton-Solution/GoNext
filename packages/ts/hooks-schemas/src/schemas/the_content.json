@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gonext.local/hooks/the_content.json",
+  "title": "the_content filter payload",
+  "description": "WP-compat the_content filter. Post body HTML being prepared for the rendered page. The running value is a string.",
+  "type": "string"
+}

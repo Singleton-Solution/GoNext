@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gonext.local/hooks/delete_post.json",
+  "title": "delete_post action payload",
+  "description": "WP-compat delete_post action. Same WPPost shape: {ID, Post, Update}.",
+  "type": "object",
+  "required": ["ID", "Update"],
+  "properties": {
+    "ID": {"type": "string"},
+    "Post": {},
+    "Update": {"type": "boolean"}
+  }
+}

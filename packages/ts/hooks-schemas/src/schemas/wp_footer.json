@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gonext.local/hooks/wp_footer.json",
+  "title": "wp_footer action payload",
+  "description": "WP-compat wp_footer action. Emit markup before </body>. No arguments.",
+  "type": "array",
+  "maxItems": 0
+}

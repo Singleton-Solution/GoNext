@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gonext.local/hooks/comment_post.json",
+  "title": "comment_post action payload",
+  "description": "WP-compat comment_post action. WPComment shape: {ID, Comment, Approve}.",
+  "type": "object",
+  "required": ["ID", "Approve"],
+  "properties": {
+    "ID": {"type": "string"},
+    "Comment": {},
+    "Approve": {"type": "boolean"}
+  }
+}
