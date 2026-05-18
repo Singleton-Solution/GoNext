@@ -64,6 +64,19 @@ const (
 	errCodeUnauthenticated  = "rest_not_logged_in"
 	errCodeInvalidParam     = "rest_invalid_param"
 	errCodeNotFound         = "rest_no_route"
+
+	// Write-path codes. Live WP emits these literals on the matching
+	// failure modes; keeping the strings identical is what lets a WP
+	// plugin's error branching work without changes.
+	errCodeInvalidNonce  = "rest_cookie_invalid_nonce"
+	errCodeInvalidJSON   = "rest_invalid_json"
+	errCodeBodyTooLarge  = "rest_request_too_large"
+	errCodePostExists    = "rest_post_exists"
+	errCodeUserExists    = "rest_user_exists"
+	errCodeTermExists    = "rest_term_exists"
+	errCodeCannotCreate  = "rest_cannot_create"
+	errCodeCannotEdit    = "rest_cannot_edit"
+	errCodeCannotDelete  = "rest_cannot_delete"
 )
 
 // writeMethodNotAllowed is the canonical 405 used for the write methods

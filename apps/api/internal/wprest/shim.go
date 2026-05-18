@@ -2,11 +2,20 @@ package wprest
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 )
+
+// maxWriteBodyBytes caps how much of a write request body we will read.
+// 1 MiB is generous for a deeply nested post + metadata; anything larger
+// is almost certainly a misuse (uploads go through a separate route).
+// Live WP enforces a similar cap via PHP's post_max_size.
+const maxWriteBodyBytes = 1 << 20
 
 // Base path under which the entire shim lives. Live WP installs serve
 // these routes at `/wp-json/...` regardless of the underlying admin URL
@@ -23,17 +32,35 @@ const defaultPerPage = 10
 // request for more is silently clamped (same as core).
 const maxPerPage = 100
 
-// Mount wires the WP REST v2 read shim onto mux at /wp-json/...
+// Mount wires the WP REST v2 read+write shim onto mux at /wp-json/...
 //
 // Deps is required; nil fields cause a build-time wiring error rather
 // than a per-request crash. The shim itself owns no state beyond the
 // resolved Deps — every handler is a closure over the bundle.
+//
+// Write routes are registered when the corresponding *Sink dependency
+// is wired. A nil sink falls through to a 405 handler with a WP-shaped
+// body so a client that probes the surface gets `rest_no_route` rather
+// than the net/http default plain-text 405.
 func Mount(mux *http.ServeMux, deps Deps) error {
 	if err := deps.validate(); err != nil {
 		return err
 	}
 	if deps.Logger == nil {
 		deps.Logger = slog.Default()
+	}
+	// Production wiring hygiene: warn if a write sink is mounted
+	// without policy/nonce verification. Tests intentionally skip
+	// both to exercise the handler body in isolation.
+	if (deps.PostsSink != nil || deps.PagesSink != nil ||
+		deps.UsersSink != nil || deps.CategoriesSink != nil ||
+		deps.TagsSink != nil) {
+		if deps.NonceVerifier == nil {
+			deps.Logger.Warn("wprest.Mount: write sink is wired but NonceVerifier is nil; writes will bypass nonce check")
+		}
+		if deps.Policy == nil {
+			deps.Logger.Warn("wprest.Mount: write sink is wired but Policy is nil; capability checks are disabled")
+		}
 	}
 	h := &handlers{deps: deps}
 
@@ -50,28 +77,66 @@ func Mount(mux *http.ServeMux, deps Deps) error {
 	mux.HandleFunc("GET "+BasePath+"/wp/v2/tags", h.listTags)
 	mux.HandleFunc("GET "+BasePath+"/wp/v2/tags/{id}", h.getTag)
 
-	// Write methods on read collections: 405. Live WP returns
-	// rest_no_route when an unsupported method is used. We register
-	// explicit handlers (rather than relying on http.ServeMux's
-	// 405 behavior) so we control the body shape — net/http's default
-	// would emit a plain-text 405 that WP clients can't parse.
-	for _, base := range readOnlyCollections {
-		mux.HandleFunc("POST "+BasePath+"/wp/v2/"+base, h.refuseWrite)
-		mux.HandleFunc("PUT "+BasePath+"/wp/v2/"+base, h.refuseWrite)
-		mux.HandleFunc("PATCH "+BasePath+"/wp/v2/"+base, h.refuseWrite)
-		mux.HandleFunc("DELETE "+BasePath+"/wp/v2/"+base, h.refuseWrite)
-		mux.HandleFunc("POST "+BasePath+"/wp/v2/"+base+"/{id}", h.refuseWrite)
-		mux.HandleFunc("PUT "+BasePath+"/wp/v2/"+base+"/{id}", h.refuseWrite)
-		mux.HandleFunc("PATCH "+BasePath+"/wp/v2/"+base+"/{id}", h.refuseWrite)
-		mux.HandleFunc("DELETE "+BasePath+"/wp/v2/"+base+"/{id}", h.refuseWrite)
-	}
+	// Write routes. The pattern across all resources is:
+	//   POST   /<coll>          — create
+	//   PUT    /<coll>/{id}     — full replace (we treat as upsert-patch
+	//                             for WP compatibility; live WP does too)
+	//   PATCH  /<coll>/{id}     — sparse update
+	//   DELETE /<coll>/{id}     — delete (soft for users; sink-defined
+	//                             for posts/terms)
+	//
+	// Where the sink is nil for a given resource, fall back to the
+	// existing 405 refuseWrite handler so the response shape matches a
+	// read-only deployment.
+	registerWrites(mux, "posts", h.deps.PostsSink != nil, h.createPost, h.updatePost, h.deletePost, h.refuseWrite)
+	registerWrites(mux, "pages", h.deps.PagesSink != nil, h.createPage, h.updatePage, h.deletePage, h.refuseWrite)
+	registerWrites(mux, "users", h.deps.UsersSink != nil, h.createUser, h.updateUser, h.deleteUser, h.refuseWrite)
+	registerWrites(mux, "categories", h.deps.CategoriesSink != nil, h.createCategory, h.updateCategory, h.deleteCategory, h.refuseWrite)
+	registerWrites(mux, "tags", h.deps.TagsSink != nil, h.createTag, h.updateTag, h.deleteTag, h.refuseWrite)
 
 	return nil
 }
 
+// registerWrites wires the POST/PUT/PATCH/DELETE table for a single
+// collection base under /wp-json/wp/v2/. When wired is false (no sink
+// for the resource), every method falls through to the refuse handler;
+// otherwise the active handlers claim the natural verb-route pair and
+// the nonsensical ones (e.g. PUT on the collection root, POST on the
+// {id} sub-resource) still get the 405 fallback.
+func registerWrites(mux *http.ServeMux, base string, wired bool,
+	createH, updateH, deleteH, refuseH http.HandlerFunc) {
+
+	if !wired {
+		mux.HandleFunc("POST "+BasePath+"/wp/v2/"+base, refuseH)
+		mux.HandleFunc("PUT "+BasePath+"/wp/v2/"+base, refuseH)
+		mux.HandleFunc("PATCH "+BasePath+"/wp/v2/"+base, refuseH)
+		mux.HandleFunc("DELETE "+BasePath+"/wp/v2/"+base, refuseH)
+		mux.HandleFunc("POST "+BasePath+"/wp/v2/"+base+"/{id}", refuseH)
+		mux.HandleFunc("PUT "+BasePath+"/wp/v2/"+base+"/{id}", refuseH)
+		mux.HandleFunc("PATCH "+BasePath+"/wp/v2/"+base+"/{id}", refuseH)
+		mux.HandleFunc("DELETE "+BasePath+"/wp/v2/"+base+"/{id}", refuseH)
+		return
+	}
+
+	// Active write surface. Note PUT and PATCH both hit updateH — live
+	// WP makes no semantic distinction between them on these routes
+	// (they both call WP_REST_*_Controller::update_item).
+	mux.HandleFunc("POST "+BasePath+"/wp/v2/"+base, createH)
+	mux.HandleFunc("PUT "+BasePath+"/wp/v2/"+base+"/{id}", updateH)
+	mux.HandleFunc("PATCH "+BasePath+"/wp/v2/"+base+"/{id}", updateH)
+	mux.HandleFunc("DELETE "+BasePath+"/wp/v2/"+base+"/{id}", deleteH)
+
+	// Nonsensical verbs still get a 405 fallback so the dispatch table
+	// stays explicit.
+	mux.HandleFunc("PUT "+BasePath+"/wp/v2/"+base, refuseH)
+	mux.HandleFunc("PATCH "+BasePath+"/wp/v2/"+base, refuseH)
+	mux.HandleFunc("DELETE "+BasePath+"/wp/v2/"+base, refuseH)
+	mux.HandleFunc("POST "+BasePath+"/wp/v2/"+base+"/{id}", refuseH)
+}
+
 // readOnlyCollections is the list of collection segments that have
-// 405-write registrations. Kept in one place so adding a new resource is
-// a one-line change.
+// 405-write registrations when no sink is wired. Kept in one place so
+// adding a new resource is a one-line change.
 var readOnlyCollections = []string{
 	"posts", "pages", "users", "categories", "tags",
 }
@@ -289,4 +354,59 @@ func contextDone(ctx context.Context) bool {
 	default:
 		return false
 	}
+}
+
+// decodeWriteBody reads the JSON write body from r into out, applying
+// the maxWriteBodyBytes cap. On parse failure it writes the WP-shaped
+// error and returns false; the caller should bail.
+//
+// We deliberately permit unknown JSON fields (unlike the native rest
+// layer's strict decoder) because WP REST clients often send plugin
+// fields the shim doesn't model — silently ignoring them is the WP-
+// compatible behavior. The sink layer is free to surface validation
+// errors on the fields it does care about.
+func decodeWriteBody(w http.ResponseWriter, r *http.Request, out any) bool {
+	if r.Body == nil {
+		writeError(w, http.StatusBadRequest, errCodeInvalidJSON,
+			"Invalid JSON body passed.")
+		return false
+	}
+	r.Body = http.MaxBytesReader(nil, r.Body, maxWriteBodyBytes)
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(out); err != nil {
+		if errors.Is(err, io.EOF) {
+			writeError(w, http.StatusBadRequest, errCodeInvalidJSON,
+				"Invalid JSON body passed.")
+			return false
+		}
+		if strings.Contains(err.Error(), "too large") {
+			writeError(w, http.StatusRequestEntityTooLarge, errCodeBodyTooLarge,
+				"Request body exceeds the maximum allowed size.")
+			return false
+		}
+		writeError(w, http.StatusBadRequest, errCodeInvalidJSON,
+			"Invalid JSON body passed.")
+		return false
+	}
+	// Trailing content (a second JSON value) is rejected — same
+	// guardrail as the native rest layer to surface client misuse.
+	if dec.More() {
+		writeError(w, http.StatusBadRequest, errCodeInvalidJSON,
+			"Request body must contain a single JSON value.")
+		return false
+	}
+	return true
+}
+
+// parseIDFromPath extracts a positive integer id from r.PathValue("id").
+// On failure, writes the WP-shaped error (the caller passes the right
+// code per resource — `rest_post_invalid_id`, etc.) and returns 0,false.
+func parseIDFromPath(w http.ResponseWriter, r *http.Request, errCode, errMsg string) (int, bool) {
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id < 1 {
+		writeError(w, http.StatusNotFound, errCode, errMsg)
+		return 0, false
+	}
+	return id, true
 }

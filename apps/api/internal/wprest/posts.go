@@ -1,6 +1,7 @@
 package wprest
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,6 +9,8 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/Singleton-Solution/GoNext/packages/go/policy"
 )
 
 // wpPostEnvelope is the on-the-wire shape for a single post/page. Field
@@ -280,4 +283,399 @@ func (h *handlers) writeJSON(w http.ResponseWriter, status int, body any) {
 		return
 	}
 	_ = json.NewEncoder(w).Encode(body)
+}
+
+// -----------------------------------------------------------------------------
+// Write path — request bodies
+// -----------------------------------------------------------------------------
+
+// wpPostWriteBody is the wire-format payload WP REST clients send on
+// POST/PUT/PATCH /wp-json/wp/v2/posts (and /pages — the body shape is
+// identical). All fields are pointer-typed so a caller can submit a
+// sparse PATCH that touches only one column without us defaulting the
+// rest to empty strings.
+//
+// Title and content arrive in either object form
+// (`{"title": {"raw": "..."}}`) or string form (`{"title": "..."}`).
+// We model the object variants as separate `*Raw` structs and pick
+// whichever is set; a future PR can add full WP-style `protected`
+// envelopes if a plugin needs them.
+type wpPostWriteBody struct {
+	// Slug is the URL slug. WP enforces lowercase + hyphen on the
+	// server; we forward it verbatim and let the sink decide.
+	Slug *string `json:"slug"`
+
+	// Title arrives either as a plain string or {raw:"..."}. The
+	// helper wpRawString picks whichever the client sent.
+	Title   *wpRawString `json:"title"`
+	Content *wpRawString `json:"content"`
+	Excerpt *wpRawString `json:"excerpt"`
+
+	// Status maps directly to the WP post status string ("publish",
+	// "draft", "private", "pending", "future"). The sink translates
+	// to the native status alphabet.
+	Status *string `json:"status"`
+
+	// Format / Template / CommentStatus / PingStatus are passed through
+	// untouched. Sinks decide whether to honor unknown values.
+	Format        *string `json:"format"`
+	Template      *string `json:"template"`
+	CommentStatus *string `json:"comment_status"`
+	PingStatus    *string `json:"ping_status"`
+
+	// Author is the WP legacy_int_id of the desired author. The shim
+	// does not validate that the principal may write on the author's
+	// behalf — that's an object-level policy concern handled by the
+	// sink (typically a sink-side "edit_others_posts" cap check).
+	Author *int `json:"author"`
+
+	// FeaturedMedia is the legacy_int_id of the attachment row to mark
+	// as featured. Unverified by the shim.
+	FeaturedMedia *int `json:"featured_media"`
+
+	Sticky *bool `json:"sticky"`
+
+	// Categories and Tags are slices of legacy_int_ids. The shim
+	// resolves them via TermSource (see resolveTerms) to surface
+	// rest_term_invalid early for unknown ids.
+	Categories *[]int `json:"categories"`
+	Tags       *[]int `json:"tags"`
+
+	// Date / DateGMT may carry a backdated or scheduled timestamp.
+	// WP accepts RFC3339 or its YYYY-MM-DDTHH:MM:SS local form.
+	Date    *time.Time `json:"date"`
+	DateGMT *time.Time `json:"date_gmt"`
+
+	// Password sets a per-post password.
+	Password *string `json:"password"`
+
+	// Meta is the WP meta envelope; we pass it through to the sink
+	// without interpretation.
+	Meta map[string]any `json:"meta"`
+}
+
+// wpRawString models the WP convention where text fields are either a
+// plain string or an object `{raw: "...", rendered: "..."}`. Writers
+// send `raw` (renderable) and we ignore any `rendered` they accidentally
+// include — only the raw input is the source of truth.
+type wpRawString struct {
+	Raw      string
+	Rendered string
+}
+
+// UnmarshalJSON accepts either a plain string or the {raw, rendered}
+// object. Empty input is treated as the empty string.
+func (s *wpRawString) UnmarshalJSON(data []byte) error {
+	// Try string first — the common case.
+	var asStr string
+	if err := json.Unmarshal(data, &asStr); err == nil {
+		s.Raw = asStr
+		return nil
+	}
+	// Fall through to the {raw, rendered} object form.
+	var asObj struct {
+		Raw      string `json:"raw"`
+		Rendered string `json:"rendered"`
+	}
+	if err := json.Unmarshal(data, &asObj); err != nil {
+		return fmt.Errorf("wpRawString: %w", err)
+	}
+	s.Raw = asObj.Raw
+	s.Rendered = asObj.Rendered
+	return nil
+}
+
+// toPostWriteInput translates the wire body into the typed sink input.
+// The translation is intentionally mechanical so the rules stay
+// auditable: WP field name → native field name, with the few
+// special-cases (title.raw → ContentHTML/Title plain) called out.
+//
+// The post type comes from the route (the caller already chose
+// posts.go vs pages.go via dispatch), so we accept it as a parameter
+// rather than reading it from the body.
+func (b *wpPostWriteBody) toPostWriteInput(postType string) PostWriteInput {
+	out := PostWriteInput{Type: postType}
+	if b.Slug != nil {
+		out.Slug = b.Slug
+	}
+	if b.Title != nil {
+		v := b.Title.Raw
+		out.Title = &v
+	}
+	if b.Content != nil {
+		v := b.Content.Raw
+		out.ContentHTML = &v
+	}
+	if b.Excerpt != nil {
+		v := b.Excerpt.Raw
+		out.ExcerptHTML = &v
+	}
+	if b.Status != nil {
+		out.Status = b.Status
+	}
+	if b.Format != nil {
+		out.Format = b.Format
+	}
+	if b.Template != nil {
+		out.Template = b.Template
+	}
+	if b.CommentStatus != nil {
+		out.CommentStatus = b.CommentStatus
+	}
+	if b.PingStatus != nil {
+		out.PingStatus = b.PingStatus
+	}
+	if b.Author != nil {
+		out.AuthorID = b.Author
+	}
+	if b.FeaturedMedia != nil {
+		out.FeaturedMedia = b.FeaturedMedia
+	}
+	if b.Sticky != nil {
+		out.Sticky = b.Sticky
+	}
+	if b.Categories != nil {
+		out.Categories = b.Categories
+	}
+	if b.Tags != nil {
+		out.Tags = b.Tags
+	}
+	if b.Date != nil {
+		out.Date = b.Date
+	}
+	if b.DateGMT != nil {
+		out.DateGMT = b.DateGMT
+	}
+	if b.Password != nil {
+		out.Password = b.Password
+	}
+	if b.Meta != nil {
+		out.Meta = b.Meta
+	}
+	return out
+}
+
+// -----------------------------------------------------------------------------
+// Write handlers — posts
+// -----------------------------------------------------------------------------
+
+// createPost implements POST /wp-json/wp/v2/posts.
+func (h *handlers) createPost(w http.ResponseWriter, r *http.Request) {
+	h.createPostLike(w, r, h.deps.PostsSink, "post", policy.CapEditPosts, EventPostCreated, errCodeInvalidPostID)
+}
+
+// updatePost implements PUT/PATCH /wp-json/wp/v2/posts/{id}.
+func (h *handlers) updatePost(w http.ResponseWriter, r *http.Request) {
+	h.updatePostLike(w, r, h.deps.PostsSink, "post", policy.CapEditPosts, EventPostUpdated, errCodeInvalidPostID)
+}
+
+// deletePost implements DELETE /wp-json/wp/v2/posts/{id}.
+func (h *handlers) deletePost(w http.ResponseWriter, r *http.Request) {
+	h.deletePostLike(w, r, h.deps.PostsSink, "post", policy.CapDeletePosts, EventPostDeleted, errCodeInvalidPostID)
+}
+
+// createPage / updatePage / deletePage mirror the post handlers with
+// page-flavored capability slugs and audit events. The dispatcher (sink,
+// type, error code) is the only difference.
+func (h *handlers) createPage(w http.ResponseWriter, r *http.Request) {
+	h.createPostLike(w, r, h.deps.PagesSink, "page", policy.CapEditPages, EventPageCreated, errCodeInvalidPageID)
+}
+func (h *handlers) updatePage(w http.ResponseWriter, r *http.Request) {
+	h.updatePostLike(w, r, h.deps.PagesSink, "page", policy.CapEditPages, EventPageUpdated, errCodeInvalidPageID)
+}
+func (h *handlers) deletePage(w http.ResponseWriter, r *http.Request) {
+	h.deletePostLike(w, r, h.deps.PagesSink, "page", policy.CapDeletePages, EventPageDeleted, errCodeInvalidPageID)
+}
+
+// createPostLike is the shared body for posts/pages create. Each step
+// is short and skippable on failure — the layout matches the gate order
+// in the issue spec: nonce → principal → capability → decode → resolve
+// terms → call sink → audit → write response.
+func (h *handlers) createPostLike(w http.ResponseWriter, r *http.Request, sink PostSink, typ string, requiredCap policy.Capability, eventType, errIDCode string) {
+	if contextDone(r.Context()) {
+		return
+	}
+	if !h.requireNonce(w, r) {
+		return
+	}
+	pr, ok := h.requirePrincipal(w, r)
+	if !ok {
+		return
+	}
+	if !h.requireCapability(w, pr, requiredCap, nil) {
+		return
+	}
+
+	var body wpPostWriteBody
+	if !decodeWriteBody(w, r, &body) {
+		return
+	}
+	in := body.toPostWriteInput(typ)
+
+	// Resolve term references up front so the WP error
+	// (rest_term_invalid, 400) surfaces before we burn cycles in the
+	// sink. The translator runs only the lookups; the sink is still
+	// free to re-validate against its own state if it stores ids in
+	// the row.
+	if err := h.resolveTermRefs(r.Context(), in); err != nil {
+		writeError(w, http.StatusBadRequest, errCodeInvalidTermID,
+			"Invalid term reference.")
+		return
+	}
+
+	row, err := sink.Create(r.Context(), pr.UserID, in)
+	if err != nil {
+		h.writeSinkError(w, r, err, errIDCode, errCodeCannotCreate)
+		return
+	}
+
+	h.emitAudit(r.Context(), pr, eventType, typ, strconv.Itoa(row.LegacyID), map[string]any{
+		"status": row.Status,
+		"slug":   row.Slug,
+	})
+
+	env := h.toWPEnvelope(row)
+	h.writeJSON(w, http.StatusCreated, env)
+}
+
+// updatePostLike — shared body for PUT/PATCH on posts/pages.
+func (h *handlers) updatePostLike(w http.ResponseWriter, r *http.Request, sink PostSink, typ string, requiredCap policy.Capability, eventType, errIDCode string) {
+	if contextDone(r.Context()) {
+		return
+	}
+	if !h.requireNonce(w, r) {
+		return
+	}
+	pr, ok := h.requirePrincipal(w, r)
+	if !ok {
+		return
+	}
+	if !h.requireCapability(w, pr, requiredCap, nil) {
+		return
+	}
+
+	id, ok := parseIDFromPath(w, r, errIDCode, "Invalid post ID.")
+	if !ok {
+		return
+	}
+
+	var body wpPostWriteBody
+	if !decodeWriteBody(w, r, &body) {
+		return
+	}
+	in := body.toPostWriteInput(typ)
+
+	if err := h.resolveTermRefs(r.Context(), in); err != nil {
+		writeError(w, http.StatusBadRequest, errCodeInvalidTermID,
+			"Invalid term reference.")
+		return
+	}
+
+	row, err := sink.Update(r.Context(), pr.UserID, id, in)
+	if err != nil {
+		h.writeSinkError(w, r, err, errIDCode, errCodeCannotEdit)
+		return
+	}
+
+	h.emitAudit(r.Context(), pr, eventType, typ, strconv.Itoa(row.LegacyID), map[string]any{
+		"status": row.Status,
+		"slug":   row.Slug,
+	})
+
+	env := h.toWPEnvelope(row)
+	h.writeJSON(w, http.StatusOK, env)
+}
+
+// deletePostLike — shared body for DELETE on posts/pages. The response
+// is the WP-shaped `{deleted: true, previous: {...}}` envelope, which
+// is what the @wordpress/api-fetch client expects on a 200.
+func (h *handlers) deletePostLike(w http.ResponseWriter, r *http.Request, sink PostSink, typ string, requiredCap policy.Capability, eventType, errIDCode string) {
+	if contextDone(r.Context()) {
+		return
+	}
+	if !h.requireNonce(w, r) {
+		return
+	}
+	pr, ok := h.requirePrincipal(w, r)
+	if !ok {
+		return
+	}
+	if !h.requireCapability(w, pr, requiredCap, nil) {
+		return
+	}
+
+	id, ok := parseIDFromPath(w, r, errIDCode, "Invalid post ID.")
+	if !ok {
+		return
+	}
+
+	row, err := sink.Delete(r.Context(), pr.UserID, id)
+	if err != nil {
+		h.writeSinkError(w, r, err, errIDCode, errCodeCannotDelete)
+		return
+	}
+
+	h.emitAudit(r.Context(), pr, eventType, typ, strconv.Itoa(row.LegacyID), map[string]any{
+		"slug": row.Slug,
+	})
+
+	// WP-shape: `{deleted: bool, previous: <envelope>}`. The envelope is
+	// what the row looked like immediately before deletion — clients
+	// rely on it to repaint a soft-trashed item or to undo.
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"deleted":  true,
+		"previous": h.toWPEnvelope(row),
+	})
+}
+
+// resolveTermRefs verifies that every id in in.Categories and in.Tags
+// resolves through the wired TermSource. Missing refs short-circuit
+// with ErrInvalidTerm so the WP error surfaces. When a source is nil
+// (the test deployment) we skip — the sink is then responsible for any
+// validation it cares about.
+func (h *handlers) resolveTermRefs(ctx context.Context, in PostWriteInput) error {
+	if in.Categories != nil && h.deps.Categories != nil {
+		for _, id := range *in.Categories {
+			if _, err := h.deps.Categories.GetByLegacyID(ctx, id); err != nil {
+				return ErrInvalidTerm
+			}
+		}
+	}
+	if in.Tags != nil && h.deps.Tags != nil {
+		for _, id := range *in.Tags {
+			if _, err := h.deps.Tags.GetByLegacyID(ctx, id); err != nil {
+				return ErrInvalidTerm
+			}
+		}
+	}
+	return nil
+}
+
+// writeSinkError maps sink-layer sentinels to WP-shaped responses. Any
+// unknown error is treated as an internal failure and the body shape
+// matches what live WP emits on the same error class.
+//
+// invalidIDCode is the per-route id-error code (rest_post_invalid_id /
+// rest_page_invalid_id / rest_user_invalid_id). cannotXCode is the
+// per-route capability code (rest_cannot_create / _edit / _delete);
+// callers pass the one matching the verb.
+func (h *handlers) writeSinkError(w http.ResponseWriter, r *http.Request, err error, invalidIDCode, cannotXCode string) {
+	switch {
+	case errors.Is(err, ErrNotFound):
+		writeError(w, http.StatusNotFound, invalidIDCode, "Resource not found.")
+	case errors.Is(err, ErrInvalidTerm):
+		writeError(w, http.StatusBadRequest, errCodeInvalidTermID,
+			"Invalid term reference.")
+	case errors.Is(err, ErrInvalidInput):
+		writeError(w, http.StatusBadRequest, errCodeInvalidParam,
+			"Invalid parameter(s).")
+	case errors.Is(err, ErrDuplicate):
+		writeError(w, http.StatusConflict, errCodePostExists,
+			"A resource with that identifier already exists.")
+	default:
+		h.deps.Logger.ErrorContext(r.Context(), "wprest: sink error",
+			slog.Any("err", err))
+		writeError(w, http.StatusInternalServerError, cannotXCode,
+			"The resource could not be saved.")
+	}
 }
