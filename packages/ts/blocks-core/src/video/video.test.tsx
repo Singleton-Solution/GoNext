@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BlockRegistry } from '@gonext/blocks-sdk';
 import { video, VideoEdit } from './index.ts';
+import { assertNoAxeViolations } from '../internal/axe.ts';
 
 describe('core/video', () => {
   it('round-trips parse → save without mutating canonical attributes', () => {
@@ -105,5 +106,23 @@ describe('core/video', () => {
     const v = container.querySelector('video');
     expect(v?.getAttribute('src')).toBe('https://x/v.mp4');
     expect(container.querySelector('figcaption')?.textContent).toBe('cap');
+  });
+
+  // Issue #250 — WCAG 2.1 AA: every interactive surface must score clean.
+  it('Edit component has no axe a11y violations', async () => {
+    const { container } = render(
+      <VideoEdit
+        attributes={{
+          src: 'https://example.com/v.mp4',
+          controls: true,
+          caption: 'A short clip',
+        }}
+        setAttributes={() => undefined}
+        isSelected={false}
+        clientId="v-axe"
+        context={{}}
+      />,
+    );
+    await assertNoAxeViolations(container);
   });
 });

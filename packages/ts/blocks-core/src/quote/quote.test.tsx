@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BlockRegistry } from '@gonext/blocks-sdk';
 import { quote, QuoteEdit } from './index.ts';
+import { assertNoAxeViolations } from '../internal/axe.ts';
 
 describe('core/quote', () => {
   it('round-trips parse → save without mutating canonical attributes', () => {
@@ -70,5 +71,19 @@ describe('core/quote', () => {
       />,
     );
     expect(screen.getByText('Author')).toBeInTheDocument();
+  });
+
+  // Issue #250 — WCAG 2.1 AA: every interactive surface must score clean.
+  it('Edit component has no axe a11y violations', async () => {
+    const { container } = render(
+      <QuoteEdit
+        attributes={{ value: 'A memorable line', citation: 'A. Person' }}
+        setAttributes={() => undefined}
+        isSelected={false}
+        clientId="q-axe"
+        context={{}}
+      />,
+    );
+    await assertNoAxeViolations(container);
   });
 });

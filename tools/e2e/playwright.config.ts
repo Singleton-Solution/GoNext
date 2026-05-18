@@ -16,6 +16,10 @@ const isCI = !!process.env.CI;
 
 export default defineConfig({
   testDir: './tests',
+  // Match every `*.spec.ts` under `tests/`, including the `a11y/` subtree
+  // wired in by issue #250. Helper files under `tests/a11y/helpers/` and
+  // `tests/a11y/fixtures/` are excluded by the explicit `.spec.ts` suffix.
+  testMatch: ['**/*.spec.ts'],
   // Fail the build on CI if you accidentally left test.only in the source.
   forbidOnly: isCI,
   // Retry on CI only — local runs should surface flakes immediately.

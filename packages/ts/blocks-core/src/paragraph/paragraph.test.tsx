@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BlockRegistry } from '@gonext/blocks-sdk';
 import { paragraph, ParagraphEdit } from './index.ts';
+import { assertNoAxeViolations } from '../internal/axe.ts';
 
 describe('core/paragraph', () => {
   it('round-trips parse → save without mutating the canonical attributes', () => {
@@ -98,5 +99,19 @@ describe('core/paragraph', () => {
       'data-block',
       'core/paragraph',
     );
+  });
+
+  // Issue #250 — WCAG 2.1 AA: every interactive surface must score clean.
+  it('Edit component has no axe a11y violations', async () => {
+    const { container } = render(
+      <ParagraphEdit
+        attributes={{ content: 'A paragraph with enough body to scan.' }}
+        setAttributes={() => undefined}
+        isSelected={false}
+        clientId="p-axe"
+        context={{}}
+      />,
+    );
+    await assertNoAxeViolations(container);
   });
 });

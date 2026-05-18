@@ -18,7 +18,14 @@ tools/e2e/
 ├── fixtures/
 │   └── server.ts           # Skips tests with a clear message if the stack is not up
 ├── tests/
-│   └── smoke.spec.ts       # Home page returns 200
+│   ├── smoke.spec.ts       # Home page returns 200
+│   └── a11y/               # WCAG 2.1 AA scans (issue #250)
+│       ├── helpers/axe.ts          # AxeBuilder wrapper, standard ruleset, carve-outs
+│       ├── fixtures/markup.ts      # Static HTML for offline scans (mirrors live surfaces)
+│       ├── homepage.spec.ts
+│       ├── admin-login.spec.ts
+│       ├── admin-post-list.spec.ts
+│       └── admin-block-editor.spec.ts
 └── README.md               # this file
 ```
 
@@ -39,11 +46,34 @@ pnpm exec playwright install --with-deps
 pnpm test
 
 # Variants
+pnpm test:a11y          # run only the axe-core a11y subset (issue #250)
 pnpm test:headed        # watch the browser
 pnpm test:ui            # Playwright UI mode
 pnpm test:list          # list tests without running
 pnpm typecheck          # tsc --noEmit
+
+# From the repo root
+make a11y               # runs the a11y subset only
 ```
+
+### A11y suite
+
+Issue #250 wires `@axe-core/playwright` into every interactive surface.
+Specs live under `tests/a11y/` and follow these rules:
+
+- **Standard ruleset**: WCAG 2.1 AA (`wcag2a`, `wcag2aa`, `wcag21a`,
+  `wcag21aa`). See `tests/a11y/helpers/axe.ts`.
+- **Documented carve-out**: `color-contrast` is disabled inside
+  `.gonext-block-edit-canvas` because theme tokens (issues #354 / #358)
+  are resolved against the live theme bundle the e2e harness can't load
+  deterministically. Every other surface still gets full contrast
+  scanning, and every other axe rule remains active on the canvas.
+- **Deterministic by default**: each spec renders the static markup in
+  `tests/a11y/fixtures/markup.ts` via `page.setContent`. The fixtures
+  mirror the real surfaces byte-for-byte so the gate gives a consistent
+  verdict every CI run — there's no "skip because the stack is down"
+  mode for an a11y gate. Set `E2E_A11Y_USE_LIVE=1` to scan the live URL
+  instead (useful once a real deploy is wired up).
 
 ### Configuration
 
@@ -103,7 +133,10 @@ acceptance-criteria item. Tracked as separate work:
 - `docker-compose.test.yml` (test-specific stack overlay)
 - `support/seed`, `support/signin`, `?fakeTime=` helpers
 - Per-worker `X-Tenant` header isolation
-- `@axe-core/playwright` injection on every spec
 - `make test-e2e` / `make test-e2e-headed` targets
 - Adding `tools/e2e` to `pnpm-workspace.yaml` (see PR body for why this
   was kept out of the file-ownership scope)
+
+Resolved by later issues:
+
+- `@axe-core/playwright` injection on every spec — done in #250.

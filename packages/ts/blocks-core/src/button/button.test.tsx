@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
 import { BlockRegistry } from '@gonext/blocks-sdk';
 import { button, ButtonEdit } from './index.ts';
+import { assertNoAxeViolations } from '../internal/axe.ts';
 
 describe('core/button', () => {
   it('round-trips parse → save without mutating canonical attributes', () => {
@@ -129,5 +130,23 @@ describe('core/button', () => {
     expect(a?.getAttribute('href')).toBe('https://x');
     expect(a?.getAttribute('target')).toBe('_blank');
     expect(a?.getAttribute('rel')).toBe('noopener noreferrer');
+  });
+
+  // Issue #250 — WCAG 2.1 AA: every interactive surface must score clean.
+  it('Edit component has no axe a11y violations', async () => {
+    const { container } = render(
+      <ButtonEdit
+        attributes={{
+          text: 'Read more',
+          url: 'https://example.com/',
+          linkTarget: '_blank',
+        }}
+        setAttributes={() => undefined}
+        isSelected={false}
+        clientId="b-axe"
+        context={{}}
+      />,
+    );
+    await assertNoAxeViolations(container);
   });
 });

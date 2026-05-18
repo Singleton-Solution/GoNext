@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BlockRegistry } from '@gonext/blocks-sdk';
 import { gallery, GalleryEdit } from './index.ts';
+import { assertNoAxeViolations } from '../internal/axe.ts';
 
 describe('core/gallery', () => {
   it('round-trips parse → save without mutating canonical attributes', () => {
@@ -137,5 +138,25 @@ describe('core/gallery', () => {
       '.gn-block-gallery__controls button',
     );
     expect(controls.length).toBe(4);
+  });
+
+  // Issue #250 — WCAG 2.1 AA: every interactive surface must score clean.
+  it('Edit component has no axe a11y violations', async () => {
+    const { container } = render(
+      <GalleryEdit
+        attributes={{
+          images: [
+            { url: 'https://example.com/a.png', alt: 'First image' },
+            { url: 'https://example.com/b.png', alt: 'Second image' },
+          ],
+          columns: 2,
+        }}
+        setAttributes={() => undefined}
+        isSelected={false}
+        clientId="g-axe"
+        context={{}}
+      />,
+    );
+    await assertNoAxeViolations(container);
   });
 });

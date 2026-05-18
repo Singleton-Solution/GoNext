@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
 import { BlockRegistry } from '@gonext/blocks-sdk';
 import { spacer, SpacerEdit } from './index.ts';
+import { assertNoAxeViolations } from '../internal/axe.ts';
 
 describe('core/spacer', () => {
   it('round-trips parse → save', () => {
@@ -62,5 +63,19 @@ describe('core/spacer', () => {
     const div = container.querySelector('div[data-block="core/spacer"]');
     expect(div).not.toBeNull();
     expect((div as HTMLElement).style.height).toBe('16px');
+  });
+
+  // Issue #250 — WCAG 2.1 AA: every interactive surface must score clean.
+  it('Edit component has no axe a11y violations', async () => {
+    const { container } = render(
+      <SpacerEdit
+        attributes={{ height: 24 }}
+        setAttributes={() => undefined}
+        isSelected={false}
+        clientId="sp-axe"
+        context={{}}
+      />,
+    );
+    await assertNoAxeViolations(container);
   });
 });

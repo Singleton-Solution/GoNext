@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BlockRegistry } from '@gonext/blocks-sdk';
 import { embed, EmbedEdit, detectProvider } from './index.ts';
+import { assertNoAxeViolations } from '../internal/axe.ts';
 
 describe('core/embed', () => {
   it('round-trips parse → save without mutating canonical attributes', () => {
@@ -132,5 +133,22 @@ describe('core/embed', () => {
     expect(container.querySelector('.wp-block-embed__wrapper a')?.getAttribute('href')).toBe(
       'https://youtu.be/abc',
     );
+  });
+
+  // Issue #250 — WCAG 2.1 AA: every interactive surface must score clean.
+  it('Edit component has no axe a11y violations', async () => {
+    const { container } = render(
+      <EmbedEdit
+        attributes={{
+          url: 'https://youtu.be/abc',
+          providerNameSlug: 'youtube',
+        }}
+        setAttributes={() => undefined}
+        isSelected={false}
+        clientId="e-axe"
+        context={{}}
+      />,
+    );
+    await assertNoAxeViolations(container);
   });
 });

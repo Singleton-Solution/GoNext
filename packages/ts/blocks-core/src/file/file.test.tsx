@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
 import { BlockRegistry } from '@gonext/blocks-sdk';
 import { file, FileEdit } from './index.ts';
+import { assertNoAxeViolations } from '../internal/axe.ts';
 
 describe('core/file', () => {
   it('round-trips parse → save without mutating canonical attributes', () => {
@@ -107,5 +108,22 @@ describe('core/file', () => {
     const links = container.querySelectorAll('a');
     expect(links.length).toBe(2);
     expect(links[1]?.className).toBe('wp-block-file__button');
+  });
+
+  // Issue #250 — WCAG 2.1 AA: every interactive surface must score clean.
+  it('Edit component has no axe a11y violations', async () => {
+    const { container } = render(
+      <FileEdit
+        attributes={{
+          href: 'https://example.com/a.pdf',
+          fileName: 'Annual report (PDF)',
+        }}
+        setAttributes={() => undefined}
+        isSelected={false}
+        clientId="f-axe"
+        context={{}}
+      />,
+    );
+    await assertNoAxeViolations(container);
   });
 });
