@@ -289,6 +289,44 @@ func TestLoad_BadEnvVarsListAll(t *testing.T) {
 	}
 }
 
+func TestLoad_PluginsDefaults(t *testing.T) {
+	cfg, err := Load(WithEnv(fixture()))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Plugins.DevMode {
+		t.Errorf("Plugins.DevMode default: got true, want false")
+	}
+	if cfg.Plugins.DevToken != "" {
+		t.Errorf("Plugins.DevToken default: got %q, want empty", cfg.Plugins.DevToken)
+	}
+}
+
+func TestLoad_PluginsOverrides(t *testing.T) {
+	cfg, err := Load(WithEnv(fixture(map[string]string{
+		"GONEXT_PLUGINS_DEV_MODE":  "true",
+		"GONEXT_PLUGINS_DEV_TOKEN": "dev-secret-xyz",
+	})))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !cfg.Plugins.DevMode {
+		t.Errorf("Plugins.DevMode: got false, want true")
+	}
+	if cfg.Plugins.DevToken != "dev-secret-xyz" {
+		t.Errorf("Plugins.DevToken: got %q, want %q", cfg.Plugins.DevToken, "dev-secret-xyz")
+	}
+}
+
+func TestLoad_PluginsBadBool_Errors(t *testing.T) {
+	_, err := Load(WithEnv(fixture(map[string]string{
+		"GONEXT_PLUGINS_DEV_MODE": "yesplease",
+	})))
+	if err == nil || !strings.Contains(err.Error(), "GONEXT_PLUGINS_DEV_MODE") {
+		t.Errorf("expected bool parse error for GONEXT_PLUGINS_DEV_MODE, got: %v", err)
+	}
+}
+
 func TestLoad_ReturnsConcreteError(t *testing.T) {
 	// errors.Join returns a non-nil error; ensure errors.Is/As still work
 	// the way we expect (won't match a sentinel since we don't have one,

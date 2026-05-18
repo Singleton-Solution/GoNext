@@ -38,6 +38,38 @@ type Config struct {
 
 	// Auth holds secrets and timings for sessions, CSRF, and password hashing.
 	Auth AuthConfig
+
+	// Plugins controls the plugin subsystem. The host-side dev install
+	// endpoint (POST /_/plugins/dev/install) is gated on Plugins.DevMode:
+	// when false (the production default), the route is not registered
+	// at all so prod can never expose it. When true, requests carrying a
+	// matching Plugins.DevToken can hot-install plugins for `gonext
+	// plugin dev` loops.
+	Plugins PluginsConfig
+}
+
+// PluginsConfig configures the plugin subsystem.
+//
+// DevMode and DevToken together gate the apps/api dev-install endpoint.
+// DevMode defaults to false: production deployments do not have to do
+// anything to keep the endpoint disabled. DevToken is REDACTED in dumps
+// — it functions as the shared secret between the `gonext plugin dev`
+// CLI and the host, so leaking it lets anyone hot-reload code into the
+// process.
+type PluginsConfig struct {
+	// DevMode toggles registration of /_/plugins/dev/install. Default
+	// false. Set true only on developer workstations / staging hosts
+	// where you actively run the `gonext plugin dev` watch loop.
+	// Honors GONEXT_PLUGINS_DEV_MODE.
+	DevMode bool
+
+	// DevToken is the shared secret the dev-install handler compares
+	// the request's Dev-Token header against. Empty + DevMode=true is
+	// treated as "no token accepted" (the handler rejects every request
+	// with 401) so a misconfigured dev box cannot accidentally accept
+	// uploads from arbitrary network peers. Honors
+	// GONEXT_PLUGINS_DEV_TOKEN.
+	DevToken string `redact:"true"`
 }
 
 // ServerConfig configures the HTTP server in apps/api.

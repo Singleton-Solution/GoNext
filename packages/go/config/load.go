@@ -207,6 +207,17 @@ func Load(opts ...LoadOption) (*Config, error) {
 		cfg.Auth.SessionIdleTTL = d
 	}
 
+	// ---- Plugins ----
+	// DevMode defaults to false: production deployments must NOT have to
+	// opt out of the dev-install surface. DevToken has no default — an
+	// empty token is meaningful (handler rejects every request).
+	if b, err := getBool(e, "GONEXT_PLUGINS_DEV_MODE", false); err != nil {
+		errs = append(errs, err)
+	} else {
+		cfg.Plugins.DevMode = b
+	}
+	cfg.Plugins.DevToken = getString(e, "GONEXT_PLUGINS_DEV_TOKEN", "")
+
 	if len(errs) > 0 {
 		return cfg, joinErrs(errs)
 	}

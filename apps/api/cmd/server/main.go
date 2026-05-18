@@ -28,6 +28,8 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/healthz"
+	plugindev "github.com/Singleton-Solution/GoNext/apps/api/internal/plugins/dev"
+	"github.com/Singleton-Solution/GoNext/packages/go/audit"
 	"github.com/Singleton-Solution/GoNext/packages/go/buildinfo"
 	"github.com/Singleton-Solution/GoNext/packages/go/config"
 	"github.com/Singleton-Solution/GoNext/packages/go/db"
@@ -35,6 +37,7 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/log"
 	gonextmetrics "github.com/Singleton-Solution/GoNext/packages/go/metrics"
 	httpmetrics "github.com/Singleton-Solution/GoNext/packages/go/middleware/metrics"
+	"github.com/Singleton-Solution/GoNext/packages/go/plugins/lifecycle"
 	redisclient "github.com/Singleton-Solution/GoNext/packages/go/redis"
 	"github.com/Singleton-Solution/GoNext/packages/go/shutdown"
 	"github.com/Singleton-Solution/GoNext/packages/go/theme/seed"
@@ -184,7 +187,7 @@ func run(ctx context.Context) error {
 	orch.MustRegister(logger, "metrics.flusher", noopCloser("metrics"))
 	orch.MustRegister(logger, "audit.emitter", noopCloser("audit"))
 
-	mux := buildRouter(cfg, pool, rdb)
+	mux := buildRouter(cfg, pool, rdb, logger)
 
 	srv, err := httpx.New(httpx.Options{
 		Config:  cfg.Server,
@@ -257,7 +260,13 @@ func run(ctx context.Context) error {
 // pool and rdb are threaded in so the readiness handler can probe them.
 // They are NOT consulted for liveness — liveness must never depend on
 // anything external (see internal/healthz/doc.go).
-func buildRouter(_ *config.Config, pool *pgxpool.Pool, rdb *goredis.Client) http.Handler {
+//
+// The dev-install plugin endpoint (/_/plugins/dev/install) is mounted
+// only when cfg.Plugins.DevMode is true. Production deployments never
+// enable DevMode, so they never see this surface — registering the
+// route conditionally (rather than gating at request time) is the
+// strongest guarantee we can offer.
+func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, logger *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
@@ -277,6 +286,25 @@ func buildRouter(_ *config.Config, pool *pgxpool.Pool, rdb *goredis.Client) http
 		healthz.DBCheck(pool),
 		healthz.RedisCheck(rdb),
 	))
+
+	if cfg.Plugins.DevMode {
+		// Dev plugin install endpoint. Used by the `gonext plugin dev`
+		// CLI's watch loop. Storage is intentionally in-memory: the
+		// dev surface is for hot-reloading a single plugin while you
+		// iterate; persistence across api restarts isn't part of the
+		// contract. The audit emitter writes to an in-memory store so
+		// nothing in the dev path touches the prod audit DB schema
+		// before #54 ships.
+		mgr := lifecycle.NewManager(
+			lifecycle.NewMemoryStorage(),
+			audit.NewEmitter(audit.NewMemoryStore()),
+			lifecycle.WithLogger(logger),
+		)
+		mux.Handle("POST /_/plugins/dev/install", plugindev.Mount(cfg.Plugins, mgr, plugindev.WithLogger(logger)))
+		logger.Info("plugins/dev: install endpoint mounted",
+			slog.String("path", "/_/plugins/dev/install"),
+		)
+	}
 
 	return mux
 }
