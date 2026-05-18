@@ -10,7 +10,7 @@
 //     Vitals + custom timings here. The endpoint is unauthenticated,
 //     IP-rate-limited, payload-capped (16 KiB), batch-capped (50
 //     events), and writes to the rum_events table introduced by
-//     migration 000018.
+//     migration 000023.
 //
 //   - Authenticated aggregate read at GET /api/v1/admin/rum/percentiles.
 //     The admin Performance page renders p50/p75/p95 over a sliding
