@@ -46,6 +46,38 @@ type Config struct {
 	// matching Plugins.DevToken can hot-install plugins for `gonext
 	// plugin dev` loops.
 	Plugins PluginsConfig
+
+	// Performance groups performance-related toggles. Most fields here
+	// are pure optimizations that can be disabled without affecting
+	// correctness — useful when a feature interacts badly with an
+	// upstream proxy or when an operator is bisecting a regression.
+	Performance PerformanceConfig
+}
+
+// PerformanceConfig groups opt-out toggles for the performance
+// optimizations the server applies. Each field maps to one specific
+// optimization; the defaults represent the production-recommended
+// shape. Disable a field only after measuring that it's the cause of
+// a regression for your deployment.
+type PerformanceConfig struct {
+	// EarlyHints enables the HTTP 103 Early Hints middleware (see
+	// packages/go/middleware/earlyhints). When true (default), the
+	// server flushes a 103 interim response carrying Link: rel=preload
+	// headers for the active theme's stylesheet (and any registered
+	// extras) before the real 200 is rendered. Browsers (Chrome 103+,
+	// Firefox 110+, Safari 17+) start fetching those assets while
+	// the server is still working, typically winning 50-200ms of
+	// Largest Contentful Paint on theme-rendered pages.
+	//
+	// Disable if:
+	//   - A reverse proxy in front of GoNext drops 1xx interim
+	//     responses (some legacy load balancers do — modern nginx,
+	//     HAProxy, Cloudflare, AWS ALB all forward them correctly).
+	//   - You are debugging an issue and want to isolate the
+	//     baseline 200-only behavior.
+	//
+	// Honors GONEXT_PERFORMANCE_EARLY_HINTS. Default true.
+	EarlyHints bool
 }
 
 // PluginsConfig configures the plugin subsystem.
