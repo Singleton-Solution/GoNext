@@ -1,0 +1,189 @@
+{
+  "title": "GoNext — Plugins",
+  "uid": "gonext-plugins",
+  "tags": ["gonext", "plugins"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "time": {"from": "now-1h", "to": "now"},
+  "refresh": "30s",
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {"text": "Prometheus", "value": "Prometheus"},
+        "hide": 0,
+        "refresh": 1
+      },
+      {
+        "name": "env",
+        "label": "Environment",
+        "type": "query",
+        "datasource": {"type": "prometheus", "uid": "${datasource}"},
+        "query": "label_values(gonext_plugin_invocations_total, env)",
+        "current": {"text": "All", "value": "$__all"},
+        "includeAll": true,
+        "multi": false,
+        "refresh": 2,
+        "sort": 1
+      },
+      {
+        "name": "plugin",
+        "label": "Plugin",
+        "type": "query",
+        "datasource": {"type": "prometheus", "uid": "${datasource}"},
+        "query": "label_values(gonext_plugin_invocations_total{env=~\"$env\"}, plugin)",
+        "current": {"text": "All", "value": "$__all"},
+        "includeAll": true,
+        "multi": true,
+        "refresh": 2,
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Invocations by plugin",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "fieldConfig": {"defaults": {"unit": "ops"}},
+      "options": {"legend": {"displayMode": "table", "placement": "right"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (plugin) (rate(gonext_plugin_invocations_total{env=~\"$env\",plugin=~\"$plugin\"}[1m]))",
+          "legendFormat": "{{plugin}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Invocations by result",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "fieldConfig": {"defaults": {"unit": "ops"}},
+      "options": {"legend": {"displayMode": "table", "placement": "right"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (result) (rate(gonext_plugin_invocations_total{env=~\"$env\",plugin=~\"$plugin\"}[1m]))",
+          "legendFormat": "{{result}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Plugin latency p50 / p95",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "options": {"legend": {"displayMode": "table", "placement": "right"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum by (le, plugin) (rate(gonext_plugin_duration_seconds_bucket{env=~\"$env\",plugin=~\"$plugin\"}[5m])))",
+          "legendFormat": "p50 {{plugin}}"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le, plugin) (rate(gonext_plugin_duration_seconds_bucket{env=~\"$env\",plugin=~\"$plugin\"}[5m])))",
+          "legendFormat": "p95 {{plugin}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Plugin traps by reason",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "fieldConfig": {"defaults": {"unit": "ops"}},
+      "options": {"legend": {"displayMode": "table", "placement": "right"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (reason) (rate(gonext_plugin_traps_total{env=~\"$env\",plugin=~\"$plugin\"}[5m]))",
+          "legendFormat": "{{reason}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Capability denials by plugin / capability",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+      "fieldConfig": {"defaults": {"unit": "ops"}},
+      "options": {"legend": {"displayMode": "table", "placement": "right"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (plugin, capability) (rate(gonext_plugin_capability_denied_total{env=~\"$env\",plugin=~\"$plugin\"}[5m]))",
+          "legendFormat": "{{plugin}} / {{capability}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Pool checkout wait p95",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "options": {"legend": {"displayMode": "table", "placement": "right"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, plugin) (rate(gonext_plugin_pool_checkout_wait_seconds_bucket{env=~\"$env\",plugin=~\"$plugin\"}[5m])))",
+          "legendFormat": "{{plugin}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Pool size / in-use",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+      "fieldConfig": {"defaults": {"unit": "short"}},
+      "options": {"legend": {"displayMode": "table", "placement": "right"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (plugin) (gonext_plugin_pool_pool_size{env=~\"$env\",plugin=~\"$plugin\"})",
+          "legendFormat": "size {{plugin}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (plugin) (gonext_plugin_pool_in_use{env=~\"$env\",plugin=~\"$plugin\"})",
+          "legendFormat": "in-use {{plugin}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Pool recycle by reason",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 32},
+      "fieldConfig": {"defaults": {"unit": "ops"}},
+      "options": {"legend": {"displayMode": "table", "placement": "right"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (plugin, reason) (rate(gonext_plugin_pool_recycle_total{env=~\"$env\",plugin=~\"$plugin\"}[5m]))",
+          "legendFormat": "{{plugin}} / {{reason}}"
+        }
+      ]
+    }
+  ]
+}
