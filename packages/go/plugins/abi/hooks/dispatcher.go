@@ -6,10 +6,33 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	pluginruntime "github.com/Singleton-Solution/GoNext/packages/go/plugins/runtime"
 	"github.com/tetratelabs/wazero/api"
 )
+
+// HookObserver is the narrow telemetry surface the Dispatcher publishes
+// to. Defining it as an interface — rather than importing the health
+// package's Recorder — keeps the runtime/hook stack free of any
+// dependency on the metrics registry, so callers that don't care about
+// metrics (most tests) can leave the observer unset.
+//
+// A nil observer is the default and disables all emission. The
+// production wiring constructs a *health.recorder and a closure that
+// forwards plugin/hook/result; see packages/go/plugins/health/doc.go.
+//
+// Implementations MUST be safe for concurrent use.
+type HookObserver interface {
+	// ObserveInvocation is called exactly once per dispatch with
+	// the result label and wall-clock duration of the call.
+	ObserveInvocation(hook, result string, duration time.Duration)
+
+	// ObserveTrap is called on every trap, in addition to the
+	// ObserveInvocation call. reason is the trap reason string;
+	// payload is the marshalled hook payload (for replay).
+	ObserveTrap(hook, reason string, payload []byte)
+}
 
 // Dispatcher wraps a single loaded plugin Module and drives the
 // gn_handle_hook ABI on its behalf.
@@ -34,6 +57,25 @@ type Dispatcher struct {
 	exportsMu sync.RWMutex
 	exports   *cachedExports
 	exportErr error // memoized "missing export" failure; sticky after first lookup
+
+	// observer, if non-nil, is called on every dispatch with the
+	// result label and duration, and on every trap with the
+	// reason + payload. nil disables emission entirely. The
+	// observer is set by the constructor (via DispatcherOption) and
+	// never mutated after — the field is therefore lock-free on the
+	// hot path.
+	observer HookObserver
+}
+
+// DispatcherOption customises a Dispatcher at construction time.
+type DispatcherOption func(*Dispatcher)
+
+// WithObserver attaches an observer that receives one call per
+// dispatch (ObserveInvocation) and one extra call per trap
+// (ObserveTrap, after the invocation observation). Passing nil is
+// equivalent to not setting an observer.
+func WithObserver(o HookObserver) DispatcherOption {
+	return func(d *Dispatcher) { d.observer = o }
 }
 
 // cachedExports holds the api.Function handles we need to dispatch a
@@ -54,11 +96,15 @@ type cachedExports struct {
 //
 // Passing a nil module returns nil; the caller is responsible for the
 // guard.
-func NewDispatcher(module *pluginruntime.Module) *Dispatcher {
+func NewDispatcher(module *pluginruntime.Module, opts ...DispatcherOption) *Dispatcher {
 	if module == nil {
 		return nil
 	}
-	return &Dispatcher{module: module}
+	d := &Dispatcher{module: module}
+	for _, opt := range opts {
+		opt(d)
+	}
+	return d
 }
 
 // Module returns the underlying plugin Module. Test helpers use this to
@@ -150,7 +196,40 @@ func (d *Dispatcher) InvokeFilter(ctx context.Context, hookName string, value js
 // frees creates more bugs than it solves. The next gn_alloc call
 // reclaims via the guest's allocator implementation (typically
 // arena-style for plugin SDKs).
-func (d *Dispatcher) invoke(ctx context.Context, hookName string, payload []byte, readResult bool) ([]byte, error) {
+func (d *Dispatcher) invoke(ctx context.Context, hookName string, payload []byte, readResult bool) (out []byte, retErr error) {
+	// Capture start so we can publish duration to the observer on
+	// every return path. The defer also handles trap notification:
+	// if the call returned a HookError tagged ResultStatusTrap, we
+	// emit an extra ObserveTrap with the payload bytes so the
+	// admin's "replay this failure" flow has everything it needs.
+	start := time.Now()
+	defer func() {
+		if d.observer == nil {
+			return
+		}
+		dur := time.Since(start)
+		result := ResultStatusOK.String()
+		if retErr != nil {
+			var he *HookError
+			if errors.As(retErr, &he) {
+				result = he.Status.String()
+				if he.Status == ResultStatusTrap {
+					reason := ""
+					var trap *pluginruntime.TrapError
+					if errors.As(he.Cause, &trap) {
+						reason = trap.Reason
+					} else if he.Cause != nil {
+						reason = he.Cause.Error()
+					}
+					d.observer.ObserveTrap(hookName, reason, payload)
+				}
+			} else {
+				result = "error"
+			}
+		}
+		d.observer.ObserveInvocation(hookName, result, dur)
+	}()
+
 	if d.module.IsClosed() {
 		return nil, &HookError{Hook: hookName, Status: ResultStatusError, Cause: pluginruntime.ErrModuleClosed}
 	}
