@@ -6,13 +6,35 @@
 // pipelines) keep working unchanged after a site migrates from WordPress to
 // GoNext. See docs/08-migration-compat.md §11 for the full background.
 //
-// # Scope of this issue (#89)
+// # Scope
 //
-// This PR is the read-only baseline. Write methods (POST/PUT/DELETE) return
-// 405 Method Not Allowed with a WP-shaped error body. Migration cohort tests
-// only exercise reads at this stage; write semantics carry an entirely
-// different correctness surface (auth, ownership, validation, nonce handling)
-// that we sequence behind the read shim landing.
+// Issue #89 landed the read-only baseline. Issue #227 extends the shim with
+// write methods (POST/PUT/PATCH/DELETE) for posts, pages, users, categories,
+// and tags. The write surface is opt-in: when the corresponding *Sink in
+// Deps is nil the shim returns the same 405 Method Not Allowed with a
+// WP-shaped error body as before; when the sink is wired, the handler runs
+// the full write pipeline (nonce → principal → capability → decode →
+// resolve terms → sink → audit → response).
+//
+// # Write semantics
+//
+// Authentication is via the existing session cookie (the auth middleware
+// stashes a policy.Principal on the request context). Cross-site request
+// forgery protection is via the existing CSRF middleware: the shim's
+// X-WP-Nonce header is a WP-flavored alias for the CSRF token, with the
+// `?_wpnonce=` query parameter as a fallback for clients that can't set
+// headers. The bridge is in auth.go.
+//
+// Capability checks use packages/go/policy:
+//
+//	POST   /posts        → CapEditPosts
+//	PUT    /posts/{id}   → CapEditPosts
+//	DELETE /posts/{id}   → CapDeletePosts
+//	POST   /pages        → CapEditPages
+//	(same pattern for pages / users / categories / tags)
+//
+// Object-level checks (edit_others_posts, delete_others_posts) live in
+// the sink layer where the resource has been loaded.
 //
 // # Endpoints
 //

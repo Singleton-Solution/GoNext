@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+
+	"github.com/Singleton-Solution/GoNext/packages/go/policy"
 )
 
 // wpTermEnvelope is the WP wire shape for a taxonomy term — both
@@ -121,6 +123,191 @@ func (h *handlers) getTerm(w http.ResponseWriter, r *http.Request, src TermSourc
 		t.Taxonomy = taxonomy
 	}
 	h.writeJSON(w, http.StatusOK, h.toWPTermEnvelope(t))
+}
+
+// -----------------------------------------------------------------------------
+// Write path — terms (categories + tags)
+// -----------------------------------------------------------------------------
+
+// wpTermWriteBody is the JSON body for POST/PUT/PATCH on /wp/v2/categories
+// and /wp/v2/tags. Tag bodies omit Parent — the field is accepted but
+// ignored by the tag sink (post_tag is a flat taxonomy in WP).
+type wpTermWriteBody struct {
+	Name        *string `json:"name"`
+	Slug        *string `json:"slug"`
+	Description *string `json:"description"`
+	Parent      *int    `json:"parent"`
+}
+
+func (b *wpTermWriteBody) toTermWriteInput() TermWriteInput {
+	return TermWriteInput{
+		Name:        b.Name,
+		Slug:        b.Slug,
+		Description: b.Description,
+		Parent:      b.Parent,
+	}
+}
+
+// createCategory / createTag share createTerm. Each calls in with the
+// dispatcher (sink + taxonomy + cap).
+func (h *handlers) createCategory(w http.ResponseWriter, r *http.Request) {
+	h.createTerm(w, r, h.deps.CategoriesSink, "category", policy.CapManageCategories)
+}
+func (h *handlers) createTag(w http.ResponseWriter, r *http.Request) {
+	h.createTerm(w, r, h.deps.TagsSink, "post_tag", policy.CapManageTags)
+}
+func (h *handlers) updateCategory(w http.ResponseWriter, r *http.Request) {
+	h.updateTerm(w, r, h.deps.CategoriesSink, "category", policy.CapManageCategories)
+}
+func (h *handlers) updateTag(w http.ResponseWriter, r *http.Request) {
+	h.updateTerm(w, r, h.deps.TagsSink, "post_tag", policy.CapManageTags)
+}
+func (h *handlers) deleteCategory(w http.ResponseWriter, r *http.Request) {
+	h.deleteTerm(w, r, h.deps.CategoriesSink, "category", policy.CapManageCategories)
+}
+func (h *handlers) deleteTag(w http.ResponseWriter, r *http.Request) {
+	h.deleteTerm(w, r, h.deps.TagsSink, "post_tag", policy.CapManageTags)
+}
+
+// createTerm — shared body for category/tag create.
+func (h *handlers) createTerm(w http.ResponseWriter, r *http.Request, sink TermSink, taxonomy string, requiredCap policy.Capability) {
+	if contextDone(r.Context()) {
+		return
+	}
+	if !h.requireNonce(w, r) {
+		return
+	}
+	pr, ok := h.requirePrincipal(w, r)
+	if !ok {
+		return
+	}
+	if !h.requireCapability(w, pr, requiredCap, nil) {
+		return
+	}
+
+	var body wpTermWriteBody
+	if !decodeWriteBody(w, r, &body) {
+		return
+	}
+	in := body.toTermWriteInput()
+
+	row, err := sink.Create(r.Context(), pr.UserID, taxonomy, in)
+	if err != nil {
+		h.writeTermSinkError(w, r, err, errCodeCannotCreate)
+		return
+	}
+	if row.Taxonomy == "" {
+		row.Taxonomy = taxonomy
+	}
+
+	h.emitAudit(r.Context(), pr, EventTermCreated, taxonomy, strconv.Itoa(row.LegacyID), map[string]any{
+		"slug": row.Slug,
+		"name": row.Name,
+	})
+
+	h.writeJSON(w, http.StatusCreated, h.toWPTermEnvelope(row))
+}
+
+// updateTerm — shared body for category/tag PUT/PATCH.
+func (h *handlers) updateTerm(w http.ResponseWriter, r *http.Request, sink TermSink, taxonomy string, requiredCap policy.Capability) {
+	if contextDone(r.Context()) {
+		return
+	}
+	if !h.requireNonce(w, r) {
+		return
+	}
+	pr, ok := h.requirePrincipal(w, r)
+	if !ok {
+		return
+	}
+	if !h.requireCapability(w, pr, requiredCap, nil) {
+		return
+	}
+
+	id, ok := parseIDFromPath(w, r, errCodeInvalidTermID, "Term does not exist.")
+	if !ok {
+		return
+	}
+
+	var body wpTermWriteBody
+	if !decodeWriteBody(w, r, &body) {
+		return
+	}
+	in := body.toTermWriteInput()
+
+	row, err := sink.Update(r.Context(), pr.UserID, taxonomy, id, in)
+	if err != nil {
+		h.writeTermSinkError(w, r, err, errCodeCannotEdit)
+		return
+	}
+	if row.Taxonomy == "" {
+		row.Taxonomy = taxonomy
+	}
+
+	h.emitAudit(r.Context(), pr, EventTermUpdated, taxonomy, strconv.Itoa(row.LegacyID), map[string]any{
+		"slug": row.Slug,
+		"name": row.Name,
+	})
+
+	h.writeJSON(w, http.StatusOK, h.toWPTermEnvelope(row))
+}
+
+// deleteTerm — shared body for category/tag DELETE. Live WP supports
+// `?force=true` to permanently delete a term; the shim forwards the
+// query param via the sink interface (sinks may interpret).
+func (h *handlers) deleteTerm(w http.ResponseWriter, r *http.Request, sink TermSink, taxonomy string, requiredCap policy.Capability) {
+	if contextDone(r.Context()) {
+		return
+	}
+	if !h.requireNonce(w, r) {
+		return
+	}
+	pr, ok := h.requirePrincipal(w, r)
+	if !ok {
+		return
+	}
+	if !h.requireCapability(w, pr, requiredCap, nil) {
+		return
+	}
+
+	id, ok := parseIDFromPath(w, r, errCodeInvalidTermID, "Term does not exist.")
+	if !ok {
+		return
+	}
+
+	row, err := sink.Delete(r.Context(), pr.UserID, taxonomy, id)
+	if err != nil {
+		h.writeTermSinkError(w, r, err, errCodeCannotDelete)
+		return
+	}
+	if row.Taxonomy == "" {
+		row.Taxonomy = taxonomy
+	}
+
+	h.emitAudit(r.Context(), pr, EventTermDeleted, taxonomy, strconv.Itoa(row.LegacyID), map[string]any{
+		"slug": row.Slug,
+	})
+
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"deleted":  true,
+		"previous": h.toWPTermEnvelope(row),
+	})
+}
+
+// writeTermSinkError maps term-sink errors to WP-shaped responses.
+func (h *handlers) writeTermSinkError(w http.ResponseWriter, r *http.Request, err error, cannotXCode string) {
+	switch {
+	case errors.Is(err, ErrNotFound):
+		writeError(w, http.StatusNotFound, errCodeInvalidTermID, "Term does not exist.")
+	case errors.Is(err, ErrInvalidInput):
+		writeError(w, http.StatusBadRequest, errCodeInvalidParam, "Invalid parameter(s).")
+	case errors.Is(err, ErrDuplicate):
+		writeError(w, http.StatusConflict, errCodeTermExists, "A term with that slug already exists.")
+	default:
+		h.deps.Logger.ErrorContext(r.Context(), "wprest: term sink error",
+			slog.Any("err", err))
+		writeError(w, http.StatusInternalServerError, cannotXCode, "The term could not be saved.")
+	}
 }
 
 // toWPTermEnvelope translates a TermRow into the WP wire shape.
