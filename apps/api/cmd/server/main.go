@@ -33,6 +33,8 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/db"
 	"github.com/Singleton-Solution/GoNext/packages/go/httpx"
 	"github.com/Singleton-Solution/GoNext/packages/go/log"
+	gonextmetrics "github.com/Singleton-Solution/GoNext/packages/go/metrics"
+	httpmetrics "github.com/Singleton-Solution/GoNext/packages/go/middleware/metrics"
 	redisclient "github.com/Singleton-Solution/GoNext/packages/go/redis"
 	"github.com/Singleton-Solution/GoNext/packages/go/shutdown"
 )
@@ -113,11 +115,13 @@ func run(ctx context.Context) error {
 	// AFTER persistence (so they drain BEFORE persistence on LIFO) —
 	// the last audit record needs the DB pool alive when it writes.
 	//
-	// Stubbed for now: metrics.Close and audit.Close exist in their
-	// respective packages but the wiring of a real exporter/emitter
-	// lands in the per-issue work for #4 (metrics) and #54 (audit).
-	// The registration shape is final, so when those exporters land,
-	// the only diff here is swapping the no-op for the real instance.
+	// The metrics registry pre-registers go_* / process_* collectors
+	// and owns the /metrics surface (issue #286). The HTTP metrics
+	// middleware (issue #158) registers gonext_http_* against the same
+	// registry so scrapers see them on the dedicated /metrics endpoint.
+	//
+	// Audit remains stubbed; that wiring lands in #54.
+	metricsReg := gonextmetrics.NewRegistry()
 	orch.MustRegister(logger, "metrics.flusher", noopCloser("metrics"))
 	orch.MustRegister(logger, "audit.emitter", noopCloser("audit"))
 
@@ -131,6 +135,7 @@ func run(ctx context.Context) error {
 			httpx.Recovery(logger),
 			httpx.RequestID(),
 			httpx.Logger(logger, "/healthz", "/readyz"),
+			httpmetrics.Middleware(metricsReg.Prometheus()),
 		},
 	})
 	if err != nil {
