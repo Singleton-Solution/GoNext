@@ -25,6 +25,7 @@ require (
 	github.com/tetratelabs/wazero v1.11.0
 	github.com/wI2L/jsondiff v0.7.1
 	golang.org/x/crypto v0.51.0
+	golang.org/x/mod v0.36.0
 	golang.org/x/net v0.53.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.20.0

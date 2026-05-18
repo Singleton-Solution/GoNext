@@ -78,6 +78,45 @@ func TestValidate_ValidFull(t *testing.T) {
 	if len(m.Signature) != 128 {
 		t.Errorf("signature length: got %d want 128", len(m.Signature))
 	}
+	if len(m.Depends) != 2 {
+		t.Fatalf("depends: got %d want 2 (%+v)", len(m.Depends), m.Depends)
+	}
+	if m.Depends[0].Name != "gn-core" || m.Depends[0].Version != "^1.0.0" {
+		t.Errorf("depends[0]: got %+v", m.Depends[0])
+	}
+	if m.Depends[1].Name != "gn-i18n" || m.Depends[1].Version != ">=2.0.0 <3.0.0" {
+		t.Errorf("depends[1]: got %+v", m.Depends[1])
+	}
+}
+
+// TestValidate_DependsField pins the happy path for the depends[]
+// array (issue #251). The schema's uniqueItems forbids exact
+// duplicates; required name + version are both checked. A malformed
+// dependency entry triggers a structured error.
+func TestValidate_DependsField(t *testing.T) {
+	t.Parallel()
+	data := readGolden(t, "with-depends.json")
+	m, err := Validate(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(m.Depends) != 2 {
+		t.Fatalf("depends: got %d want 2", len(m.Depends))
+	}
+
+	// Negative: malformed entry must surface at /depends/0.
+	bad := readGolden(t, "invalid-depends-shape.json")
+	if _, err := Validate(bad); err == nil {
+		t.Fatal("Validate: want error for invalid depends shape")
+	} else {
+		var ve Errors
+		if !errors.As(err, &ve) {
+			t.Fatalf("want Errors, got %T", err)
+		}
+		if !errorHasPath(ve, "/depends/0") && !errorHasPath(ve, "/depends/1") {
+			t.Errorf("expected /depends/N in errors: %v", ve)
+		}
+	}
 }
 
 // TestValidate_TableDriven exercises the negative paths. Each case
