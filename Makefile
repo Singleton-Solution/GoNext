@@ -68,6 +68,23 @@ test-js: ## Run JS/TS tests.
 	@pnpm -r run test
 
 # ---------------------------------------------------------------------------
+# Accessibility (issue #250 — WCAG 2.1 AA gate)
+
+.PHONY: a11y
+a11y: ## Run only the axe-core a11y subset of the e2e suite (all 3 browsers).
+	@echo "==> Running a11y e2e suite (tools/e2e/tests/a11y)"
+	@# tools/e2e is intentionally outside the pnpm workspace (see #241);
+	@# invoke its scripts directly via its own package manifest. Locally
+	@# you may not have firefox/webkit binaries installed — use
+	@# `make a11y-chromium` for a fast chromium-only loop.
+	@cd tools/e2e && pnpm run test:a11y
+
+.PHONY: a11y-chromium
+a11y-chromium: ## Run the a11y subset on chromium only (fast local loop).
+	@echo "==> Running a11y e2e suite (chromium only)"
+	@cd tools/e2e && pnpm run test:a11y:chromium
+
+# ---------------------------------------------------------------------------
 # Lint
 
 .PHONY: lint lint-go lint-js lint-md

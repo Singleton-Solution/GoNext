@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
 import { BlockRegistry } from '@gonext/blocks-sdk';
 import { group, GroupEdit, GROUP_INNER_SENTINEL } from './index.ts';
+import { assertNoAxeViolations } from '../internal/axe.ts';
 
 describe('core/group', () => {
   it('round-trips parse → save with the inner-blocks sentinel intact', () => {
@@ -77,5 +78,19 @@ describe('core/group', () => {
       />,
     );
     expect(container.querySelector('aside[data-block="core/group"]')).not.toBeNull();
+  });
+
+  // Issue #250 — WCAG 2.1 AA: every interactive surface must score clean.
+  it('Edit component has no axe a11y violations', async () => {
+    const { container } = render(
+      <GroupEdit
+        attributes={{ tagName: 'section' }}
+        setAttributes={() => undefined}
+        isSelected={false}
+        clientId="grp-axe"
+        context={{}}
+      />,
+    );
+    await assertNoAxeViolations(container);
   });
 });

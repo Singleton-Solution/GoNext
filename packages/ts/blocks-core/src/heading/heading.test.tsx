@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BlockRegistry } from '@gonext/blocks-sdk';
 import { heading, HeadingEdit } from './index.ts';
+import { assertNoAxeViolations } from '../internal/axe.ts';
 
 describe('core/heading', () => {
   it('round-trips parse → save without mutating canonical attributes', () => {
@@ -92,5 +93,19 @@ describe('core/heading', () => {
       />,
     );
     expect(screen.getByText('My H3').tagName).toBe('H3');
+  });
+
+  // Issue #250 — WCAG 2.1 AA: every interactive surface must score clean.
+  it('Edit component has no axe a11y violations', async () => {
+    const { container } = render(
+      <HeadingEdit
+        attributes={{ content: 'Section heading', level: 2 }}
+        setAttributes={() => undefined}
+        isSelected={false}
+        clientId="h-axe"
+        context={{}}
+      />,
+    );
+    await assertNoAxeViolations(container);
   });
 });

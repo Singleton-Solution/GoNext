@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
 import { BlockRegistry } from '@gonext/blocks-sdk';
 import { separator, SeparatorEdit } from './index.ts';
+import { assertNoAxeViolations } from '../internal/axe.ts';
 
 describe('core/separator', () => {
   it('round-trips parse → save', () => {
@@ -60,5 +61,19 @@ describe('core/separator', () => {
       />,
     );
     expect(container.querySelector('hr')).not.toBeNull();
+  });
+
+  // Issue #250 — WCAG 2.1 AA: every interactive surface must score clean.
+  it('Edit component has no axe a11y violations', async () => {
+    const { container } = render(
+      <SeparatorEdit
+        attributes={{ style: 'wide' }}
+        setAttributes={() => undefined}
+        isSelected={false}
+        clientId="s-axe"
+        context={{}}
+      />,
+    );
+    await assertNoAxeViolations(container);
   });
 });

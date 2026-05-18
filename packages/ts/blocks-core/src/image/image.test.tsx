@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BlockRegistry } from '@gonext/blocks-sdk';
 import { image, ImageEdit } from './index.ts';
+import { assertNoAxeViolations } from '../internal/axe.ts';
 
 describe('core/image', () => {
   it('round-trips parse → save without mutating canonical attributes', () => {
@@ -105,5 +106,24 @@ describe('core/image', () => {
       />,
     );
     expect(screen.getByText('Pick or upload an image')).toBeInTheDocument();
+  });
+
+  // Issue #250 — WCAG 2.1 AA: every interactive surface must score clean.
+  it('Edit component has no axe a11y violations (with alt)', async () => {
+    const { container } = render(
+      <ImageEdit
+        attributes={{
+          url: 'https://example.com/a.png',
+          alt: 'A descriptive alt text',
+          width: 800,
+          height: 600,
+        }}
+        setAttributes={() => undefined}
+        isSelected={false}
+        clientId="img-axe"
+        context={{}}
+      />,
+    );
+    await assertNoAxeViolations(container);
   });
 });
