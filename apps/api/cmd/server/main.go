@@ -42,6 +42,36 @@ import (
 const serviceName = "api"
 
 func main() {
+	// --print-config is an operator-facing escape hatch: load the config
+	// from the environment, dump it (secrets masked) to stderr, and exit 0
+	// without ever opening the listener. Useful when a prod container is
+	// crash-looping on boot and the operator needs to verify "what did
+	// THIS process see" without attaching a debugger. We check os.Args
+	// directly rather than reach for flag.Parse because the rest of main
+	// doesn't take flags and we don't want to grow a surface for one
+	// short-circuit.
+	for _, a := range os.Args[1:] {
+		if a == "--print-config" || a == "-print-config" {
+			cfg, err := config.Load()
+			if err != nil {
+				// Print the error to stderr so operators see WHAT failed,
+				// then dump whatever did load (Load returns a partial cfg
+				// on error) so they can see what env vars were honored.
+				fmt.Fprintf(os.Stderr, "config: %v\n", err)
+			}
+			if cfg != nil {
+				if dumpErr := config.Dump(*cfg, os.Stderr); dumpErr != nil {
+					fmt.Fprintf(os.Stderr, "dump: %v\n", dumpErr)
+					os.Exit(1)
+				}
+			}
+			if err != nil {
+				os.Exit(1)
+			}
+			os.Exit(0)
+		}
+	}
+
 	if err := run(context.Background()); err != nil {
 		fmt.Fprintf(os.Stderr, "fatal: %v\n", err)
 		os.Exit(2)
