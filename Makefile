@@ -130,6 +130,13 @@ redis-cli: ## Open redis-cli against the dev redis.
 	@docker compose exec redis redis-cli
 
 # ---------------------------------------------------------------------------
+# Bench
+
+.PHONY: bench
+bench: ## Run the in-tree `gonext bench` synthetic load runner (short smoke).
+	@cd cli/gonext && go run . bench --vus 5 --duration 30s --ramp 5s --no-slo
+
+# ---------------------------------------------------------------------------
 # Maintenance
 
 .PHONY: tidy clean
