@@ -83,7 +83,8 @@ type LogConfig struct {
 // This is the only field that is REQUIRED (and the only one without a default).
 type DatabaseConfig struct {
 	// URL is required. Format: postgres://user:pass@host:port/db
-	URL string
+	// Contains the database password embedded in the DSN; redacted in dumps.
+	URL string `redact:"true"`
 
 	// Connection pool. Defaults: Max=25, MaxIdle=5, lifetimes per pgx best-practice.
 	MaxOpenConns    int
@@ -104,8 +105,9 @@ type DatabaseConfig struct {
 // RedisConfig is the Redis connection.
 //
 // URL is required for production. In dev, defaults to redis://localhost:6379/0.
+// May embed a password (redis://:pw@host:port); redacted in dumps.
 type RedisConfig struct {
-	URL          string
+	URL          string `redact:"true"`
 	PoolSize     int
 	MinIdleConns int
 	DialTimeout  time.Duration
@@ -121,8 +123,8 @@ type StorageConfig struct {
 	Endpoint  string // empty = AWS default; set for MinIO/R2/etc.
 	Region    string
 	Bucket    string
-	AccessKey string
-	SecretKey string
+	AccessKey string `redact:"true"`
+	SecretKey string `redact:"true"`
 	UseSSL    bool
 	PathStyle bool // required for MinIO; off for AWS
 }
@@ -136,15 +138,15 @@ type AuthConfig struct {
 	// Pepper is the secret HMAC'd into the password-hash input. Rotation
 	// is supported in packages/go/auth/password — see that package.
 	// Required. Honors GONEXT_AUTH_PEPPER.
-	Pepper string
+	Pepper string `redact:"true"`
 
 	// SessionSecret signs session cookies. Required. Honors
 	// GONEXT_AUTH_SESSION_SECRET.
-	SessionSecret string
+	SessionSecret string `redact:"true"`
 
 	// CSRFSecret signs anti-CSRF tokens (public-form variant). Required.
 	// Honors GONEXT_AUTH_CSRF_SECRET.
-	CSRFSecret string
+	CSRFSecret string `redact:"true"`
 
 	// SessionTTL is the cookie lifetime. Default 30 days.
 	SessionTTL time.Duration
