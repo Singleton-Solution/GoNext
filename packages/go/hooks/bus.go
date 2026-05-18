@@ -60,6 +60,19 @@ type Bus struct {
 	// shutdown, eventually) can wait for them to finish. Internal use
 	// only — not exported because the contract is "fire and forget".
 	asyncWG sync.WaitGroup
+
+	// actionOpts stores per-action-name configuration set via
+	// SetActionOptions. Currently the only entry is OrderedAsync (see
+	// ordered.go). sync.Map matches actions/filters above: read-heavy,
+	// rare writes at startup, key set grows over time.
+	actionOpts sync.Map // map[string]OrderedAsync
+
+	// ordered is the lazy-initialized dispatcher for strict-ordered
+	// async actions. The first ordered Do creates it; subsequent calls
+	// reuse the same instance. atomic.Pointer is the right shape for
+	// "create-once, read-many" without a sync.Once because the dispatcher
+	// owns a background reaper that needs to live for the bus's lifetime.
+	ordered atomic.Pointer[orderedDispatcher]
 }
 
 // chainSlot holds a single hook's handler chain plus the mutex that
@@ -551,13 +564,31 @@ func (b *Bus) Do(ctx context.Context, name string, args ...any) error {
 		return nil
 	}
 
+	// If this action is configured for strict-ordered async dispatch and
+	// has at least one async subscriber, bundle all async subscribers into
+	// a single per-key job so they fire as a unit in submission order
+	// across same-key events. Sync subscribers still run inline below.
+	var orderedOpts OrderedAsync
+	hasOrdered := false
+	if v, ok := b.actionOpts.Load(name); ok {
+		if oa, ok2 := v.(OrderedAsync); ok2 && oa.KeyFn != nil {
+			orderedOpts = oa
+			hasOrdered = true
+		}
+	}
+
 	var errs []error
+	var asyncRegs chain
 	for i, reg := range *snapshot {
 		if !reg.active.Load() {
 			continue
 		}
 		if reg.async {
-			b.dispatchAsync(ctx, name, reg, args)
+			if hasOrdered {
+				asyncRegs = append(asyncRegs, reg)
+			} else {
+				b.dispatchAsync(ctx, name, reg, args)
+			}
 			continue
 		}
 		err := b.invokeAction(ctx, name, i, reg, args)
@@ -565,10 +596,43 @@ func (b *Bus) Do(ctx context.Context, name string, args ...any) error {
 			errs = append(errs, err)
 		}
 	}
+
+	if hasOrdered && len(asyncRegs) > 0 {
+		key := b.safeKey(ctx, name, orderedOpts, args)
+		d := b.orderedDispatcher()
+		if err := d.dispatch(ctx, name, key, orderedOpts, asyncRegs, args); err != nil {
+			// Backlog / context errors are surfaced to the caller via
+			// errs so Do's contract — "errors from this dispatch" —
+			// covers ordered-async drops too. We chose to include this
+			// in the aggregated error (rather than silently log) because
+			// a backlog drop means the event did not reach any
+			// subscriber, which is materially different from an async
+			// handler returning an error.
+			errs = append(errs, err)
+		}
+	}
+
 	if len(errs) == 0 {
 		return nil
 	}
 	return errors.Join(errs...)
+}
+
+// safeKey calls the OrderedAsync KeyFn with panic recovery. A panicking
+// KeyFn falls back to the empty key — every event lands on the same worker
+// — which preserves "at most one panic per misconfigured action" rather
+// than failing every Do.
+func (b *Bus) safeKey(ctx context.Context, name string, opts OrderedAsync, args []any) (key string) {
+	defer func() {
+		if r := recover(); r != nil {
+			b.log().ErrorContext(ctx, "OrderedAsync KeyFn panicked; using empty key",
+				slog.String("hook", name),
+				slog.Any("recovered", r),
+			)
+			key = ""
+		}
+	}()
+	return opts.KeyFn(args)
 }
 
 // ApplyFilters runs the filter chain for `name`, threading `value` through
