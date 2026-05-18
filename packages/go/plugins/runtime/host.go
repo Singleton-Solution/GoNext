@@ -151,6 +151,15 @@ func (r *Runtime) hostGnLog(ctx context.Context, mod api.Module, stack []uint64)
 	default:
 		r.logger.Info(msg, slog.String("plugin", mod.Name()))
 	}
+
+	// Fan the event out to the optional LogPublisher (the dev CLI's
+	// log-streaming endpoint subscribes here). Publish MUST be
+	// non-blocking; the contract is documented on the LogPublisher
+	// interface. We deliberately do this AFTER the slog write so a
+	// misbehaving subscriber can't suppress the structured log.
+	if r.logPublisher != nil {
+		r.logPublisher.Publish(mod.Name(), level, msg)
+	}
 }
 
 // hostGnPanic implements env.gn_panic. Signature: (ptr i32, len i32).

@@ -36,6 +36,28 @@ func readManifestCapabilities(projectDir string) ([]string, error) {
 	return dedupSorted(stub.Capabilities), nil
 }
 
+// readManifestName returns the "name" field of the project's
+// manifest.json. Used by the --logs flag to identify which per-plugin
+// log stream to subscribe to. Errors propagate so the caller can
+// disable log tailing rather than connecting to a wrong endpoint.
+func readManifestName(projectDir string) (string, error) {
+	path := filepath.Join(projectDir, "manifest.json")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	var stub struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(body, &stub); err != nil {
+		return "", err
+	}
+	if stub.Name == "" {
+		return "", fmt.Errorf("manifest %q has no name field", path)
+	}
+	return stub.Name, nil
+}
+
 // dedupSorted returns in sorted with duplicates collapsed. We return a
 // fresh slice so the caller can store it as the "previous" snapshot
 // without worrying about backing-array aliasing.
