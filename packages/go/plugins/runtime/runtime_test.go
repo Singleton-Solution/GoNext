@@ -290,6 +290,64 @@ func TestHost_GnLog(t *testing.T) {
 	}
 }
 
+// recordingPublisher captures gn_log fan-out for the TestHost_GnLog_
+// Publisher test. The contract is that hostGnLog calls Publish
+// exactly once per gn_log invocation, after the structured-logger
+// write, with the module name, raw int32 level, and decoded message.
+type recordingPublisher struct {
+	mu    sync.Mutex
+	calls []recordedLog
+}
+
+type recordedLog struct {
+	module  string
+	level   int32
+	message string
+}
+
+func (p *recordingPublisher) Publish(module string, level int32, message string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.calls = append(p.calls, recordedLog{module, level, message})
+}
+
+func (p *recordingPublisher) snapshot() []recordedLog {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	out := make([]recordedLog, len(p.calls))
+	copy(out, p.calls)
+	return out
+}
+
+// TestHost_GnLog_Publisher verifies the WithLogPublisher seam: a
+// runtime configured with a publisher must invoke its Publish exactly
+// once per guest gn_log call, with the correct module, level, and
+// decoded message. This is the load-bearing test for the dev-CLI log
+// streaming feature.
+func TestHost_GnLog_Publisher(t *testing.T) {
+	pub := &recordingPublisher{}
+	rt, _ := newTestRuntime(t, WithLogPublisher(pub))
+	ctx := context.Background()
+	mod, err := rt.LoadModule(ctx, "logger", wasmLog)
+	if err != nil {
+		t.Fatalf("LoadModule: %v", err)
+	}
+	defer mod.Close(ctx)
+	if _, err := mod.Call(ctx, "say_hi"); err != nil {
+		t.Fatalf("Call: %v", err)
+	}
+	calls := pub.snapshot()
+	if len(calls) != 1 {
+		t.Fatalf("publisher call count: got %d want 1; calls=%+v", len(calls), calls)
+	}
+	if calls[0].module != "logger" {
+		t.Errorf("module: got %q want %q", calls[0].module, "logger")
+	}
+	if calls[0].message != "hi from plugin" {
+		t.Errorf("message: got %q want %q", calls[0].message, "hi from plugin")
+	}
+}
+
 func TestHost_GnTimeMs(t *testing.T) {
 	// Pin time so the test is deterministic.
 	fixed := time.Date(2026, 5, 17, 12, 0, 0, 0, time.UTC)

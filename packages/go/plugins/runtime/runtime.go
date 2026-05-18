@@ -34,6 +34,23 @@ const hostModuleName = "env"
 // time.Now.
 type TimeSource func() time.Time
 
+// LogPublisher is the seam the debug package (and any future
+// log-sink) uses to receive gn_log events as they happen. Each
+// gn_log call from any module triggers exactly one Publish, with the
+// runtime supplying the module name, the int32 level the guest passed,
+// and the decoded message string.
+//
+// Implementations MUST be non-blocking: this is called from the wazero
+// host-function thread, and any back-pressure would stall every plugin
+// that logs. The reference implementation (debug.LogHub) drops on a
+// full subscriber buffer rather than waiting.
+//
+// Publish runs on whichever goroutine called Module.Call; nothing in
+// the runtime serialises it.
+type LogPublisher interface {
+	Publish(module string, level int32, message string)
+}
+
 // Runtime is the wazero-backed WebAssembly host.
 //
 // One Runtime per process is the intended pattern — it owns the wazero
@@ -82,6 +99,16 @@ type Runtime struct {
 	// no WithLimits is supplied, New installs a defaults-backed
 	// enforcer so Module.Call has a single uniform code path.
 	enforcer *limits.Enforcer
+
+	// logPublisher is the optional sink hostGnLog forwards to AFTER
+	// the structured-logger write. nil when no publisher has been
+	// installed; the host function nil-checks before each call to
+	// keep the fast path branch-predictable.
+	//
+	// This is the seam that the dev CLI's log streaming uses (#271):
+	// the debug.LogHub satisfies LogPublisher and is registered here
+	// at construction by WithLogPublisher.
+	logPublisher LogPublisher
 }
 
 // wazeroRuntime is an alias for wazero.Runtime, kept under a local
@@ -114,6 +141,7 @@ type runtimeConfig struct {
 	timeSource       TimeSource
 	memoryLimitPages uint32
 	extraHosts       []HostModuleBuilder
+	logPublisher     LogPublisher
 
 	// limits, when non-nil, overrides the default resource envelope.
 	// nil means "use limits.Default()". The separate flag (instead of
@@ -169,6 +197,24 @@ func WithHostModule(b HostModuleBuilder) Option {
 		if b != nil {
 			c.extraHosts = append(c.extraHosts, b)
 		}
+	}
+}
+
+// WithLogPublisher installs a sink for gn_log calls. Each guest
+// gn_log invocation will, in addition to the structured-logger write,
+// invoke p.Publish with the module name, the raw int32 level, and the
+// decoded message. Passing nil clears the publisher.
+//
+// The intended consumer is the debug package's LogHub, which fans the
+// events out to subscribers (the dev CLI's `--logs` flag). Production
+// hosts that don't want streaming leave this unset.
+//
+// Multiple WithLogPublisher calls keep only the last value — there is
+// no chaining. Callers that want fan-out should compose their own
+// publisher and pass that one.
+func WithLogPublisher(p LogPublisher) Option {
+	return func(c *runtimeConfig) {
+		c.logPublisher = p
 	}
 }
 
@@ -242,12 +288,13 @@ func New(ctx context.Context, opts ...Option) (*Runtime, error) {
 	wRT := wazero.NewRuntimeWithConfig(ctx, wazeroCfg)
 
 	rt := &Runtime{
-		wazeroRT:   wRT,
-		logger:     cfg.logger,
-		timeSource: cfg.timeSource,
-		modules:    make(map[string]*Module),
-		extraHosts: cfg.extraHosts,
-		enforcer:   enforcer,
+		wazeroRT:     wRT,
+		logger:       cfg.logger,
+		timeSource:   cfg.timeSource,
+		modules:      make(map[string]*Module),
+		extraHosts:   cfg.extraHosts,
+		enforcer:     enforcer,
+		logPublisher: cfg.logPublisher,
 	}
 
 	// Register the built-in "env" host module that exposes the minimum
