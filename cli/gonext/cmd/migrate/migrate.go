@@ -30,6 +30,7 @@ Subcommands:
   up               Apply every pending up migration. Idempotent.
   down [N]         Roll back N migrations (default 1). Pass 0 to roll back ALL.
   status           Print the current schema version and dirty flag.
+  wp               Import a WordPress WXR export. See 'migrate wp --help'.
 
 Environment:
   DATABASE_URL              Required. Postgres DSN.
@@ -59,6 +60,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runDown(args[1:], stdout, stderr)
 	case "status":
 		return runStatus(args[1:], stdout, stderr)
+	case "wp":
+		return runWP(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "gonext migrate: unknown subcommand %q\n\n%s\n", args[0], usage)
 		return ExitUsage
