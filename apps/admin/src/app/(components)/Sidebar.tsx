@@ -37,6 +37,11 @@ const NAV_ITEMS: readonly NavItem[] = [
   // most users will reach it through the always-visible search input.
   { href: '/search', label: 'Search', icon: 'Sr' },
   { href: '/plugins', label: 'Plugins', icon: 'Pl' },
+  // Marketplace is the browse + install entry point sibling to the
+  // installed-plugins manager. Adminstrators land here to discover new
+  // plugins; the install flow on this surface reuses the same
+  // CapabilityReview component as the manual install path.
+  { href: '/marketplace', label: 'Marketplace', icon: 'Mk' },
   // Appearance → Site Editor surface (issue #428). The link points
   // at the lite cut today; v0.2 expands the same section with full
   // template editing.
