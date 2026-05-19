@@ -62,6 +62,23 @@ export interface Post {
 }
 
 /**
+ * Public-site configuration the renderer fetches once per request and
+ * stamps into discoverability surfaces (sitemap.xml, Atom feeds,
+ * robots.txt). The Go side reads these from `Config.PublicSite` and
+ * exposes them at `/api/v1/public-site/config`.
+ *
+ * `allowIndex` defaults to `false` so a renderer that can't reach the
+ * API serves a Disallow-everything robots.txt — the safe failure mode
+ * for an unconfigured deployment is "stay out of search results".
+ */
+export interface PublicSiteConfig {
+  /** Canonical origin (e.g. `https://example.com`). No trailing slash. */
+  baseUrl: string;
+  /** Whether crawlers may index this deployment. */
+  allowIndex: boolean;
+}
+
+/**
  * Active-theme summary. We deliberately keep this narrow: the Go side
  * already resolved which theme is active and emitted the CSS custom
  * properties; we only need the bits the renderer mixes into the HTML.
@@ -311,15 +328,24 @@ export async function fetchResolvedTemplate(
  * Fetch the archive feed for the home/archive page. The renderer
  * walks blocks for each entry; the API returns the same `Post`
  * shape as `fetchPostBySlug`, minus heavy fields where applicable.
+ *
+ * Accepts an optional `category` filter (the term slug) for the
+ * per-category Atom feed route — when set the renderer asks the Go
+ * side to narrow the result set rather than over-fetching.
  */
 export async function fetchArchive(
-  query: { postType?: string; limit?: number } = {},
+  query: {
+    postType?: string;
+    limit?: number;
+    category?: string;
+  } = {},
   options: { revalidate?: number } = {},
 ): Promise<Post[]> {
   const params = new URLSearchParams();
   params.set('status', 'published');
   if (query.postType) params.set('postType', query.postType);
   if (query.limit) params.set('limit', String(query.limit));
+  if (query.category) params.set('category', query.category);
   try {
     const raw = await getJson<unknown>(
       `/api/v1/posts?${params.toString()}`,
@@ -333,6 +359,38 @@ export async function fetchArchive(
       .filter((p): p is Post => p !== null);
   } catch (err) {
     if (err instanceof ApiError && err.status === 0) return [];
+    throw err;
+  }
+}
+
+/**
+ * Fetch the public-site config the renderer needs for discoverability
+ * surfaces. Falls back to a safe (no-base-url, no-index) shape if the
+ * endpoint is unreachable — the route handlers degrade rather than
+ * 500.
+ *
+ * TODO(#public-site-config): wire `/api/v1/public-site/config` on the
+ * Go side once the renderer ships these endpoints. Until then the
+ * fallback object mirrors `Config.PublicSite` defaults: empty BaseURL,
+ * AllowIndex=false (the staging/dev convention).
+ */
+export async function fetchPublicSiteConfig(
+  options: { revalidate?: number } = {},
+): Promise<PublicSiteConfig> {
+  const fallback: PublicSiteConfig = { baseUrl: '', allowIndex: false };
+  try {
+    const raw = await getJson<unknown>('/api/v1/public-site/config', options);
+    if (!raw || typeof raw !== 'object') return fallback;
+    const r = raw as Record<string, unknown>;
+    const baseUrl = typeof r.baseUrl === 'string' ? r.baseUrl : '';
+    const allowIndex = typeof r.allowIndex === 'boolean' ? r.allowIndex : false;
+    // Defensive: strip a trailing slash if the API forgot to.
+    return {
+      baseUrl: baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl,
+      allowIndex,
+    };
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 0) return fallback;
     throw err;
   }
 }

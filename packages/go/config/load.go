@@ -319,6 +319,27 @@ func Load(opts ...LoadOption) (*Config, error) {
 		}
 	}
 
+	// ---- PublicSite ----
+	// BaseURL has no default — an empty value is the meaningful
+	// "renderer not yet configured" state and the apps/web side
+	// degrades gracefully. We trim a trailing slash if the operator
+	// supplied one so downstream concatenation produces a single
+	// "/" separator.
+	cfg.PublicSite.BaseURL = strings.TrimRight(
+		getString(e, "GONEXT_PUBLIC_SITE_BASE_URL", ""),
+		"/",
+	)
+	// AllowIndex defaults to (Env == EnvProduction). Staging, dev,
+	// and test deployments all default to non-indexable; an operator
+	// can flip the env var if they really want their staging host
+	// crawled.
+	allowIndexDefault := cfg.Env == EnvProduction
+	if b, err := getBool(e, "GONEXT_PUBLIC_SITE_ALLOW_INDEX", allowIndexDefault); err != nil {
+		errs = append(errs, err)
+	} else {
+		cfg.PublicSite.AllowIndex = b
+	}
+
 	if len(errs) > 0 {
 		return cfg, joinErrs(errs)
 	}

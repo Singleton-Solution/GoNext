@@ -64,6 +64,14 @@ type Config struct {
 	// welcome, comment notifications). See [EmailConfig] for the
 	// provider/SMTP/credential matrix.
 	Email EmailConfig
+
+	// PublicSite groups settings for the public-facing Next.js
+	// renderer (apps/web): the canonical base URL stamped into
+	// sitemap entries / Atom feed self-links, and whether search
+	// engines are allowed to index the deployment. The renderer
+	// fetches these values from the API at boot so a single source
+	// of truth lives here on the Go side.
+	PublicSite PublicSiteConfig
 }
 
 // PerformanceConfig groups opt-out toggles for the performance
@@ -337,4 +345,36 @@ type EmailConfig struct {
 	// password-reset bodies. Empty hides the "contact support" line.
 	// Honors GONEXT_EMAIL_SUPPORT.
 	SupportEmail string
+}
+
+// PublicSiteConfig configures the discoverability surfaces served by
+// the public renderer (apps/web): sitemap.xml, Atom feeds, robots.txt.
+//
+// BaseURL is the canonical origin the renderer stamps into XML
+// `<loc>` elements, Atom `<id>` / `<link rel="self">` URIs, and the
+// `Sitemap:` line in robots.txt. It must be an absolute URL with no
+// trailing slash — the renderer's builders concatenate paths directly.
+//
+// AllowIndex is the kill-switch for non-production hosts. When false,
+// robots.txt emits `User-agent: *` + `Disallow: /` so staging and
+// preview deployments don't accidentally rank for their public
+// content. The default depends on Env:
+//
+//   - EnvProduction => AllowIndex defaults to true
+//   - everything else (development, staging, test) => false
+//
+// Operators can override either direction via
+// GONEXT_PUBLIC_SITE_ALLOW_INDEX.
+type PublicSiteConfig struct {
+	// BaseURL is the canonical origin (e.g. "https://example.com").
+	// No trailing slash; the renderer joins paths verbatim. Empty
+	// disables every absolute-URL surface (sitemap entries skip
+	// `<loc>`, feed self-links degrade to a placeholder). Honors
+	// GONEXT_PUBLIC_SITE_BASE_URL.
+	BaseURL string
+
+	// AllowIndex toggles whether robots.txt allows search engine
+	// crawling. Defaults to (Env == EnvProduction). Honors
+	// GONEXT_PUBLIC_SITE_ALLOW_INDEX.
+	AllowIndex bool
 }

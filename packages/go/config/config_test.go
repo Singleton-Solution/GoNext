@@ -327,6 +327,76 @@ func TestLoad_PluginsBadBool_Errors(t *testing.T) {
 	}
 }
 
+func TestLoad_PublicSiteDefaults(t *testing.T) {
+	// Default Env is development; AllowIndex should default to false
+	// (only production sites are indexable by default) and BaseURL is
+	// empty until an operator wires it.
+	cfg, err := Load(WithEnv(fixture()))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.PublicSite.BaseURL != "" {
+		t.Errorf("PublicSite.BaseURL default: got %q, want %q", cfg.PublicSite.BaseURL, "")
+	}
+	if cfg.PublicSite.AllowIndex != false {
+		t.Errorf("PublicSite.AllowIndex (dev) default: got %v, want false", cfg.PublicSite.AllowIndex)
+	}
+}
+
+func TestLoad_PublicSiteAllowIndexDefaultsTrueInProduction(t *testing.T) {
+	cfg, err := Load(WithEnv(fixture(map[string]string{
+		"GONEXT_ENV": "production",
+	})))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.PublicSite.AllowIndex != true {
+		t.Errorf("PublicSite.AllowIndex (prod) default: got %v, want true", cfg.PublicSite.AllowIndex)
+	}
+}
+
+func TestLoad_PublicSiteOverridesHonored(t *testing.T) {
+	cfg, err := Load(WithEnv(fixture(map[string]string{
+		"GONEXT_PUBLIC_SITE_BASE_URL":    "https://example.com/",
+		"GONEXT_PUBLIC_SITE_ALLOW_INDEX": "true",
+	})))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	// Trailing slash should be trimmed so callers can do BaseURL+"/path"
+	// without worrying about double slashes.
+	if cfg.PublicSite.BaseURL != "https://example.com" {
+		t.Errorf("PublicSite.BaseURL: got %q, want %q", cfg.PublicSite.BaseURL, "https://example.com")
+	}
+	if !cfg.PublicSite.AllowIndex {
+		t.Errorf("PublicSite.AllowIndex override: got false, want true")
+	}
+}
+
+func TestLoad_PublicSiteAllowIndexFalseInProductionWhenSet(t *testing.T) {
+	// Operator can still opt OUT of indexing in production (e.g. during
+	// an initial soft-launch where the site exists but shouldn't rank).
+	cfg, err := Load(WithEnv(fixture(map[string]string{
+		"GONEXT_ENV":                     "production",
+		"GONEXT_PUBLIC_SITE_ALLOW_INDEX": "false",
+	})))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.PublicSite.AllowIndex {
+		t.Errorf("PublicSite.AllowIndex (prod, opt-out): got true, want false")
+	}
+}
+
+func TestLoad_PublicSiteBadBool_Errors(t *testing.T) {
+	_, err := Load(WithEnv(fixture(map[string]string{
+		"GONEXT_PUBLIC_SITE_ALLOW_INDEX": "totally",
+	})))
+	if err == nil || !strings.Contains(err.Error(), "GONEXT_PUBLIC_SITE_ALLOW_INDEX") {
+		t.Errorf("expected bool parse error for GONEXT_PUBLIC_SITE_ALLOW_INDEX, got: %v", err)
+	}
+}
+
 func TestLoad_ReturnsConcreteError(t *testing.T) {
 	// errors.Join returns a non-nil error; ensure errors.Is/As still work
 	// the way we expect (won't match a sentinel since we don't have one,

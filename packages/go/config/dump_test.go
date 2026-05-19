@@ -239,6 +239,10 @@ func TestDump_Golden(t *testing.T) {
 			BrandName: "GoNext", BrandColor: "#2563eb",
 			SiteURL: "https://example.com/", SupportEmail: "help@example.com",
 		},
+		PublicSite: PublicSiteConfig{
+			BaseURL:    "https://example.com",
+			AllowIndex: true,
+		},
 	}
 
 	want := strings.Join([]string{
@@ -275,6 +279,8 @@ func TestDump_Golden(t *testing.T) {
 		"Performance.EarlyHints=true",
 		"Plugins.DevMode=false",
 		"Plugins.DevToken=" + expectedMask(""),
+		"PublicSite.AllowIndex=true",
+		"PublicSite.BaseURL=https://example.com",
 		"RUM.Enabled=false",
 		"RUM.SampleRate=1",
 		"Redis.DialTimeout=5s",
