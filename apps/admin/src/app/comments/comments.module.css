@@ -1,0 +1,342 @@
+/*
+ * Scoped styles for the Comments admin surface.
+ *
+ * Mirrors the posts.module.css conventions so the two list screens
+ * feel like siblings. When the design-system extraction lands
+ * (issue #34) these primitives migrate to design tokens; until
+ * then keeping them local to the route means a future rename is a
+ * single directory delete.
+ */
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.chipGroup {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chip {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 4px var(--space-3);
+  font-size: 13px;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--color-accent);
+}
+
+.chipActive {
+  background: var(--color-accent);
+  color: white;
+  border-color: var(--color-accent);
+}
+
+.chipActive:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.bulkBar {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.bulkSelect {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-2);
+  font: inherit;
+  background: var(--color-surface);
+}
+
+.bulkApply {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 4px var(--space-3);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.bulkApply:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tableWrap {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table thead {
+  background: var(--color-bg);
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.avatar {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--color-border);
+}
+
+.excerpt {
+  max-width: 360px;
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.postLink {
+  color: var(--color-accent);
+  font-size: 13px;
+}
+
+.quickActions {
+  display: inline-flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.quickAction {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 2px var(--space-2);
+  font-size: 12px;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.quickAction:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.quickAction:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px var(--space-2);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.badgePending {
+  background: #fef7e0;
+  color: #92740c;
+  border-color: #f7e6a2;
+}
+
+.badgeApproved {
+  background: #e6f4ea;
+  color: #137333;
+  border-color: #c1e3cb;
+}
+
+.badgeSpam {
+  background: #fff3e0;
+  color: #b15c00;
+  border-color: #f1c889;
+}
+
+.badgeTrash {
+  background: #fce8e6;
+  color: #c5221f;
+  border-color: #f4c7c3;
+}
+
+.empty {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-8);
+  text-align: center;
+}
+
+.empty h2 {
+  font-size: 18px;
+  margin-bottom: var(--space-2);
+}
+
+.empty p {
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-4);
+}
+
+.error {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid #c5221f;
+  border-radius: var(--radius);
+  padding: var(--space-6);
+}
+
+.loadMoreWrap {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-4);
+}
+
+.headerBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--space-4);
+}
+
+@media (max-width: 800px) {
+  .detail {
+    grid-template-columns: 1fr;
+  }
+}
+
+.detailCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+}
+
+.detailHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.replyForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.replyTextarea {
+  width: 100%;
+  min-height: 80px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.replyTextarea:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+  border-color: var(--color-accent);
+}
+
+.replyActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.replyButton {
+  background: var(--color-accent);
+  color: white;
+  border: 0;
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-4);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.replyButton:hover {
+  background: var(--color-accent-hover);
+}
+
+.replyButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.threadList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.threadItem {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+}
+
+.threadItemActive {
+  border-color: var(--color-accent);
+  background: var(--color-surface);
+}
+
+.metaRow {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  margin-bottom: var(--space-2);
+  font-size: 13px;
+  color: var(--color-text-muted);
+  flex-wrap: wrap;
+}
