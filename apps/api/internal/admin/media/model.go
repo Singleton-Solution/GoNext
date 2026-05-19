@@ -58,6 +58,30 @@ type Asset struct {
 	UploaderID string    `json:"uploader_id"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
+
+	// Variants is the list of generated renditions (thumbnail,
+	// medium, large, re-encoded original) the upload-time image-
+	// processing pipeline produced. Populated by the worker via
+	// Store.MarkProcessed after the media.process task runs. Empty
+	// for non-image assets and for image assets whose processing has
+	// not yet completed; clients should treat absence as "fall back
+	// to the original via PublicURL".
+	Variants []Variant `json:"variants,omitempty"`
+}
+
+// Variant is one rendition produced by packages/go/media/imageproc.
+// Mirrors the imageproc.ManifestEntry shape; defined locally so the
+// REST package's wire surface does not leak the internal package's
+// type names into JSON consumers. PublicURL is computed at render
+// time the same way Asset.PublicURL is.
+type Variant struct {
+	Name       string `json:"name"`
+	Format     string `json:"format"`
+	Width      int    `json:"width"`
+	Height     int    `json:"height"`
+	StorageKey string `json:"storage_key"`
+	MimeType   string `json:"mime_type"`
+	PublicURL  string `json:"public_url,omitempty"`
 }
 
 // AssetCreate is the input shape for Store.Insert. Separated from
@@ -143,6 +167,14 @@ type Store interface {
 	// SoftDelete sets deleted_at on the row. Returns ErrNotFound if no
 	// active row matches.
 	SoftDelete(ctx context.Context, id string) error
+
+	// SetVariants records the renditions produced by the image-
+	// processing pipeline on the asset's row. Called by the worker
+	// once the media.process task has written variants to storage;
+	// idempotent — re-running on the same asset replaces the
+	// previous variant list. Returns ErrNotFound if the asset has
+	// been soft-deleted between enqueue and handler.
+	SetVariants(ctx context.Context, id string, variants []Variant) error
 }
 
 // ErrNotFound is the sentinel returned by store reads when the row is
@@ -166,6 +198,26 @@ type ObjectPutter interface {
 	// implementation chooses between path-style and virtual-host
 	// addressing based on its configured storage layout.
 	PublicURL(key string) string
+}
+
+// ProcessEnqueuer fires the upload-time image-processing pipeline.
+// The upload handler invokes Enqueue after the row is committed; the
+// worker runs the corresponding handler from packages/go/media/imageproc
+// and calls Store.SetVariants when the variants land in storage.
+//
+// Implementations live outside this package — production wires a
+// thin adapter around taskspec.Enqueue; tests use an in-process
+// closure that runs the handler synchronously. Defined here because
+// the handler's dependency bag should be the one place that names
+// all the collaborators.
+type ProcessEnqueuer interface {
+	// Enqueue requests processing for the asset whose original bytes
+	// were just uploaded to storageKey. A non-nil error from this
+	// method does NOT fail the upload — the row and S3 object are
+	// already committed, and a worker-queue outage should not lose
+	// uploads. The handler logs and moves on; an operator can rerun
+	// processing later via an admin reprocess endpoint.
+	Enqueue(ctx context.Context, assetID, storageKey, mimeType string) error
 }
 
 // disallowedMimePrefixes is the set of sniffed MIME types we refuse on

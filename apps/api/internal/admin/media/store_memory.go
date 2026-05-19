@@ -24,12 +24,12 @@ import (
 // library moves to a Postgres backend that doesn't need this struct
 // in the first place.
 type MemoryStore struct {
-	mu       sync.RWMutex
-	rows     map[string]*memRow
-	byHash   map[string]string // hex(sha256) → id
-	byKey    map[string]string // storage_key → id
-	clock    func() time.Time
-	idGen    func() string
+	mu     sync.RWMutex
+	rows   map[string]*memRow
+	byHash map[string]string // hex(sha256) → id
+	byKey  map[string]string // storage_key → id
+	clock  func() time.Time
+	idGen  func() string
 }
 
 type memRow struct {
@@ -250,6 +250,28 @@ func (s *MemoryStore) SoftDelete(_ context.Context, id string) error {
 	now := s.clock().UTC()
 	row.deletedAt = &now
 	row.UpdatedAt = now
+	return nil
+}
+
+// SetVariants replaces the variant list on the asset's row. Used by
+// the worker after the media.process task writes variants to storage.
+// Idempotent: a re-run overwrites the previous list. The clock
+// advances so the UpdatedAt column reflects the variant-write rather
+// than the original insert.
+func (s *MemoryStore) SetVariants(_ context.Context, id string, variants []Variant) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	row, ok := s.rows[id]
+	if !ok || row.deletedAt != nil {
+		return ErrNotFound
+	}
+	// Copy so callers can mutate the input slice without poisoning
+	// the row. Variants are small and the volume per asset is fixed
+	// (four entries per format), so the copy is cheap.
+	out := make([]Variant, len(variants))
+	copy(out, variants)
+	row.Variants = out
+	row.UpdatedAt = s.clock().UTC()
 	return nil
 }
 
