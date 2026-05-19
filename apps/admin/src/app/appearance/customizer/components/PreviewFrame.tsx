@@ -25,12 +25,17 @@ export interface PreviewFrameProps {
   overrides: ThemeOverrides;
   /** Optional path to preview inside the public site. Defaults to /. */
   previewPath?: string;
+  /** Optional fixed pixel width for the iframe. Drives the
+   *  responsive preview when the BreakpointEditor locks the iframe to
+   *  a specific viewport. */
+  frameWidth?: number | null;
 }
 
 export function PreviewFrame({
   publicSiteUrl,
   overrides,
   previewPath = '/',
+  frameWidth = null,
 }: PreviewFrameProps): ReactElement {
   // Derive the iframe src from the inputs. useMemo keeps the URL
   // stable across renders that don't actually change the override —
@@ -41,13 +46,20 @@ export function PreviewFrame({
     [publicSiteUrl, previewPath, overrides],
   );
 
+  // When the breakpoint editor locks the preview to a specific width,
+  // both the iframe's HTML `width` attribute and its CSS width have to
+  // pin. We surface the width as a data attribute too so tests can
+  // assert without relying on style parsing.
+  const widthAttr = frameWidth && frameWidth > 0 ? frameWidth : undefined;
+
   return (
-    <div className="customizer-preview">
+    <div className="customizer-preview" data-frame-width={widthAttr ?? 'full'}>
       <iframe
         title="Theme preview"
         src={src}
         className="customizer-preview__frame"
         data-testid="customizer-preview-frame"
+        {...(widthAttr ? { width: widthAttr, style: { width: `${widthAttr}px` } } : {})}
       />
     </div>
   );

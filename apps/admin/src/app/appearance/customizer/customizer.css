@@ -213,3 +213,197 @@
   font-size: 12px;
   margin: var(--space-1) 0 0;
 }
+
+/*
+ * Advanced surface — spacing scale, shadow presets, layout grid,
+ * breakpoints. Each editor sits inside a <details> group nested
+ * under a single collapsible <section>. Layout-wise the panels
+ * inherit the sidebar's column width, so each row is dense vertical.
+ */
+
+.customizer-advanced__toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+}
+
+.customizer-advanced__toggle:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.customizer-advanced__chevron {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 16px;
+  color: var(--color-text-muted);
+}
+
+.customizer-advanced__panels {
+  margin-top: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.customizer-advanced__group {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+}
+
+.customizer-advanced__group > summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  padding: var(--space-1) 0;
+}
+
+.customizer-advanced__panel {
+  margin-top: var(--space-2);
+}
+
+.spacing-scale-editor__list,
+.shadow-presets-editor__list,
+.breakpoint-editor__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.spacing-scale-editor__row,
+.shadow-presets-editor__row,
+.breakpoint-editor__row,
+.layout-grid-editor__row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.spacing-scale-editor__meta,
+.shadow-presets-editor__head,
+.breakpoint-editor__meta,
+.layout-grid-editor__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.spacing-scale-editor__slug,
+.shadow-presets-editor__slug,
+.breakpoint-editor__slug {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.shadow-presets-editor__slider {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2px;
+}
+
+.shadow-presets-editor__readout {
+  margin-left: var(--space-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.shadow-presets-editor__color label,
+.breakpoint-editor__input label,
+.layout-grid-editor__inputs label {
+  display: block;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-bottom: 2px;
+}
+
+.shadow-presets-editor__color input,
+.breakpoint-editor__input input,
+.layout-grid-editor__inputs input,
+.layout-grid-editor__row input[type='text'] {
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.layout-grid-editor__inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.breakpoint-editor__active-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: var(--space-2) 0;
+}
+
+.breakpoint-editor__active-btn {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.breakpoint-editor__active-btn.is-active {
+  background: var(--color-accent);
+  color: white;
+  border-color: var(--color-accent);
+}
+
+.token-preview {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2px;
+}
+
+.token-preview__labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.token-preview__swatch {
+  display: block;
+  background: var(--color-accent);
+  border-radius: 2px;
+}
+
+.token-preview__swatch--shadow {
+  width: 64px;
+  height: 40px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.token-preview__swatch--bar {
+  height: 6px;
+  background: var(--color-accent);
+}
+
+.customizer-preview[data-frame-width]:not([data-frame-width='full']) .customizer-preview__frame {
+  margin: 0 auto;
+  display: block;
+}
