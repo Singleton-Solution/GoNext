@@ -31,6 +31,10 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: '/media', label: 'Media', icon: 'M' },
   { href: '/users', label: 'Users', icon: 'U' },
   { href: '/plugins', label: 'Plugins', icon: 'Pl' },
+  // Appearance → Site Editor surface (issue #428). The link points
+  // at the lite cut today; v0.2 expands the same section with full
+  // template editing.
+  { href: '/appearance/site-editor', label: 'Appearance', icon: 'A' },
   { href: '/settings', label: 'Settings', icon: 'S' },
   // System Status is the operator surface (issue #221). It sits at the
   // bottom of the IA so it doesn't compete with the content-authoring

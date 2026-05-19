@@ -88,7 +88,7 @@ func TestDefaultRoleCapabilities_PerRoleSets(t *testing.T) {
 				CapEditUsers, CapDeleteUsers, CapPromoteUsers,
 				CapInstallPlugins, CapManagePlugins, CapActivatePlugins,
 				CapManagePluginSettings, CapInstallThemes, CapManageThemes,
-				CapSwitchThemes, CapEditThemes,
+				CapSwitchThemes, CapEditThemes, CapThemeEditParts,
 			},
 			mustNotHave: []Capability{
 				CapManageInstall, // reserved for super_admin
