@@ -64,7 +64,60 @@ importers:
         specifier: ^1.6.0
         version: 1.6.1(@types/node@22.19.19)(jsdom@24.1.3)
 
-  apps/web: {}
+  apps/web:
+    dependencies:
+      '@gonext/blocks-core':
+        specifier: workspace:*
+        version: link:../../packages/ts/blocks-core
+      '@gonext/blocks-sdk':
+        specifier: workspace:*
+        version: link:../../packages/ts/blocks-sdk
+      next:
+        specifier: ^15.0.0
+        version: 15.5.18(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.6
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.6(react@19.2.6)
+    devDependencies:
+      '@gonext/test-config':
+        specifier: workspace:*
+        version: link:../../packages/ts/test-config
+      '@testing-library/jest-dom':
+        specifier: ^6.4.0
+        version: 6.9.1
+      '@testing-library/react':
+        specifier: ^16.0.0
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.19
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.3(@types/react@19.2.14)
+      '@vitest/coverage-v8':
+        specifier: ^1.6.0
+        version: 1.6.1(vitest@1.6.1(@types/node@22.19.19)(jsdom@24.1.3))
+      eslint:
+        specifier: ^8.57.0
+        version: 8.57.1
+      eslint-config-next:
+        specifier: ^15.0.0
+        version: 15.5.18(eslint@8.57.1)(typescript@5.9.3)
+      jsdom:
+        specifier: ^24.0.0
+        version: 24.1.3
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@22.19.19)(jsdom@24.1.3)
 
   packages/ts/blocks-core:
     dependencies:

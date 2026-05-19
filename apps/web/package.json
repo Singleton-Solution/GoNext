@@ -2,12 +2,37 @@
   "name": "@gonext/web",
   "version": "0.0.0",
   "private": true,
-  "description": "GoNext public site renderer. Next.js App Router. SSR/SSG/ISR. Themes mount here. Status: skeleton — issue #1 only adds the workspace entry. Real Next.js setup lands in subsequent issues.",
+  "type": "module",
+  "description": "GoNext public site renderer. Next.js App Router. SSR/SSG/ISR. Fetches posts + active theme + template from the API, walks the block tree via @gonext/blocks-core's serverRender hints, wraps the result in the theme's header/footer parts, and returns HTML to the visitor.",
   "scripts": {
-    "build": "echo '@gonext/web build: not yet implemented (see issue #6)'",
-    "dev": "echo '@gonext/web dev: not yet implemented (see issue #6)'",
-    "lint": "echo '@gonext/web lint: not yet implemented'",
-    "test": "echo '@gonext/web test: not yet implemented'",
-    "typecheck": "echo '@gonext/web typecheck: not yet implemented'"
+    "build": "next build",
+    "dev": "next dev -p 3000",
+    "start": "next start -p 3000",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ci": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@gonext/blocks-core": "workspace:*",
+    "@gonext/blocks-sdk": "workspace:*",
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@gonext/test-config": "workspace:*",
+    "@testing-library/jest-dom": "^6.4.0",
+    "@testing-library/react": "^16.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitest/coverage-v8": "^1.6.0",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^15.0.0",
+    "jsdom": "^24.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^1.6.0"
   }
 }
