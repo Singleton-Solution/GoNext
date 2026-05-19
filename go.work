@@ -4,5 +4,6 @@ use (
 	./apps/api
 	./apps/worker
 	./cli/gonext
+	./examples/plugins/seo
 	./packages/go
 )
