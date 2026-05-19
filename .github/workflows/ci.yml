@@ -20,6 +20,7 @@ jobs:
       web: ${{ steps.filter.outputs.web }}
       docs: ${{ steps.filter.outputs.docs }}
       dashboards: ${{ steps.filter.outputs.dashboards }}
+      openapi: ${{ steps.filter.outputs.openapi }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -49,6 +50,10 @@ jobs:
             dashboards:
               - 'deploy/grafana/**'
               - 'tools/dashboards/**'
+            openapi:
+              - 'apps/api/openapi/**'
+              - 'apps/api/internal/openapi/**'
+              - 'tools/openapi-validate/**'
 
   lint-docs:
     needs: changes
@@ -183,6 +188,37 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
 
+  # OpenAPI structural validation (issue #310).
+  #
+  # Runs the tools/openapi-validate program against the canonical spec at
+  # apps/api/openapi/gonext.openapi.json. The tool is stdlib-only so we
+  # don't sync the rest of the workspace's modules just to lint one
+  # document.
+  lint-openapi:
+    needs: changes
+    if: needs.changes.outputs.openapi == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'tools/openapi-validate/go.mod'
+          cache: false
+      - name: Validate OpenAPI document
+        env:
+          GOWORK: 'off'
+        run: |
+          go run ./tools/openapi-validate apps/api/openapi/gonext.openapi.json
+      - name: Validator tests
+        env:
+          GOWORK: 'off'
+        run: |
+          cd tools/openapi-validate && go test ./...
+      - name: Embedded mirror is in sync
+        run: |
+          diff -q apps/api/openapi/gonext.openapi.json apps/api/internal/openapi/spec/gonext.openapi.json
+          diff -q apps/api/openapi/openapi.yaml         apps/api/internal/openapi/spec/openapi.yaml
+
   lint-dashboards:
     needs: changes
     if: needs.changes.outputs.dashboards == 'true'
@@ -245,7 +281,7 @@ jobs:
   # Aggregate gate. Required check on the branch protection rule.
   # bundle-budget is intentionally NOT in `needs:` while it remains advisory.
   ci:
-    needs: [lint-docs, lint-go, test-go, lint-web, test-web, lint-dashboards]
+    needs: [lint-docs, lint-go, test-go, lint-web, test-web, lint-dashboards, lint-openapi]
     if: always()
     runs-on: ubuntu-latest
     steps:

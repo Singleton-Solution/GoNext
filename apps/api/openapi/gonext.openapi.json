@@ -3,8 +3,8 @@
   "info": {
     "title": "GoNext API",
     "summary": "GoNext core HTTP API surface.",
-    "description": "OpenAPI 3.1 description of the GoNext core HTTP API. This is the scaffold delivered by issue #29 — only the identity endpoint (GET /) is described concretely. Resource sections for posts, pages, users, and comments are reserved with empty schemas and will be filled in by subsequent issues that ship the corresponding handlers (see docs/05-admin-api.md §3 for the canonical surface design).",
-    "version": "0.0.0",
+    "description": "OpenAPI 3.1 description of every endpoint exposed by the GoNext core\nHTTP API. Generated alongside issue #310 — covers auth, posts, pages,\nusers, comments, terms, media (in flight), plugins admin, jobs admin,\nsettings, search, webhooks, and personal access tokens.\n",
+    "version": "0.1.0",
     "license": {
       "name": "FSL-1.1-Apache-2.0",
       "identifier": "FSL-1.1-Apache-2.0"
@@ -18,28 +18,92 @@
     {
       "url": "http://localhost:8080",
       "description": "Local development server (default httpx bind)."
+    },
+    {
+      "url": "https://api.example.com",
+      "description": "Production placeholder — operators replace this with their own host."
     }
   ],
   "tags": [
-    { "name": "meta", "description": "Server identity and health." },
-    { "name": "posts", "description": "Post content type. Reserved — handlers not yet shipped." },
-    { "name": "pages", "description": "Page content type. Reserved — handlers not yet shipped." },
-    { "name": "users", "description": "User accounts and profiles. Reserved — handlers not yet shipped." },
-    { "name": "comments", "description": "Comment threads. Reserved — handlers not yet shipped." }
+    {
+      "name": "meta",
+      "description": "Server identity and health."
+    },
+    {
+      "name": "auth",
+      "description": "Authentication, sessions, email verification, PATs."
+    },
+    {
+      "name": "posts",
+      "description": "Native REST surface for the posts content type."
+    },
+    {
+      "name": "pages",
+      "description": "Native REST surface for the pages content type."
+    },
+    {
+      "name": "users",
+      "description": "User accounts and profiles (WordPress shim)."
+    },
+    {
+      "name": "comments",
+      "description": "Comment threads (WordPress shim, read-only in this PR)."
+    },
+    {
+      "name": "terms",
+      "description": "Taxonomy terms — categories and tags (WordPress shim)."
+    },
+    {
+      "name": "media",
+      "description": "Media library (in flight — uploads land in a follow-up)."
+    },
+    {
+      "name": "plugins",
+      "description": "Plugin lifecycle administration."
+    },
+    {
+      "name": "jobs",
+      "description": "Background job DLQ administration (Asynq)."
+    },
+    {
+      "name": "settings",
+      "description": "Site settings and options."
+    },
+    {
+      "name": "search",
+      "description": "Cross-resource search."
+    },
+    {
+      "name": "webhooks",
+      "description": "Outbound webhook subscriptions."
+    },
+    {
+      "name": "rum",
+      "description": "In-house Real-User Monitoring beacon + read API."
+    },
+    {
+      "name": "openapi",
+      "description": "The OpenAPI spec itself, served at runtime."
+    }
   ],
   "paths": {
     "/": {
       "get": {
-        "tags": ["meta"],
+        "tags": [
+          "meta"
+        ],
         "summary": "Server identity",
-        "description": "Returns the server identity payload: name, version, and commit. This is the only endpoint shipped by issue #2 (root handler) and is the concrete example for this scaffold.",
+        "description": "Returns the binary's name, version, and commit. Mounted by cmd/server/main.go.",
         "operationId": "getRoot",
+        "security": [],
         "responses": {
           "200": {
             "description": "Identity payload.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Identity" },
+                "schema": {
+                  "$ref": "#/components/schemas/Identity"
+                },
                 "examples": {
                   "default": {
                     "summary": "Typical local response",
@@ -53,7 +117,2446 @@
               }
             }
           },
-          "500": { "$ref": "#/components/responses/InternalError" }
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Liveness probe",
+        "description": "Returns 200 unconditionally once the process has started serving. Must\nnever depend on external state (DB, Redis); a failure here means the\nbinary itself is unhealthy.\n",
+        "operationId": "getHealthz",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Process is alive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Readiness probe",
+        "description": "Returns 200 only when every registered readiness check (DB, Redis)\nsucceeds. Returns 503 with a per-check breakdown otherwise. Drives\nKubernetes traffic gating.\n",
+        "operationId": "getReadyz",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "All dependencies healthy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "One or more dependencies are unhealthy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "tags": [
+          "openapi",
+          "meta"
+        ],
+        "summary": "OpenAPI 3.1 document",
+        "description": "Returns the embedded OpenAPI 3.1 description as application/json.\nConditional requests are honored via ETag and Last-Modified.\n",
+        "operationId": "getOpenapiJSON",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OpenAPI document.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "An OpenAPI 3.1 description document."
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "ETag matched — caller has a fresh copy."
+          },
+          "405": {
+            "description": "Method not allowed."
+          }
+        }
+      }
+    },
+    "/api/openapi.yaml": {
+      "get": {
+        "tags": [
+          "openapi",
+          "meta"
+        ],
+        "summary": "OpenAPI 3.1 document (YAML)",
+        "description": "Same content as /openapi.json, served as YAML. Identical caching\nsemantics. Convenience surface for tooling that prefers YAML.\n",
+        "operationId": "getOpenapiYAML",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OpenAPI document, YAML serialization.",
+            "content": {
+              "application/yaml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "ETag matched."
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Password + TOTP login",
+        "description": "Exchanges email + password (and optionally TOTP / recovery code) for\na session cookie. The session token is delivered exclusively via the\nSet-Cookie header — never echoed in the response body so HttpOnly\nkeeps its meaning. Returns a 200 with the user id and expiry on\nsuccess, or a 200 with an intermediate token when 2FA is required.\n",
+        "operationId": "login",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Either an authenticated session was established (LoginResponse) or\n2FA is required (TOTPChallenge). The client distinguishes by the\nshape of the payload.\n",
+            "headers": {
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Session cookie on a successful login."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/LoginResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TOTPChallenge"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Revoke the current session",
+        "operationId": "logout",
+        "responses": {
+          "204": {
+            "description": "Session cookie cleared.",
+            "headers": {
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Refresh the bearer JWT",
+        "description": "Trades a refresh cookie for a short-lived (15m) JWT access token\nconsumed by the dashboard's API client.\n",
+        "operationId": "refreshToken",
+        "responses": {
+          "200": {
+            "description": "New access token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessToken"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "List the caller's live sessions",
+        "operationId": "listSessions",
+        "responses": {
+          "200": {
+            "description": "Every live session for the authenticated principal.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Revoke every session belonging to the caller",
+        "operationId": "revokeAllSessions",
+        "responses": {
+          "204": {
+            "description": "All sessions revoked. The caller's session is gone too."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "SessionView.id from listSessions."
+        }
+      ],
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Revoke a single session",
+        "operationId": "revokeSession",
+        "responses": {
+          "204": {
+            "description": "Session revoked."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/verify/send": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Send an email-verification link",
+        "description": "Generates a fresh verification token, persists its hash in Redis\nwith a 24h TTL, and queues the verification email. Rate-limited to\none send per minute per user.\n",
+        "operationId": "sendVerificationEmail",
+        "responses": {
+          "202": {
+            "description": "Send accepted. The email is dispatched asynchronously."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Rate limiter unavailable — fail-closed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/verify": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Consume an email-verification token",
+        "description": "Validates the token from the link the user clicked. Marks the\nunderlying user row as verified on success. Tokens are single-use.\n",
+        "operationId": "verifyEmail",
+        "security": [],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Email verified.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "410": {
+            "description": "Token expired or already consumed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/tokens": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "List personal access tokens",
+        "operationId": "listTokens",
+        "responses": {
+          "200": {
+            "description": "PAT metadata for the authenticated principal.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "tokens"
+                  ],
+                  "properties": {
+                    "tokens": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Token"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Mint a new personal access token",
+        "description": "Creates a long-lived PAT. The secret is returned ONCE in the response;\nsubsequent reads only see metadata.\n",
+        "operationId": "createToken",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Token minted. Secret is in the response body — store it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenWithSecret"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/tokens/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Revoke a personal access token",
+        "operationId": "revokeToken",
+        "responses": {
+          "204": {
+            "description": "Token revoked."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/posts": {
+      "get": {
+        "tags": [
+          "posts"
+        ],
+        "summary": "List posts",
+        "operationId": "listPosts",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "publish",
+                "future",
+                "pending",
+                "private",
+                "trash"
+              ]
+            }
+          },
+          {
+            "name": "author",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of posts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "posts"
+        ],
+        "summary": "Create a post",
+        "operationId": "createPost",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Post created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/posts/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "posts"
+        ],
+        "summary": "Get a single post",
+        "operationId": "getPost",
+        "parameters": [
+          {
+            "name": "X-Post-Password",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Password for protected posts. See HeaderPostPassword."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The requested post.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Version": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Post"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "posts"
+        ],
+        "summary": "Update a post",
+        "operationId": "updatePost",
+        "parameters": [
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optimistic concurrency token (X-Version from last read)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Post updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "412": {
+            "description": "Optimistic concurrency check failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "posts"
+        ],
+        "summary": "Trash a post",
+        "description": "Soft-deletes the post (status → trash).",
+        "operationId": "trashPost",
+        "responses": {
+          "204": {
+            "description": "Post trashed."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/posts/{id}/autosave": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "posts"
+        ],
+        "summary": "Read the current autosave for a post",
+        "operationId": "getPostAutosave",
+        "responses": {
+          "200": {
+            "description": "Autosave payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Autosave"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No autosave exists for this post."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "posts"
+        ],
+        "summary": "Write or replace the autosave for a post",
+        "operationId": "putPostAutosave",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutosaveInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Autosave stored."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/pages": {
+      "get": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "List pages",
+        "operationId": "listPages",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "publish",
+                "future",
+                "pending",
+                "private",
+                "trash"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of pages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagePage"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Create a page",
+        "operationId": "createPage",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PageCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Page created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/pages/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Get a page",
+        "operationId": "getPage",
+        "responses": {
+          "200": {
+            "description": "The requested page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Update a page",
+        "operationId": "updatePage",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PageUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Page updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Trash a page",
+        "operationId": "trashPage",
+        "responses": {
+          "204": {
+            "description": "Page trashed."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/users": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "List users",
+        "operationId": "listUsers",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of users.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/users/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Get a user",
+        "operationId": "getUser",
+        "responses": {
+          "200": {
+            "description": "The requested user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Update a user",
+        "operationId": "updateUser",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Delete a user",
+        "operationId": "deleteUser",
+        "responses": {
+          "204": {
+            "description": "User deleted (soft)."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/comments": {
+      "get": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "List comments",
+        "operationId": "listComments",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "name": "post",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by post id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of comments.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/comments/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Get a comment",
+        "operationId": "getComment",
+        "responses": {
+          "200": {
+            "description": "The requested comment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Comment"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/terms": {
+      "get": {
+        "tags": [
+          "terms"
+        ],
+        "summary": "List taxonomy terms",
+        "operationId": "listTerms",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "name": "taxonomy",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "category",
+                "post_tag"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of terms.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermPage"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "terms"
+        ],
+        "summary": "Create a term",
+        "operationId": "createTerm",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TermCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Term created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Term"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/terms/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "terms"
+        ],
+        "summary": "Get a term",
+        "operationId": "getTerm",
+        "responses": {
+          "200": {
+            "description": "The requested term.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Term"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "terms"
+        ],
+        "summary": "Update a term",
+        "operationId": "updateTerm",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TermUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Term updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Term"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "terms"
+        ],
+        "summary": "Delete a term",
+        "operationId": "deleteTerm",
+        "responses": {
+          "204": {
+            "description": "Term deleted."
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/media": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "List media library items",
+        "operationId": "listMedia",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "name": "mime",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by MIME type (e.g. image/png)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of media items.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Upload a media file",
+        "description": "Accepts a multipart/form-data upload. Persists the binary in the\nconfigured object store, computes derived sizes, and returns the\nresulting Media row. This endpoint is in flight — see issue #341.\n",
+        "operationId": "uploadMedia",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "alt": {
+                    "type": "string"
+                  },
+                  "caption": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Media uploaded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Media"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "413": {
+            "description": "Upload too large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/media/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Get a media item",
+        "operationId": "getMedia",
+        "responses": {
+          "200": {
+            "description": "The requested media item.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Media"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Delete a media item",
+        "operationId": "deleteMedia",
+        "responses": {
+          "204": {
+            "description": "Media deleted."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/plugins": {
+      "get": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "List installed plugins",
+        "operationId": "listPlugins",
+        "responses": {
+          "200": {
+            "description": "Plugin manifest list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "plugins"
+                  ],
+                  "properties": {
+                    "plugins": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Plugin"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/plugins/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Get a plugin manifest",
+        "operationId": "getPlugin",
+        "responses": {
+          "200": {
+            "description": "Plugin manifest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plugin"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/plugins/{id}/activate": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Activate a plugin",
+        "operationId": "activatePlugin",
+        "responses": {
+          "200": {
+            "description": "Plugin activated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plugin"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Plugin already active or activation refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/plugins/{id}/deactivate": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Deactivate a plugin",
+        "operationId": "deactivatePlugin",
+        "responses": {
+          "200": {
+            "description": "Plugin deactivated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plugin"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/_/plugins/dev/install": {
+      "post": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Dev-only plugin hot-install",
+        "description": "Hot-installs a plugin from a local manifest. Only mounted when\nGONEXT_PLUGINS_DEV_MODE=true. Used by the `gonext plugin dev` CLI's\nwatch loop. Storage is in-memory: not persisted across restarts.\n",
+        "operationId": "installPluginDev",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginManifest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Plugin installed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plugin"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Endpoint not mounted (dev mode disabled)."
+          }
+        }
+      }
+    },
+    "/api/v1/admin/jobs/dlq": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "List archived (dead-letter) jobs",
+        "operationId": "listDeadLetterJobs",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "name": "queue",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of archived jobs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "tasks"
+                  ],
+                  "properties": {
+                    "tasks": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ArchivedTask"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/jobs/dlq/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Get an archived job",
+        "operationId": "getDeadLetterJob",
+        "responses": {
+          "200": {
+            "description": "Archived task detail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchivedTask"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/jobs/dlq/{id}/replay": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Re-enqueue an archived job",
+        "operationId": "replayDeadLetterJob",
+        "responses": {
+          "204": {
+            "description": "Job re-enqueued."
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/jobs/dlq/{id}/discard": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Permanently delete an archived job",
+        "operationId": "discardDeadLetterJob",
+        "responses": {
+          "204": {
+            "description": "Job discarded."
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/jobs/dlq/{id}/redact": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Redact fields in an archived job payload",
+        "operationId": "redactDeadLetterJob",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedactRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Redaction applied."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/status": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Aggregate operational status",
+        "description": "Returns the per-axis health report (DB, Redis, queues, disk, themes,\nplugins). Status is always 200; per-source failures are reported in\nthe body.\n",
+        "operationId": "getAdminStatus",
+        "responses": {
+          "200": {
+            "description": "Operational status report.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/rum/percentiles": {
+      "get": {
+        "tags": [
+          "rum"
+        ],
+        "summary": "RUM Web Vitals percentiles",
+        "operationId": "getRumPercentiles",
+        "parameters": [
+          {
+            "name": "route",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "p50/p75/p95/p99 of LCP, CLS, INP per route.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RumPercentiles"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/rum/slow-routes": {
+      "get": {
+        "tags": [
+          "rum"
+        ],
+        "summary": "Slowest routes by RUM metric",
+        "operationId": "getRumSlowRoutes",
+        "parameters": [
+          {
+            "name": "metric",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "lcp",
+                "inp",
+                "cls",
+                "fcp",
+                "ttfb"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Routes ranked by the requested metric.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "routes"
+                  ],
+                  "properties": {
+                    "routes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RumSlowRoute"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/_/rum/beacon": {
+      "post": {
+        "tags": [
+          "rum"
+        ],
+        "summary": "RUM beacon endpoint",
+        "description": "Public, unauthenticated beacon used by the theme JS to ship Web\nVitals. Returns 204 on accept. Drops malformed payloads silently.\n",
+        "operationId": "rumBeacon",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RumBeacon"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Beacon accepted."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/api/v1/settings": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get site settings",
+        "operationId": "getSettings",
+        "responses": {
+          "200": {
+            "description": "Settings map.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Patch site settings",
+        "operationId": "updateSettings",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Settings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Settings updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/search": {
+      "get": {
+        "tags": [
+          "search"
+        ],
+        "summary": "Cross-resource search",
+        "operationId": "search",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "post",
+                  "page",
+                  "user",
+                  "term",
+                  "media"
+                ]
+              }
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mixed-type search results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/api/v1/webhooks": {
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "List webhook subscriptions",
+        "operationId": "listWebhooks",
+        "responses": {
+          "200": {
+            "description": "Webhook subscriptions for this site.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "webhooks"
+                  ],
+                  "properties": {
+                    "webhooks": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Webhook"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Create a webhook subscription",
+        "operationId": "createWebhook",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebhookCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Webhook subscription created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Webhook"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/webhooks/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Get a webhook",
+        "operationId": "getWebhook",
+        "responses": {
+          "200": {
+            "description": "Webhook.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Webhook"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Update a webhook",
+        "operationId": "updateWebhook",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebhookUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Webhook"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Delete a webhook",
+        "operationId": "deleteWebhook",
+        "responses": {
+          "204": {
+            "description": "Webhook deleted."
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/wp-json/wp/v2/posts": {
+      "get": {
+        "tags": [
+          "posts"
+        ],
+        "summary": "WordPress-compatible posts list",
+        "operationId": "wpListPosts",
+        "security": [],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "WordPress-shaped posts collection.",
+            "headers": {
+              "X-WP-Total": {
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-WP-TotalPages": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WPPost"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wp-json/wp/v2/posts/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "posts"
+        ],
+        "summary": "WordPress-compatible post fetch",
+        "operationId": "wpGetPost",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "WordPress-shaped post.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WPPost"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
         }
       }
     }
@@ -62,141 +2565,1524 @@
     "schemas": {
       "Identity": {
         "type": "object",
-        "description": "Server identity returned by GET /. Mirrors the JSON written by apps/api/cmd/server/main.go.",
-        "required": ["name", "version", "commit"],
+        "description": "Server identity returned by GET /. Mirrors cmd/server/main.go.",
+        "required": [
+          "name",
+          "version",
+          "commit"
+        ],
         "properties": {
           "name": {
             "type": "string",
-            "description": "Service name. Always 'gonext' for this binary.",
-            "examples": ["gonext"]
+            "examples": [
+              "gonext"
+            ]
           },
           "version": {
             "type": "string",
-            "description": "Semantic version string injected at build time (defaults to 'dev').",
-            "examples": ["v0.1.0", "dev"]
+            "examples": [
+              "v0.1.0",
+              "dev"
+            ]
           },
           "commit": {
             "type": "string",
-            "description": "Git commit SHA the binary was built from (defaults to 'unknown').",
-            "examples": ["abc1234", "unknown"]
+            "examples": [
+              "abc1234",
+              "unknown"
+            ]
           }
         }
       },
-      "Error": {
+      "Health": {
         "type": "object",
-        "description": "RFC 7807-flavoured error envelope (see docs/05-admin-api.md §3.1 Errors).",
-        "required": ["error"],
+        "required": [
+          "status"
+        ],
         "properties": {
-          "error": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded",
+              "fail"
+            ]
+          },
+          "checks": {
             "type": "object",
-            "required": ["status", "code", "title"],
-            "properties": {
-              "type": {
-                "type": "string",
-                "format": "uri",
-                "description": "A URI reference identifying the problem type."
-              },
-              "title": {
-                "type": "string",
-                "description": "A short, human-readable summary of the problem."
-              },
-              "status": {
-                "type": "integer",
-                "minimum": 400,
-                "maximum": 599,
-                "description": "HTTP status code."
-              },
-              "code": {
-                "type": "string",
-                "description": "Stable machine-readable error code."
-              },
-              "detail": {
-                "type": "string",
-                "description": "Human-readable explanation specific to this occurrence."
-              },
-              "fields": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "array",
-                  "items": { "type": "string" }
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string"
                 },
-                "description": "Per-field validation errors keyed by field name."
-              },
-              "trace_id": {
-                "type": "string",
-                "description": "Server-side trace ID for correlating logs."
+                "detail": {
+                  "type": "string"
+                }
               }
             }
           }
         }
       },
-      "_PostsPlaceholder": {
-        "description": "Reserved — see docs/05-admin-api.md §3.1 for the canonical Post resource shape. Will be populated when the posts handler issue lands.",
-        "type": "object"
+      "Pagination": {
+        "type": "object",
+        "required": [
+          "next_cursor",
+          "prev_cursor"
+        ],
+        "properties": {
+          "next_cursor": {
+            "type": "string"
+          },
+          "prev_cursor": {
+            "type": "string"
+          }
+        }
       },
-      "_PagesPlaceholder": {
-        "description": "Reserved — see docs/05-admin-api.md §3.1 for the canonical Page resource shape. Will be populated when the pages handler issue lands.",
-        "type": "object"
+      "Error": {
+        "type": "object",
+        "description": "RFC 7807-flavoured error envelope.",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "status",
+              "code",
+              "title"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "format": "uri"
+              },
+              "title": {
+                "type": "string"
+              },
+              "status": {
+                "type": "integer",
+                "minimum": 400,
+                "maximum": 599
+              },
+              "code": {
+                "type": "string"
+              },
+              "detail": {
+                "type": "string"
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "trace_id": {
+                "type": "string"
+              }
+            }
+          }
+        }
       },
-      "_UsersPlaceholder": {
-        "description": "Reserved — see docs/05-admin-api.md §3.1 for the canonical User resource shape. Will be populated when the users handler issue lands.",
-        "type": "object"
+      "ErrorEnvelope": {
+        "$ref": "#/components/schemas/Error"
       },
-      "_CommentsPlaceholder": {
-        "description": "Reserved — see docs/05-admin-api.md §3.1 for the canonical Comment resource shape. Will be populated when the comments handler issue lands.",
-        "type": "object"
+      "LoginRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "format": "password"
+          },
+          "totp_code": {
+            "type": "string"
+          },
+          "recovery_code": {
+            "type": "string"
+          },
+          "intermediate_token": {
+            "type": "string"
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "expires_at"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TOTPChallenge": {
+        "type": "object",
+        "required": [
+          "intermediate_token",
+          "requires"
+        ],
+        "properties": {
+          "intermediate_token": {
+            "type": "string"
+          },
+          "requires": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "totp",
+                "recovery"
+              ]
+            }
+          }
+        }
+      },
+      "AccessToken": {
+        "type": "object",
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in"
+        ],
+        "properties": {
+          "access_token": {
+            "type": "string"
+          },
+          "token_type": {
+            "type": "string",
+            "enum": [
+              "Bearer"
+            ]
+          },
+          "expires_in": {
+            "type": "integer",
+            "description": "Seconds until expiry."
+          }
+        }
+      },
+      "SessionView": {
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "last_seen_at",
+          "device_label",
+          "ip",
+          "current"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "device_label": {
+            "type": "string"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "current": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SessionList": {
+        "type": "object",
+        "required": [
+          "sessions"
+        ],
+        "properties": {
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionView"
+            }
+          }
+        }
+      },
+      "VerifyResult": {
+        "type": "object",
+        "required": [
+          "verified",
+          "user_id"
+        ],
+        "properties": {
+          "verified": {
+            "type": "boolean"
+          },
+          "user_id": {
+            "type": "string"
+          }
+        }
+      },
+      "Token": {
+        "type": "object",
+        "description": "Personal access token metadata. The secret is never echoed.",
+        "required": [
+          "id",
+          "name",
+          "created_at",
+          "last_used_at",
+          "scopes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_used_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "TokenCreate": {
+        "type": "object",
+        "required": [
+          "name",
+          "scopes"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "TokenWithSecret": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Token"
+          },
+          {
+            "type": "object",
+            "required": [
+              "secret"
+            ],
+            "properties": {
+              "secret": {
+                "type": "string",
+                "description": "The raw token string. Echoed exactly once in the create\nresponse — clients MUST store it now; subsequent reads only\nsee metadata.\n"
+              }
+            }
+          }
+        ]
+      },
+      "Post": {
+        "type": "object",
+        "description": "Native REST projection of a row in the posts table.",
+        "required": [
+          "id",
+          "post_type",
+          "author_id",
+          "status",
+          "title",
+          "slug",
+          "content_blocks",
+          "comment_status",
+          "ping_status",
+          "menu_order",
+          "meta",
+          "created_at",
+          "updated_at",
+          "version",
+          "protected"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "post_type": {
+            "type": "string"
+          },
+          "parent_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "author_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "publish",
+              "future",
+              "pending",
+              "private",
+              "trash"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "content_blocks": {
+            "type": "object",
+            "description": "Canonical block-tree JSON."
+          },
+          "comment_status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ]
+          },
+          "ping_status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ]
+          },
+          "menu_order": {
+            "type": "integer"
+          },
+          "meta": {
+            "type": "object"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "scheduled_for": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "protected": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PostCreate": {
+        "type": "object",
+        "properties": {
+          "parent_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "content_blocks": {
+            "type": "object"
+          },
+          "password": {
+            "type": "string"
+          },
+          "comment_status": {
+            "type": "string"
+          },
+          "ping_status": {
+            "type": "string"
+          },
+          "menu_order": {
+            "type": "integer"
+          },
+          "meta": {
+            "type": "object"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "scheduled_for": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PostUpdate": {
+        "$ref": "#/components/schemas/PostCreate"
+      },
+      "PostPage": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Post"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "Page": {
+        "$ref": "#/components/schemas/Post"
+      },
+      "PageCreate": {
+        "$ref": "#/components/schemas/PostCreate"
+      },
+      "PageUpdate": {
+        "$ref": "#/components/schemas/PostCreate"
+      },
+      "PagePage": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Page"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "Autosave": {
+        "type": "object",
+        "required": [
+          "post_id",
+          "content_blocks",
+          "saved_at"
+        ],
+        "properties": {
+          "post_id": {
+            "type": "string"
+          },
+          "content_blocks": {
+            "type": "object"
+          },
+          "title": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "saved_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AutosaveInput": {
+        "type": "object",
+        "required": [
+          "content_blocks"
+        ],
+        "properties": {
+          "content_blocks": {
+            "type": "object"
+          },
+          "title": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": "string"
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "display_name",
+          "roles",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "avatar_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "verified_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "UserUpdate": {
+        "type": "object",
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "avatar_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "UserPage": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/User"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "Comment": {
+        "type": "object",
+        "required": [
+          "id",
+          "post_id",
+          "author_name",
+          "content",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "post_id": {
+            "type": "string"
+          },
+          "author_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "author_name": {
+            "type": "string"
+          },
+          "author_email": {
+            "type": "string",
+            "format": "email"
+          },
+          "author_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "content": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "pending",
+              "spam",
+              "trash"
+            ]
+          },
+          "parent_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CommentPage": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Comment"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "Term": {
+        "type": "object",
+        "required": [
+          "id",
+          "taxonomy",
+          "name",
+          "slug",
+          "count"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "taxonomy": {
+            "type": "string",
+            "enum": [
+              "category",
+              "post_tag"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "parent_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "count": {
+            "type": "integer"
+          }
+        }
+      },
+      "TermCreate": {
+        "type": "object",
+        "required": [
+          "taxonomy",
+          "name"
+        ],
+        "properties": {
+          "taxonomy": {
+            "type": "string",
+            "enum": [
+              "category",
+              "post_tag"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "parent_id": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "TermUpdate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "parent_id": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "TermPage": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Term"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "Media": {
+        "type": "object",
+        "required": [
+          "id",
+          "mime",
+          "url",
+          "byte_size",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "byte_size": {
+            "type": "integer"
+          },
+          "width": {
+            "type": "integer"
+          },
+          "height": {
+            "type": "integer"
+          },
+          "alt": {
+            "type": "string"
+          },
+          "caption": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "uploaded_by": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MediaPage": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Media"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "Plugin": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "version",
+          "active"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "author": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "installed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PluginManifest": {
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "entrypoint"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "entrypoint": {
+            "type": "string"
+          },
+          "manifest": {
+            "type": "object"
+          }
+        }
+      },
+      "ArchivedTask": {
+        "type": "object",
+        "required": [
+          "id",
+          "queue",
+          "type",
+          "payload_preview",
+          "last_error",
+          "retried",
+          "max_retry",
+          "redacted"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "queue": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "payload_preview": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "string",
+            "format": "byte",
+            "description": "Present on detail responses; nil on list."
+          },
+          "last_error": {
+            "type": "string"
+          },
+          "failed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "retried": {
+            "type": "integer"
+          },
+          "max_retry": {
+            "type": "integer"
+          },
+          "redacted": {
+            "type": "boolean"
+          },
+          "redacted_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RedactRequest": {
+        "type": "object",
+        "required": [
+          "fields"
+        ],
+        "properties": {
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Settings": {
+        "type": "object",
+        "description": "Free-form site options. Keys are stable strings.",
+        "additionalProperties": true
+      },
+      "SearchResult": {
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "title",
+          "excerpt"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "post",
+              "page",
+              "user",
+              "term",
+              "media"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "score": {
+            "type": "number"
+          }
+        }
+      },
+      "SearchResults": {
+        "type": "object",
+        "required": [
+          "results"
+        ],
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchResult"
+            }
+          },
+          "total": {
+            "type": "integer"
+          }
+        }
+      },
+      "Webhook": {
+        "type": "object",
+        "required": [
+          "id",
+          "url",
+          "events",
+          "active",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "secret_preview": {
+            "type": "string",
+            "description": "First 4 chars only."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "WebhookCreate": {
+        "type": "object",
+        "required": [
+          "url",
+          "events"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "events": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "secret": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "WebhookUpdate": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RumBeacon": {
+        "type": "object",
+        "required": [
+          "route",
+          "metric",
+          "value"
+        ],
+        "properties": {
+          "route": {
+            "type": "string"
+          },
+          "metric": {
+            "type": "string",
+            "enum": [
+              "lcp",
+              "fcp",
+              "cls",
+              "inp",
+              "ttfb"
+            ]
+          },
+          "value": {
+            "type": "number"
+          },
+          "device": {
+            "type": "string"
+          },
+          "connection": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RumPercentiles": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "properties": {
+            "p50": {
+              "type": "number"
+            },
+            "p75": {
+              "type": "number"
+            },
+            "p95": {
+              "type": "number"
+            },
+            "p99": {
+              "type": "number"
+            },
+            "samples": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "RumSlowRoute": {
+        "type": "object",
+        "required": [
+          "route",
+          "value"
+        ],
+        "properties": {
+          "route": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number"
+          },
+          "samples": {
+            "type": "integer"
+          }
+        }
+      },
+      "StatusReport": {
+        "type": "object",
+        "required": [
+          "generated_at",
+          "sections"
+        ],
+        "properties": {
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sections": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "ok": {
+                  "type": "boolean"
+                },
+                "detail": {
+                  "type": "object"
+                },
+                "error": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "AuditEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "event_type",
+          "actor_id",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "actor_id": {
+            "type": "string"
+          },
+          "subject_type": {
+            "type": "string"
+          },
+          "subject_id": {
+            "type": "string"
+          },
+          "meta": {
+            "type": "object"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "WPPost": {
+        "type": "object",
+        "description": "WordPress-shaped post envelope for /wp-json clients.",
+        "required": [
+          "id",
+          "slug",
+          "status",
+          "type",
+          "title",
+          "content"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "date_gmt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "modified": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "modified_gmt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "link": {
+            "type": "string",
+            "format": "uri"
+          },
+          "title": {
+            "type": "object",
+            "properties": {
+              "rendered": {
+                "type": "string"
+              }
+            }
+          },
+          "content": {
+            "type": "object",
+            "properties": {
+              "rendered": {
+                "type": "string"
+              },
+              "protected": {
+                "type": "boolean"
+              }
+            }
+          },
+          "excerpt": {
+            "type": "object",
+            "properties": {
+              "rendered": {
+                "type": "string"
+              }
+            }
+          },
+          "author": {
+            "type": "integer"
+          },
+          "comment_status": {
+            "type": "string"
+          },
+          "ping_status": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "parameters": {
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Opaque pagination cursor."
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 25
+        },
+        "description": "Maximum number of items to return."
       }
     },
     "responses": {
       "BadRequest": {
-        "description": "Malformed request: invalid JSON, missing required fields, or values that fail validation.",
+        "description": "Malformed request.",
         "content": {
-          "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
         }
       },
       "Unauthorized": {
-        "description": "Authentication required or the supplied credentials are invalid/expired.",
+        "description": "Authentication required or credentials are invalid.",
         "headers": {
           "WWW-Authenticate": {
-            "description": "Which auth schemes the server will accept.",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         },
         "content": {
-          "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
         }
       },
       "Forbidden": {
-        "description": "The caller is authenticated but lacks the capability required for this operation.",
+        "description": "Caller is authenticated but lacks the capability required.",
         "content": {
-          "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
         }
       },
       "NotFound": {
-        "description": "Resource not found, or not visible to the caller.",
+        "description": "Resource not found.",
         "content": {
-          "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
         }
       },
       "TooManyRequests": {
-        "description": "Rate limit exceeded (see docs/05-admin-api.md §3.5).",
+        "description": "Rate limit exceeded.",
         "headers": {
           "Retry-After": {
-            "description": "Seconds until the caller may retry.",
-            "schema": { "type": "integer", "minimum": 0 }
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
           },
-          "RateLimit-Limit": { "schema": { "type": "integer" } },
-          "RateLimit-Remaining": { "schema": { "type": "integer" } },
-          "RateLimit-Reset": { "schema": { "type": "integer" } }
+          "RateLimit-Limit": {
+            "schema": {
+              "type": "integer"
+            }
+          },
+          "RateLimit-Remaining": {
+            "schema": {
+              "type": "integer"
+            }
+          },
+          "RateLimit-Reset": {
+            "schema": {
+              "type": "integer"
+            }
+          }
         },
         "content": {
-          "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
         }
       },
       "InternalError": {
-        "description": "Unexpected server error. Includes a trace_id for log correlation.",
+        "description": "Unexpected server error. Includes a trace_id.",
         "content": {
-          "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
         }
       }
     },
@@ -205,36 +4091,30 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "__Host-gn_session",
-        "description": "Admin-UI cookie session. HTTPOnly, SameSite=Lax, signed with HMAC. Paired with the __Host-gn_csrf double-submit token + X-CSRF-Token header on mutating requests."
+        "description": "Admin-UI cookie session. HTTPOnly, SameSite=Lax, signed with HMAC.\nPaired with __Host-gn_csrf double-submit + X-CSRF-Token header on\nmutating requests.\n"
       },
       "BearerJWT": {
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "Short-lived (15m) JWT access token used by first-party scripts, CLIs, and the dashboard's API client. Refreshed via POST /api/v1/auth/refresh."
+        "description": "Short-lived (15m) JWT access token; refresh via POST /api/v1/auth/refresh."
       },
       "ApplicationPassword": {
         "type": "http",
         "scheme": "basic",
-        "description": "WordPress-compatible Application Password (HTTP Basic) for programmatic clients that already speak the WP REST API. Backed by long-lived API keys stored hashed in Postgres."
-      }
-    },
-    "parameters": {
-      "Cursor": {
-        "name": "cursor",
-        "in": "query",
-        "required": false,
-        "schema": { "type": "string" },
-        "description": "Opaque pagination cursor, as returned in the previous response's page.next / page.prev."
-      },
-      "Limit": {
-        "name": "limit",
-        "in": "query",
-        "required": false,
-        "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 25 },
-        "description": "Maximum number of items to return."
+        "description": "WordPress-compatible Application Password / PAT."
       }
     }
   },
-  "security": []
+  "security": [
+    {
+      "CookieSession": []
+    },
+    {
+      "BearerJWT": []
+    },
+    {
+      "ApplicationPassword": []
+    }
+  ]
 }
