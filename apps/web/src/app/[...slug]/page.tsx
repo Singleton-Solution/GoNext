@@ -31,7 +31,9 @@
 import { cookies, headers } from 'next/headers';
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';
-import { renderSingular, renderNotFound } from '@/lib/render';
+import { renderSingular, renderNotFound, isAuthenticatedCookie } from '@/lib/render';
+import { fetchPostBySlug, fetchPostComments, apiBaseUrl } from '@/lib/api';
+import { CommentsThread } from '@/components/comments/CommentsThread';
 import { PublicShell } from '../PublicShell';
 
 export const dynamic = 'force-dynamic';
@@ -115,6 +117,22 @@ async function stampCacheHeaders(
   }
 }
 
+/**
+ * `comments_open` may be carried on the post (a future
+ * post-metadata field) or omitted — defaults to true. We honour
+ * an explicit `false` and never display the form in that case.
+ */
+function commentsOpenFromPost(raw: unknown): boolean {
+  if (!raw || typeof raw !== 'object') return true;
+  const r = raw as Record<string, unknown>;
+  if (r.commentsOpen === false) return false;
+  if (typeof r.commentsOpen === 'object' && r.commentsOpen !== null) {
+    return true;
+  }
+  if (r.comments_open === false) return false;
+  return true;
+}
+
 export default async function CatchAllSlugPage(
   { params }: { params: Promise<CatchAllParams> },
 ): Promise<ReactElement> {
@@ -147,11 +165,45 @@ export default async function CatchAllSlugPage(
     result.headers['Cache-Control'] ?? '',
     result.templateBasename,
   );
+
+  // Inject the comments surface when the resolved post is a `post`
+  // (not a `page`) and the post hasn't been marked comments-closed.
+  // We re-fetch the post here so we have the id + postType + the
+  // forward-compatible comments_open flag. The fetch is deduped by
+  // Next's data cache within the same request, so this is free.
+  let commentsBlock: ReactElement | null = null;
+  if (joined) {
+    const post = await fetchPostBySlug(joined, {
+      cookie,
+      revalidate: isAuthenticatedCookie(cookie) ? undefined : 300,
+    });
+    if (post && post.postType === 'post') {
+      const open = commentsOpenFromPost(post);
+      const initial = open
+        ? await fetchPostComments(post.id, {
+            revalidate: isAuthenticatedCookie(cookie) ? undefined : 60,
+          })
+        : [];
+      commentsBlock = (
+        <CommentsThread
+          postId={post.id}
+          apiBaseUrl={apiBaseUrl}
+          initialComments={initial}
+          isAuthenticated={isAuthenticatedCookie(cookie)}
+          commentsOpen={open}
+        />
+      );
+    }
+  }
+
   return (
-    <PublicShell
-      bodyHtml={result.html}
-      cssCustomProperties={result.css}
-      templateBasename={result.templateBasename}
-    />
+    <>
+      <PublicShell
+        bodyHtml={result.html}
+        cssCustomProperties={result.css}
+        templateBasename={result.templateBasename}
+      />
+      {commentsBlock}
+    </>
   );
 }
