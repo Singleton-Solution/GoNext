@@ -12,6 +12,9 @@ import {
   fetchResolvedTemplate,
   fetchArchive,
   fetchPublicSiteConfig,
+  fetchArchivePage,
+  fetchAuthorBySlug,
+  fetchTermBySlug,
   ApiError,
 } from './api.ts';
 
@@ -218,5 +221,138 @@ describe('fetchPublicSiteConfig', () => {
     );
     const cfg = await fetchPublicSiteConfig();
     expect(cfg).toEqual({ baseUrl: '', allowIndex: false });
+describe('fetchArchivePage', () => {
+  it('returns the parsed envelope with total + page metadata', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        posts: [
+          { id: '1', slug: 'a', title: 'A', postType: 'post', blocks: [] },
+        ],
+        total: 42,
+        perPage: 5,
+        page: 3,
+      }),
+    );
+    const page = await fetchArchivePage({ limit: 5, page: 3 });
+    expect(page.posts).toHaveLength(1);
+    expect(page.total).toBe(42);
+    expect(page.perPage).toBe(5);
+    expect(page.page).toBe(3);
+  });
+
+  it('forwards the author / taxonomy / date filters as query params', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, { posts: [] }),
+    );
+    await fetchArchivePage({
+      authorSlug: 'jane',
+      taxonomy: 'category',
+      termSlug: 'news',
+      year: 2026,
+      month: 5,
+      day: 19,
+    });
+    const url = String(spy.mock.calls[0]?.[0]);
+    expect(url).toContain('authorSlug=jane');
+    expect(url).toContain('taxonomy=category');
+    expect(url).toContain('termSlug=news');
+    expect(url).toContain('year=2026');
+    expect(url).toContain('month=5');
+    expect(url).toContain('day=19');
+  });
+
+  it('returns an empty page on network failure', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('down'));
+    const page = await fetchArchivePage({ limit: 10, page: 1 });
+    expect(page.posts).toEqual([]);
+    expect(page.total).toBe(0);
+    expect(page.perPage).toBe(10);
+    expect(page.page).toBe(1);
+  });
+
+  it('falls back to the bare {posts} shape when totals are missing', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        posts: [
+          { id: '1', slug: 'a', title: 'A', postType: 'post', blocks: [] },
+          { id: '2', slug: 'b', title: 'B', postType: 'post', blocks: [] },
+        ],
+      }),
+    );
+    const page = await fetchArchivePage({ limit: 10, page: 1 });
+    expect(page.posts).toHaveLength(2);
+    // Total defaults to the post count when the envelope omits it.
+    expect(page.total).toBe(2);
+  });
+});
+
+describe('fetchAuthorBySlug', () => {
+  it('returns the parsed author', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        id: 7,
+        slug: 'jane',
+        name: 'Jane Doe',
+        description: 'Writes about things',
+      }),
+    );
+    const author = await fetchAuthorBySlug('jane');
+    expect(author).not.toBeNull();
+    expect(author?.id).toBe('7');
+    expect(author?.slug).toBe('jane');
+    expect(author?.name).toBe('Jane Doe');
+    expect(author?.description).toBe('Writes about things');
+  });
+
+  it('returns null for a 404', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(404, null));
+    expect(await fetchAuthorBySlug('missing')).toBeNull();
+  });
+
+  it('returns null on empty slug without hitting the network', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch');
+    expect(await fetchAuthorBySlug('')).toBeNull();
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+describe('fetchTermBySlug', () => {
+  it('returns the parsed term', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        id: '11',
+        slug: 'news',
+        name: 'News',
+        taxonomy: 'category',
+      }),
+    );
+    const term = await fetchTermBySlug('category', 'news');
+    expect(term?.taxonomy).toBe('category');
+    expect(term?.name).toBe('News');
+  });
+
+  it('accepts taxonomySlug as the alias for taxonomy', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        id: '12',
+        slug: 'breaking',
+        name: 'Breaking',
+        taxonomySlug: 'post_tag',
+      }),
+    );
+    const term = await fetchTermBySlug('post_tag', 'breaking');
+    expect(term?.taxonomy).toBe('post_tag');
+  });
+
+  it('returns null for a 404', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(404, null));
+    expect(await fetchTermBySlug('category', 'missing')).toBeNull();
+  });
+
+  it('returns null without a network call when arguments are empty', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch');
+    expect(await fetchTermBySlug('', 'news')).toBeNull();
+    expect(await fetchTermBySlug('category', '')).toBeNull();
+    expect(spy).not.toHaveBeenCalled();
   });
 });
