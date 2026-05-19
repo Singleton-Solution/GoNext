@@ -94,6 +94,8 @@ func DefaultRoleCapabilities() map[Role]CapabilitySet {
 		CapEditThemes,
 		// Background jobs / DLQ inspection.
 		CapJobsAdmin,
+		// Webhook subscription administration.
+		CapWebhooksManage,
 	))
 
 	superAdmin := admin.Union(NewCapabilitySet(
