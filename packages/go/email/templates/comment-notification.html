@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <body style="margin:0;padding:0;background:#f6f8fb;font-family:system-ui,-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#0f172a;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f6f8fb;padding:32px 0;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;border-radius:8px;box-shadow:0 1px 3px rgba(15,23,42,0.06);overflow:hidden;">
+            <tr>
+              <td style="background:{{.SiteBrandColor}};color:#ffffff;padding:24px 32px;font-size:18px;font-weight:600;">
+                New reply on {{.SiteName}}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px;font-size:15px;line-height:1.6;">
+                <p style="margin:0 0 16px 0;">Hi {{.UserName}},</p>
+                <p style="margin:0 0 16px 0;"><strong>{{.CommenterName}}</strong> replied to &ldquo;{{.PostTitle}}&rdquo;:</p>
+                <blockquote style="margin:16px 0;padding:12px 16px;border-left:3px solid {{.SiteBrandColor}};background:#f8fafc;color:#334155;font-size:14px;">
+                  {{.CommentExcerpt}}
+                </blockquote>
+                <p style="margin:24px 0;">
+                  <a href="{{.PostURL}}" style="background:{{.SiteBrandColor}};color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:6px;display:inline-block;font-weight:600;">Read &amp; reply</a>
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 32px;border-top:1px solid #e2e8f0;color:#94a3b8;font-size:12px;">
+                You're receiving this because you subscribed to comments on this post. <a href="{{.UnsubscribeURL}}" style="color:#94a3b8;">Unsubscribe</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

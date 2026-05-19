@@ -62,6 +62,12 @@ type SMTPConfig struct {
 
 	// DialTimeout bounds the TCP+TLS handshake. Default 10 seconds.
 	DialTimeout time.Duration
+
+	// AuthMech selects the SMTP AUTH variant. Empty defaults to PLAIN
+	// — the right choice for every modern provider (SES, SendGrid,
+	// Postmark, Mailgun, Gmail SMTP relay). See [AuthMechanism] for
+	// when to pick LOGIN or CRAMMD5.
+	AuthMech AuthMechanism
 }
 
 // LoadSMTPConfig reads SMTP configuration from environment variables
@@ -111,6 +117,13 @@ func LoadSMTPConfig() (SMTPConfig, error) {
 		}
 		cfg.DialTimeout = d
 	}
+	if v := os.Getenv("GONEXT_SMTP_AUTH_MECH"); v != "" {
+		mech, err := ParseAuthMechanism(v)
+		if err != nil {
+			return SMTPConfig{}, err
+		}
+		cfg.AuthMech = mech
+	}
 	if err := cfg.validate(); err != nil {
 		return SMTPConfig{}, err
 	}
@@ -141,6 +154,9 @@ func (c SMTPConfig) validate() error {
 	}
 	if c.User != "" && c.Password == "" {
 		return errors.New("email: SMTPConfig.Password is required when User is set")
+	}
+	if !c.AuthMech.Valid() {
+		return fmt.Errorf("email: SMTPConfig.AuthMech %q is not a known mechanism", c.AuthMech)
 	}
 	return nil
 }
@@ -238,10 +254,17 @@ func (s *SMTPSender) Send(ctx context.Context, msg Message) error {
 	}
 
 	if s.cfg.User != "" {
-		// PLAIN auth is safe over the TLS-upgraded channel.
-		auth := smtp.PlainAuth("", s.cfg.User, s.cfg.Password, s.cfg.Host)
-		if err := client.Auth(auth); err != nil {
-			return fmt.Errorf("email: auth: %w", err)
+		// Auth runs over the TLS-upgraded channel (or over implicit
+		// TLS for port 465). The mechanism choice — PLAIN, LOGIN,
+		// CRAMMD5 — is config-driven; defaults to PLAIN.
+		auth, err := newAuth(s.cfg.AuthMech, s.cfg.Host, s.cfg.User, s.cfg.Password)
+		if err != nil {
+			return fmt.Errorf("email: auth setup: %w", err)
+		}
+		if auth != nil {
+			if err := client.Auth(auth); err != nil {
+				return fmt.Errorf("email: auth: %w", err)
+			}
 		}
 	}
 
