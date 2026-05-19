@@ -20,19 +20,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { ApiError } from '../../api-client';
 import { resetOverrides, saveOverrides } from './api';
+import { BreakpointEditor } from './components/BreakpointEditor';
 import { ColorPicker } from './components/ColorPicker';
+import { LayoutGridEditor } from './components/LayoutGridEditor';
 import { LayoutSection } from './components/LayoutSection';
 import { PreviewFrame } from './components/PreviewFrame';
+import { ShadowPresetsEditor } from './components/ShadowPresetsEditor';
+import { SpacingScaleEditor } from './components/SpacingScaleEditor';
 import { SpacingSection } from './components/SpacingSection';
 import { TypographySection } from './components/TypographySection';
 import { buildOverrides, initialState, isOverrideEmpty } from './state';
 import type {
   ActiveResponse,
+  Breakpoint,
+  BreakpointSlug,
   ColorEntry,
   FontFamily,
   FontSize,
   LayoutSettings,
+  ShadowPreset,
   SpacingScale,
+  SpacingSize,
 } from './types';
 
 const TOAST_DISMISS_MS = 4_000;
@@ -61,6 +69,10 @@ export function CustomizerClient({
   const [activeResponse, setActiveResponse] = useState(active);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [activeBreakpoint, setActiveBreakpoint] = useState<BreakpointSlug | null>(
+    null,
+  );
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Build the preview override payload on every state change. We pass
@@ -118,6 +130,27 @@ export function CustomizerClient({
     (next: SpacingScale) => setState((prev) => ({ ...prev, spacing: next })),
     [],
   );
+  const onSpacingTokensChange = useCallback(
+    (next: SpacingSize[]) => setState((prev) => ({ ...prev, spacingTokens: next })),
+    [],
+  );
+  const onShadowPresetsChange = useCallback(
+    (next: ShadowPreset[]) => setState((prev) => ({ ...prev, shadowPresets: next })),
+    [],
+  );
+  const onBreakpointsChange = useCallback(
+    (next: Breakpoint[]) => setState((prev) => ({ ...prev, breakpoints: next })),
+    [],
+  );
+
+  // Resolve the iframe width from the active breakpoint selection.
+  // Memoised so PreviewFrame's prop identity is stable when the
+  // breakpoint hasn't moved.
+  const frameWidth = useMemo<number | null>(() => {
+    if (activeBreakpoint === null) return null;
+    const bp = state.breakpoints.find((b) => b.slug === activeBreakpoint);
+    return bp ? bp.width : null;
+  }, [activeBreakpoint, state.breakpoints]);
 
   const dirty = !isOverrideEmpty(overrides);
 
@@ -197,6 +230,61 @@ export function CustomizerClient({
         <LayoutSection layout={state.layout} onChange={onLayoutChange} />
         <SpacingSection scale={state.spacing} onChange={onSpacingChange} />
 
+        <section
+          className={`customizer-section customizer-advanced ${
+            advancedOpen ? 'is-open' : ''
+          }`}
+          data-testid="customizer-advanced"
+        >
+          <button
+            type="button"
+            className="customizer-advanced__toggle"
+            onClick={() => setAdvancedOpen((prev) => !prev)}
+            aria-expanded={advancedOpen}
+            aria-controls="customizer-advanced-panels"
+            data-testid="customizer-advanced-toggle"
+          >
+            <span className="customizer-section__title">Advanced</span>
+            <span className="customizer-advanced__chevron" aria-hidden>
+              {advancedOpen ? '−' : '+'}
+            </span>
+          </button>
+          {advancedOpen && (
+            <div
+              id="customizer-advanced-panels"
+              className="customizer-advanced__panels"
+            >
+              <details className="customizer-advanced__group" open>
+                <summary>Spacing scale</summary>
+                <SpacingScaleEditor
+                  tokens={state.spacingTokens}
+                  onChange={onSpacingTokensChange}
+                />
+              </details>
+              <details className="customizer-advanced__group">
+                <summary>Shadow presets</summary>
+                <ShadowPresetsEditor
+                  presets={state.shadowPresets}
+                  onChange={onShadowPresetsChange}
+                />
+              </details>
+              <details className="customizer-advanced__group">
+                <summary>Layout grid</summary>
+                <LayoutGridEditor layout={state.layout} onChange={onLayoutChange} />
+              </details>
+              <details className="customizer-advanced__group">
+                <summary>Breakpoints</summary>
+                <BreakpointEditor
+                  breakpoints={state.breakpoints}
+                  onChange={onBreakpointsChange}
+                  activeBreakpoint={activeBreakpoint}
+                  onActiveBreakpointChange={setActiveBreakpoint}
+                />
+              </details>
+            </div>
+          )}
+        </section>
+
         <div className="customizer__actions">
           <button
             type="button"
@@ -233,7 +321,11 @@ export function CustomizerClient({
         )}
       </aside>
 
-      <PreviewFrame publicSiteUrl={publicSiteUrl} overrides={overrides} />
+      <PreviewFrame
+        publicSiteUrl={publicSiteUrl}
+        overrides={overrides}
+        frameWidth={frameWidth}
+      />
     </div>
   );
 }

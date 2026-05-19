@@ -169,6 +169,158 @@ describe('CustomizerClient', () => {
     expect((screen.getByTestId('layout-content-size') as HTMLInputElement).value).toBe('720px');
   });
 
+  describe('advanced surface', () => {
+    function openAdvanced(): void {
+      fireEvent.click(screen.getByTestId('customizer-advanced-toggle'));
+    }
+
+    function openGroup(label: string): void {
+      const summaries = Array.from(document.querySelectorAll('details > summary'));
+      const match = summaries.find((s) => (s.textContent ?? '').includes(label));
+      if (!match) throw new Error(`group "${label}" not found`);
+      const details = match.parentElement as HTMLDetailsElement;
+      details.open = true;
+    }
+
+    it('starts collapsed, expands on click', () => {
+      render(
+        <CustomizerClient
+          active={makeActive()}
+          publicSiteUrl="http://localhost:3000"
+          saveAction={vi.fn()}
+          resetAction={vi.fn()}
+        />,
+      );
+      expect(
+        screen.queryByTestId('spacing-scale-editor'),
+      ).not.toBeInTheDocument();
+      openAdvanced();
+      expect(screen.getByTestId('spacing-scale-editor')).toBeInTheDocument();
+      expect(screen.getByTestId('breakpoint-editor')).toBeInTheDocument();
+    });
+
+    it('spacing token drag flows through to the save payload', async () => {
+      const saveAction = vi.fn().mockResolvedValue({
+        ...makeActive(),
+        overrides: { settings: {} },
+      });
+      render(
+        <CustomizerClient
+          active={makeActive()}
+          publicSiteUrl="http://localhost:3000"
+          saveAction={saveAction}
+          resetAction={vi.fn()}
+        />,
+      );
+      openAdvanced();
+      const slider = screen.getByTestId('spacing-token-slider-md') as HTMLInputElement;
+      fireEvent.change(slider, { target: { value: '2' } });
+
+      const save = screen.getByTestId('customizer-save') as HTMLButtonElement;
+      expect(save.disabled).toBe(false);
+      await act(async () => {
+        fireEvent.click(save);
+      });
+      const payload = saveAction.mock.calls[0][0];
+      const tokens = payload.settings.custom.gonext.spacingTokens;
+      expect(tokens).toBeDefined();
+      const md = tokens.find((t: { slug: string }) => t.slug === 'md');
+      expect(md.size).toBe('2rem');
+    });
+
+    it('shadow preset change flows through to the save payload', async () => {
+      const saveAction = vi.fn().mockResolvedValue({
+        ...makeActive(),
+        overrides: { settings: {} },
+      });
+      render(
+        <CustomizerClient
+          active={makeActive()}
+          publicSiteUrl="http://localhost:3000"
+          saveAction={saveAction}
+          resetAction={vi.fn()}
+        />,
+      );
+      openAdvanced();
+      openGroup('Shadow presets');
+      fireEvent.change(screen.getByTestId('shadow-blur-md'), {
+        target: { value: '20' },
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('customizer-save'));
+      });
+      const payload = saveAction.mock.calls[0][0];
+      const md = payload.settings.custom.gonext.shadowPresets.find(
+        (p: { slug: string }) => p.slug === 'md',
+      );
+      expect(md.blur).toBe(20);
+    });
+
+    it('breakpoint click locks the preview iframe width', () => {
+      render(
+        <CustomizerClient
+          active={makeActive()}
+          publicSiteUrl="http://localhost:3000"
+          saveAction={vi.fn()}
+          resetAction={vi.fn()}
+        />,
+      );
+      openAdvanced();
+      openGroup('Breakpoints');
+      // No breakpoint selected initially — iframe should not carry a
+      // width attribute.
+      const iframe = screen.getByTestId('customizer-preview-frame') as HTMLIFrameElement;
+      expect(iframe.getAttribute('width')).toBeNull();
+
+      fireEvent.click(screen.getByTestId('breakpoint-active-md'));
+      // After clicking md (default 768) the iframe should carry that
+      // width attribute.
+      expect(iframe.getAttribute('width')).toBe('768');
+
+      // Clicking Full width clears the lock.
+      fireEvent.click(screen.getByTestId('breakpoint-active-full'));
+      expect(iframe.getAttribute('width')).toBeNull();
+    });
+
+    it('breakpoint width edit propagates to the iframe lock', () => {
+      render(
+        <CustomizerClient
+          active={makeActive()}
+          publicSiteUrl="http://localhost:3000"
+          saveAction={vi.fn()}
+          resetAction={vi.fn()}
+        />,
+      );
+      openAdvanced();
+      openGroup('Breakpoints');
+      fireEvent.click(screen.getByTestId('breakpoint-active-lg'));
+      fireEvent.change(screen.getByTestId('breakpoint-input-lg'), {
+        target: { value: '900' },
+      });
+      const iframe = screen.getByTestId('customizer-preview-frame') as HTMLIFrameElement;
+      expect(iframe.getAttribute('width')).toBe('900');
+    });
+
+    it('layout grid rem input writes a rem string to the layout state', () => {
+      render(
+        <CustomizerClient
+          active={makeActive()}
+          publicSiteUrl="http://localhost:3000"
+          saveAction={vi.fn()}
+          resetAction={vi.fn()}
+        />,
+      );
+      openAdvanced();
+      openGroup('Layout grid');
+      const remInput = screen.getByTestId('layout-content-rem') as HTMLInputElement;
+      fireEvent.change(remInput, { target: { value: '50' } });
+      // The basic layout section's text input mirrors the same state,
+      // so we can verify via that surface that the change landed.
+      const basic = screen.getByTestId('layout-content-size') as HTMLInputElement;
+      expect(basic.value).toBe('50rem');
+    });
+  });
+
   it('renders the validation error detail when Save fails', async () => {
     const { ApiError } = await import('../../api-client');
     const saveAction = vi.fn().mockRejectedValue(

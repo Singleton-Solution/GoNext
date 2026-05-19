@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  ADVANCED_DEFAULTS,
   buildOverrides,
   encodePreviewOverrides,
   initialState,
@@ -143,6 +144,129 @@ describe('encodePreviewOverrides', () => {
     expect(JSON.parse(base64UrlDecode(encoded))).toEqual({
       settings: { layout: { contentSize: '999px' } },
     });
+  });
+});
+
+describe('advanced surface — initialState defaults', () => {
+  it('seeds the six spacing tokens, four shadow presets, four breakpoints', () => {
+    const state = initialState(makeActive());
+    expect(state.spacingTokens.map((t) => t.slug)).toEqual([
+      'xs',
+      'sm',
+      'md',
+      'lg',
+      'xl',
+      '2xl',
+    ]);
+    expect(state.shadowPresets.map((p) => p.slug)).toEqual(['sm', 'md', 'lg', 'xl']);
+    expect(state.breakpoints.map((b) => b.slug)).toEqual(['sm', 'md', 'lg', 'xl']);
+  });
+
+  it('prefers theme-declared custom tokens over the built-in defaults', () => {
+    const active = makeActive();
+    active.theme.settings.custom = {
+      gonext: {
+        breakpoints: [
+          { slug: 'sm', name: 'Small', width: 600 },
+          { slug: 'md', name: 'Medium', width: 800 },
+          { slug: 'lg', name: 'Large', width: 1000 },
+          { slug: 'xl', name: 'Extra large', width: 1400 },
+        ],
+      },
+    };
+    const state = initialState(active);
+    expect(state.breakpoints[3]?.width).toBe(1400);
+  });
+
+  it('prefers persisted overrides over theme defaults', () => {
+    const active = makeActive();
+    active.overrides = {
+      settings: {
+        custom: {
+          gonext: {
+            spacingTokens: [
+              { slug: 'xs', name: 'Extra small', size: '0.125rem' },
+              { slug: 'sm', name: 'Small', size: '0.25rem' },
+              { slug: 'md', name: 'Medium', size: '0.5rem' },
+              { slug: 'lg', name: 'Large', size: '1rem' },
+              { slug: 'xl', name: 'Extra large', size: '2rem' },
+              { slug: '2xl', name: '2× extra large', size: '4rem' },
+            ],
+          },
+        },
+      },
+    };
+    const state = initialState(active);
+    expect(state.spacingTokens[0]?.size).toBe('0.125rem');
+    expect(state.spacingTokens[5]?.size).toBe('4rem');
+  });
+});
+
+describe('advanced surface — buildOverrides diffing', () => {
+  it('omits custom block when every token matches the defaults', () => {
+    const active = makeActive();
+    const state = initialState(active);
+    const overrides = buildOverrides(state, active.theme);
+    expect(overrides.settings?.custom).toBeUndefined();
+  });
+
+  it('includes spacingTokens when one token changes', () => {
+    const active = makeActive();
+    const state = initialState(active);
+    const mdIndex = state.spacingTokens.findIndex((t) => t.slug === 'md');
+    if (state.spacingTokens[mdIndex]) {
+      state.spacingTokens[mdIndex] = {
+        ...state.spacingTokens[mdIndex],
+        size: '1.5rem',
+      };
+    }
+    const overrides = buildOverrides(state, active.theme);
+    expect(overrides.settings?.custom?.gonext?.spacingTokens).toHaveLength(6);
+    const md = overrides.settings?.custom?.gonext?.spacingTokens?.find(
+      (t) => t.slug === 'md',
+    );
+    expect(md?.size).toBe('1.5rem');
+  });
+
+  it('includes shadowPresets when one slider value moves', () => {
+    const active = makeActive();
+    const state = initialState(active);
+    const md = state.shadowPresets[1];
+    if (md) state.shadowPresets[1] = { ...md, blur: 99 };
+    const overrides = buildOverrides(state, active.theme);
+    const updated = overrides.settings?.custom?.gonext?.shadowPresets?.find(
+      (p) => p.slug === 'md',
+    );
+    expect(updated?.blur).toBe(99);
+  });
+
+  it('includes breakpoints when a width changes', () => {
+    const active = makeActive();
+    const state = initialState(active);
+    const lg = state.breakpoints[2];
+    if (lg) state.breakpoints[2] = { ...lg, width: 1100 };
+    const overrides = buildOverrides(state, active.theme);
+    expect(
+      overrides.settings?.custom?.gonext?.breakpoints?.find((b) => b.slug === 'lg')
+        ?.width,
+    ).toBe(1100);
+  });
+
+  it('isOverrideEmpty returns false once a custom token changes', () => {
+    const active = makeActive();
+    const state = initialState(active);
+    const sm = state.breakpoints[0];
+    if (sm) state.breakpoints[0] = { ...sm, width: 555 };
+    const overrides = buildOverrides(state, active.theme);
+    expect(isOverrideEmpty(overrides)).toBe(false);
+  });
+});
+
+describe('ADVANCED_DEFAULTS', () => {
+  it('exposes a stable shape', () => {
+    expect(ADVANCED_DEFAULTS.spacingTokens.length).toBe(6);
+    expect(ADVANCED_DEFAULTS.shadowPresets.length).toBe(4);
+    expect(ADVANCED_DEFAULTS.breakpoints.length).toBe(4);
   });
 });
 
