@@ -34,6 +34,7 @@ describe('Sidebar', () => {
       ['Users', '/users'],
       ['Search', '/search'],
       ['Plugins', '/plugins'],
+      ['Customize', '/appearance/customizer'],
       ['Settings', '/settings'],
       ['System Status', '/status'],
       ['Performance', '/performance'],

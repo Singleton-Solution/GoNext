@@ -93,6 +93,7 @@ func DefaultRoleCapabilities() map[Role]CapabilitySet {
 		CapSwitchThemes,
 		CapEditThemes,
 		CapThemeEditParts,
+		CapThemeCustomize,
 		// Background jobs / DLQ inspection.
 		CapJobsAdmin,
 		// Webhook subscription administration.

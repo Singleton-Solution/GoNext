@@ -1,0 +1,215 @@
+/*
+ * Theme Customizer styles.
+ *
+ * Two-pane layout: a fixed-width sidebar for controls, a flexible
+ * iframe-hosting pane on the right. The sidebar stays scrollable when
+ * the form grows past the viewport; the iframe pane fills the rest.
+ *
+ * No design tokens yet beyond what `globals.css` provides — the
+ * customizer ships before the design-system extraction (#34).
+ */
+
+.customizer {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: var(--space-6);
+  align-items: start;
+  min-height: calc(100vh - var(--header-height) - var(--space-8));
+}
+
+.customizer__sidebar {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  max-height: calc(100vh - var(--header-height) - var(--space-8));
+  overflow-y: auto;
+}
+
+.customizer__header {
+  margin-bottom: var(--space-4);
+}
+
+.customizer__header h1 {
+  margin-bottom: var(--space-1);
+}
+
+.customizer-section {
+  margin-bottom: var(--space-6);
+}
+
+.customizer-section__title {
+  font-size: 16px;
+  margin-bottom: var(--space-3);
+}
+
+.customizer-subsection__title {
+  font-size: 14px;
+  margin: var(--space-3) 0;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.customizer-color-row {
+  display: grid;
+  grid-template-columns: 1fr 48px 1fr;
+  gap: var(--space-2);
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.customizer-color-row__label {
+  display: flex;
+  flex-direction: column;
+}
+
+.customizer-color-row__slug {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.customizer-color-row__name {
+  font-weight: 500;
+}
+
+.customizer-family-row,
+.customizer-size-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+
+.customizer-size-row {
+  grid-template-columns: 1fr;
+}
+
+.customizer-family-row__meta,
+.customizer-size-row__label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.customizer-family-row__slug,
+.customizer-size-row__slug {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.customizer-field {
+  margin-bottom: var(--space-3);
+}
+
+.customizer-field label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: var(--space-1);
+}
+
+.customizer-field input,
+.customizer-field select,
+.customizer-color-row input,
+.customizer-family-row input,
+.customizer-size-row input[type='text'] {
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.customizer-color-row input[type='color'] {
+  padding: 2px;
+  height: 36px;
+  width: 48px;
+}
+
+.customizer__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.btn-primary,
+.btn-secondary {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  font-weight: 500;
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.btn-secondary {
+  background: transparent;
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.customizer-preview {
+  position: sticky;
+  top: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  height: calc(100vh - var(--header-height) - var(--space-8));
+}
+
+.customizer-preview__frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: white;
+}
+
+.customizer__toast {
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+
+.customizer__toast--success {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.customizer__toast--error {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.customizer__banner {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.muted {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  margin: var(--space-1) 0 0;
+}

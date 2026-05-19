@@ -28,6 +28,7 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 
 	adminmedia "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/media"
+	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/customizer"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/rum"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/healthz"
 	openapidocs "github.com/Singleton-Solution/GoNext/apps/api/internal/openapi"
@@ -192,7 +193,7 @@ func run(ctx context.Context) error {
 	orch.MustRegister(logger, "metrics.flusher", noopCloser("metrics"))
 	orch.MustRegister(logger, "audit.emitter", noopCloser("audit"))
 
-	mux := buildRouter(cfg, pool, rdb, logger)
+	mux := buildRouter(cfg, pool, rdb, themeDir, logger)
 
 	// Build the middleware chain. Early Hints (issue #122) sits AFTER
 	// Recovery (so a panicking hints provider doesn't crash the
@@ -305,7 +306,7 @@ func run(ctx context.Context) error {
 // enable DevMode, so they never see this surface — registering the
 // route conditionally (rather than gating at request time) is the
 // strongest guarantee we can offer.
-func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, logger *slog.Logger) http.Handler {
+func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, themeDir string, logger *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
@@ -376,6 +377,25 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, lo
 	} else {
 		logger.Info("admin/media: routes mounted",
 			slog.String("base", "/api/v1/admin/media"),
+		)
+	}
+
+	// Theme Customizer (issue #355). Operators GET the active theme +
+	// any persisted overrides and PUT a partial-override payload that
+	// the renderer merges at request time. The route prefix mirrors
+	// the rest of the admin REST surface so operators looking for
+	// "admin/customizer" find it next to "admin/jobs", "admin/rum",
+	// "admin/status".
+	if err := customizer.Mount(mux, "/api/v1/admin/customizer", customizer.Deps{
+		Store:  customizer.NewPgxStore(customizer.PoolAdapter{Pool: pool}),
+		Loader: customizer.FilesystemLoader(themeDir),
+		Policy: policy.NewBasicPolicy(policy.DefaultRoleCapabilities()),
+		Logger: logger,
+	}); err != nil {
+		logger.Warn("customizer: failed to mount routes", slog.Any("err", err))
+	} else {
+		logger.Info("customizer: routes mounted",
+			slog.String("base", "/api/v1/admin/customizer"),
 		)
 	}
 
