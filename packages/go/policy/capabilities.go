@@ -114,6 +114,13 @@ const (
 	// secrets via the create/rotate flow — a stricter need-to-know than
 	// generic queue administration.
 	CapWebhooksManage Capability = "webhooks.manage"
+	// Theme Customizer. Holders may read the active theme manifest +
+	// any persisted overrides through the admin customizer surface and
+	// commit (or reset) overrides that are merged at render time. The
+	// capability is intentionally distinct from manage_themes /
+	// switch_themes — operators who tweak palette + typography without
+	// activating new themes shouldn't need install-grade access.
+	CapThemeCustomize Capability = "theme.customize"
 )
 
 // CapabilitySet is the resolved set of capabilities a Principal holds.

@@ -41,6 +41,11 @@ const NAV_ITEMS: readonly NavItem[] = [
   // at the lite cut today; v0.2 expands the same section with full
   // template editing.
   { href: '/appearance/site-editor', label: 'Appearance', icon: 'A' },
+  // Appearance funnels into the Theme Customizer surface (#355). The
+  // link points straight at /appearance/customizer because that's the
+  // only landing inside the section today; an index page lands when
+  // theme installation arrives.
+  { href: '/appearance/customizer', label: 'Customize', icon: 'Cu' },
   { href: '/settings', label: 'Settings', icon: 'S' },
   // System Status is the operator surface (issue #221). It sits at the
   // bottom of the IA so it doesn't compete with the content-authoring
