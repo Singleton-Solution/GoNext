@@ -32,6 +32,17 @@ export type {
 
 export { clonePatternBlocks } from './pattern-clone.ts';
 
+export type {
+  Transform,
+  TransformRegistry,
+  TransformResult,
+} from './transform-types.ts';
+
+export {
+  BlockTransformToolbar,
+  type BlockTransformToolbarProps,
+} from './block-transform-toolbar.tsx';
+
 export {
   BlockEditCanvas,
   clearEditModuleCache,

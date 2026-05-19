@@ -29,6 +29,11 @@ import type {
   EditComponent,
 } from '@gonext/blocks-sdk';
 import { createElement, Suspense, use } from 'react';
+import { BlockTransformToolbar } from './block-transform-toolbar.tsx';
+import type {
+  Transform,
+  TransformRegistry,
+} from './transform-types.ts';
 
 export interface BlockEditCanvasProps {
   /** Registry of block types. */
@@ -46,6 +51,26 @@ export interface BlockEditCanvasProps {
    * SDK doesn't ship a designed loader; the editor app supplies one.
    */
   loadingFallback?: React.ReactNode;
+  /**
+   * Optional transform registry. When passed, each block in the tree
+   * renders a "Transform to..." dropdown next to it in the canvas
+   * toolbar; clicking an option calls `onApplyTransform` with the
+   * source block + chosen transform id. When omitted, the toolbar is
+   * not rendered — the canvas degrades back to its plain walker shape.
+   */
+  transformRegistry?: TransformRegistry;
+  /**
+   * Called when an author picks a transform from the toolbar. The
+   * host is expected to apply the transform via the editor's
+   * mutation API (look up the transform on the registry, call its
+   * `convert`, splice the result into the tree). Required when
+   * `transformRegistry` is set; otherwise unused.
+   */
+  onApplyTransform?: (
+    block: Block,
+    transformId: string,
+    transform: Transform,
+  ) => void;
 }
 
 /**
@@ -58,6 +83,8 @@ export function BlockEditCanvas({
   blocks,
   context,
   loadingFallback = null,
+  transformRegistry,
+  onApplyTransform,
 }: BlockEditCanvasProps) {
   return (
     <div
@@ -72,6 +99,8 @@ export function BlockEditCanvas({
             registry={registry}
             context={context ?? {}}
             indexPath={[index]}
+            transformRegistry={transformRegistry}
+            onApplyTransform={onApplyTransform}
           />
         ))}
       </Suspense>
@@ -84,6 +113,12 @@ interface BlockNodeProps {
   registry: BlockRegistry;
   context: Record<string, unknown>;
   indexPath: number[];
+  transformRegistry?: TransformRegistry;
+  onApplyTransform?: (
+    block: Block,
+    transformId: string,
+    transform: Transform,
+  ) => void;
 }
 
 function BlockNode({
@@ -91,6 +126,8 @@ function BlockNode({
   registry,
   context,
   indexPath,
+  transformRegistry,
+  onApplyTransform,
 }: BlockNodeProps): React.ReactNode {
   const def = registry.get(block.type);
   if (def === undefined) {
@@ -119,12 +156,27 @@ function BlockNode({
     props,
   );
 
+  // The toolbar only renders when a host wires a transform registry in.
+  // When omitted, the canvas degrades back to its original "walker only"
+  // shape — preserving the test contract from before this issue.
+  const showToolbar =
+    transformRegistry !== undefined && onApplyTransform !== undefined;
+
   return (
     <div
       className="gonext-block-edit-canvas__node"
       data-block-type={block.type}
       data-testid={`block-edit-canvas-node-${block.type}`}
     >
+      {showToolbar ? (
+        <BlockTransformToolbar
+          block={block}
+          registry={transformRegistry}
+          onApply={(transformId, transform) =>
+            onApplyTransform(block, transformId, transform)
+          }
+        />
+      ) : null}
       {rendered}
       {block.innerBlocks && block.innerBlocks.length > 0 ? (
         <div className="gonext-block-edit-canvas__children">
@@ -135,6 +187,8 @@ function BlockNode({
               registry={registry}
               context={context}
               indexPath={[...indexPath, childIndex]}
+              transformRegistry={transformRegistry}
+              onApplyTransform={onApplyTransform}
             />
           ))}
         </div>

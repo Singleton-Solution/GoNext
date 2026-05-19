@@ -1,0 +1,34 @@
+{
+  "name": "@gonext/blocks-transforms",
+  "version": "0.0.0",
+  "private": false,
+  "description": "Block transforms for GoNext — the 'change block type' affordance every modern editor has. Ships a TransformRegistry plus a curated set of first-party transforms (paragraph<->heading, list<->paragraphs, image->gallery, heading level shifts, code<->paragraph, columns<->group). Pure functions over Block / BlockTree — no React, no DOM. Apache-2.0.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "echo '@gonext/blocks-transforms: source-only package, no build step'",
+    "lint": "echo '@gonext/blocks-transforms lint: not yet implemented'",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gonext/blocks-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@gonext/test-config": "workspace:*",
+    "@vitest/coverage-v8": "^1.6.0",
+    "typescript": "^5.6.0",
+    "vitest": "^1.6.0"
+  }
+}
