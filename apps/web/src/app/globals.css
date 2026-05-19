@@ -1,0 +1,94 @@
+/**
+ * Baseline public-site stylesheet.
+ *
+ * Intentionally tiny — the theme owns visual identity through the
+ * design-token surface emitted as `--wp-preset--*` CSS custom
+ * properties. This file just maps a few of those tokens onto bare
+ * elements so a freshly-installed site is presentable before the
+ * author touches anything.
+ *
+ * Theme authors who want to override should ship a `style.css` in
+ * their theme package; the renderer will surface it via the
+ * resolver's existing path.
+ */
+
+:root {
+  --wp-preset--color--ink: #0f172a;
+  --wp-preset--color--paper: #ffffff;
+  --wp-preset--color--muted: #64748b;
+  --wp-preset--color--accent: #2563eb;
+  --wp-preset--font-family--sans: system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif;
+  --wp-preset--font-family--serif: Iowan Old Style, Apple Garamond, Baskerville, Georgia, serif;
+  --wp-preset--font-size--md: 1rem;
+  --wp-preset--layout--content: 720px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--wp-preset--font-family--serif);
+  font-size: var(--wp-preset--font-size--md);
+  line-height: 1.6;
+  color: var(--wp-preset--color--ink);
+  background: var(--wp-preset--color--paper);
+}
+
+a {
+  color: var(--wp-preset--color--accent);
+}
+
+.gn-site-main {
+  max-width: var(--wp-preset--layout--content);
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.gn-site-header,
+.gn-site-footer {
+  max-width: var(--wp-preset--layout--wide, 1180px);
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.gn-site-footer {
+  border-top: 1px solid color-mix(in srgb, var(--wp-preset--color--muted) 30%, transparent);
+  margin-top: 3rem;
+  color: var(--wp-preset--color--muted);
+  font-size: 0.875rem;
+}
+
+.gn-post-meta {
+  color: var(--wp-preset--color--muted);
+  font-size: 0.875rem;
+  margin-bottom: 1.5rem;
+}
+
+.gn-post-meta > * + *::before {
+  content: ' · ';
+  margin: 0 0.25rem;
+}
+
+.gn-archive-list {
+  list-style: none;
+  padding: 0;
+}
+
+.gn-archive-item + .gn-archive-item {
+  margin-top: 2rem;
+}
+
+.gn-archive-title {
+  margin: 0;
+}
+
+.gn-404 {
+  text-align: center;
+  padding: 4rem 0;
+}
