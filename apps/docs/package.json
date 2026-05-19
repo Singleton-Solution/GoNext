@@ -1,0 +1,47 @@
+{
+  "name": "@gonext/docs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "GoNext documentation site. Static site generator (Next.js 15 App Router + MDX) that renders docs/*.md and adr/*.md from the monorepo root. Deploys to docs.gonext.io.",
+  "scripts": {
+    "prebuild": "node scripts/sync-content.mjs",
+    "build": "next build",
+    "predev": "node scripts/sync-content.mjs",
+    "dev": "next dev -p 3002",
+    "start": "next start -p 3002",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@mdx-js/loader": "^3.0.1",
+    "@mdx-js/react": "^3.0.1",
+    "@next/mdx": "^15.0.0",
+    "fuse.js": "^7.0.0",
+    "gray-matter": "^4.0.3",
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "rehype-autolink-headings": "^7.1.0",
+    "rehype-slug": "^6.0.0",
+    "remark-gfm": "^4.0.0",
+    "shiki": "^1.22.0"
+  },
+  "devDependencies": {
+    "@gonext/test-config": "workspace:*",
+    "@testing-library/jest-dom": "^6.4.0",
+    "@testing-library/react": "^16.0.0",
+    "@types/mdx": "^2.0.13",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitest/coverage-v8": "^1.6.0",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^15.0.0",
+    "jsdom": "^24.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^1.6.0"
+  }
+}

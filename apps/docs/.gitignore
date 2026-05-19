@@ -1,0 +1,16 @@
+# Synced from <repo>/docs and <repo>/adr at build time by
+# scripts/sync-content.mjs. Source of truth lives at the repo root; we do
+# not commit the copy.
+content/
+
+# Next.js build output
+.next/
+out/
+
+# Test coverage
+coverage/
+
+# Node / TS
+node_modules/
+*.tsbuildinfo
+next-env.d.ts
