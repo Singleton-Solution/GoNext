@@ -176,5 +176,8 @@ func builtinCapabilityDescriptions() []registeredCapability {
 
 		// Background jobs.
 		{CapJobsAdmin, "Inspect, replay, discard, or redact archived background jobs."},
+
+		// Webhooks.
+		{CapWebhooksManage, "Create, edit, test, disable, and delete webhook subscriptions."},
 	}
 }

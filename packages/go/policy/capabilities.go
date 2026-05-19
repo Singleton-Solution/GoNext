@@ -98,6 +98,14 @@ const (
 	CapMediaUpload Capability = "media.upload"
 	CapMediaRead   Capability = "media.read"
 	CapMediaDelete Capability = "media.delete"
+
+	// Webhook subscription administration. Holders can create, edit,
+	// disable, and delete webhook subscriptions, trigger a test delivery,
+	// and inspect the recent-deliveries log. The capability is gated
+	// separately from jobs.admin because webhooks expose subscriber
+	// secrets via the create/rotate flow — a stricter need-to-know than
+	// generic queue administration.
+	CapWebhooksManage Capability = "webhooks.manage"
 )
 
 // CapabilitySet is the resolved set of capabilities a Principal holds.
