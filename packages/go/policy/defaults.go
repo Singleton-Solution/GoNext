@@ -34,6 +34,12 @@ func DefaultRoleCapabilities() map[Role]CapabilitySet {
 		CapEditPublishedPosts,
 		CapDeletePublishedPosts,
 		CapUploadFiles,
+		// Authors own their own media library uploads. Read is paired
+		// with upload so an author can browse their previous uploads
+		// in the inserter; delete stays at the editor tier so a
+		// confused author can't blow away a published asset.
+		CapMediaUpload,
+		CapMediaRead,
 	))
 
 	editor := author.Union(NewCapabilitySet(
@@ -58,6 +64,10 @@ func DefaultRoleCapabilities() map[Role]CapabilitySet {
 		CapManageCategories,
 		CapManageTags,
 		CapEditOthersMedia,
+		// Editors can also remove media uploaded by other operators.
+		// The author tier can upload + read but not delete; the editor
+		// tier gains delete so the moderation buck stops here.
+		CapMediaDelete,
 		// Comment moderation.
 		CapModerateComments,
 		CapEditComment,

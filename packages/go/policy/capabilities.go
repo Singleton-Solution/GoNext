@@ -80,6 +80,24 @@ const (
 	// them, and apply redaction masks to sensitive payload fields before
 	// display in the admin UI. Issue #262.
 	CapJobsAdmin Capability = "jobs.admin"
+
+	// Media library administration. The three caps split the surface so
+	// a constrained operator role (e.g. "media moderator") can be
+	// granted read + delete without also getting upload access — useful
+	// when an external CMS owns the upload path but the admin UI still
+	// renders the library.
+	//
+	//   - CapMediaUpload — POST /api/v1/admin/media.
+	//   - CapMediaRead   — GET  /api/v1/admin/media (list) and /{id} (detail).
+	//   - CapMediaDelete — DELETE /api/v1/admin/media/{id}.
+	//
+	// PATCH alt-text/caption is gated by CapMediaUpload because the
+	// operator who can put files into the library is the same operator
+	// who can describe them; carving a fourth cap for "edit metadata"
+	// is more granularity than the admin surface needs today.
+	CapMediaUpload Capability = "media.upload"
+	CapMediaRead   Capability = "media.read"
+	CapMediaDelete Capability = "media.delete"
 )
 
 // CapabilitySet is the resolved set of capabilities a Principal holds.
