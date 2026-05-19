@@ -27,6 +27,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	goredis "github.com/redis/go-redis/v9"
 
+	adminmedia "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/media"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/rum"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/healthz"
 	openapidocs "github.com/Singleton-Solution/GoNext/apps/api/internal/openapi"
@@ -355,6 +356,26 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, lo
 		logger.Info("rum: routes mounted",
 			slog.String("beacon", "/_/rum/beacon"),
 			slog.String("read", "/api/v1/admin/rum"),
+		)
+	}
+
+	// Media library admin (issue: media library). Uses the in-memory
+	// store + putter at this tier — the Postgres-backed store and the
+	// minio-go ObjectPutter land in a follow-up wiring change once the
+	// config-level storage client is shared between the upload path and
+	// the public variant proxy. The in-memory wiring keeps the admin UI
+	// functional end-to-end for smoke tests without requiring a MinIO
+	// container for `make dev`.
+	if err := adminmedia.Mount(mux, "/api/v1/admin/media", adminmedia.Deps{
+		Store:  adminmedia.NewMemoryStore(nil, nil),
+		Putter: adminmedia.NewMemoryPutter(),
+		Policy: policy.NewBasicPolicy(policy.DefaultRoleCapabilities()),
+		Logger: logger,
+	}); err != nil {
+		logger.Warn("admin/media: failed to mount routes", slog.Any("err", err))
+	} else {
+		logger.Info("admin/media: routes mounted",
+			slog.String("base", "/api/v1/admin/media"),
 		)
 	}
 
