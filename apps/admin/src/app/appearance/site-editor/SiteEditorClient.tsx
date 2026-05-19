@@ -252,7 +252,7 @@ export function SiteEditorClient(): ReactElement {
         <div>
           <h1 style={{ marginBottom: 4 }}>Site Editor</h1>
           <p style={styles.meta}>
-            Active theme: <strong>{theme || '—'}</strong>. Edit your theme's template
+            Active theme: <strong>{theme || '—'}</strong>. Edit your theme&apos;s template
             parts directly from the browser; changes save automatically.
           </p>
         </div>
