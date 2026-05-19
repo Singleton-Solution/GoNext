@@ -51,6 +51,11 @@ const NAV_ITEMS: readonly NavItem[] = [
   // only landing inside the section today; an index page lands when
   // theme installation arrives.
   { href: '/appearance/customizer', label: 'Customize', icon: 'Cu' },
+  // Redirects is the WordPress-parity 301/302/307/308 admin surface.
+  // Operators manage literal and regex rules; the API middleware
+  // serves matched paths with the configured status BEFORE the
+  // renderer sees them.
+  { href: '/redirects', label: 'Redirects', icon: 'R' },
   { href: '/settings', label: 'Settings', icon: 'S' },
   // System Status is the operator surface (issue #221). It sits at the
   // bottom of the IA so it doesn't compete with the content-authoring
