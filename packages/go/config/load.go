@@ -246,6 +246,79 @@ func Load(opts ...LoadOption) (*Config, error) {
 		cfg.RUM.SampleRate = f
 	}
 
+	// ---- Email ----
+	// Provider defaults to "noop" so a freshly bootstrapped deployment
+	// (no SMTP yet) doesn't accidentally fan out password-reset emails
+	// during smoke-tests. Operators flip to "smtp" once Host/Username/
+	// Password/From are populated.
+	cfg.Email.Provider = strings.ToLower(strings.TrimSpace(getString(e, "GONEXT_EMAIL_PROVIDER", "noop")))
+	cfg.Email.Host = getString(e, "GONEXT_EMAIL_HOST", getString(e, "GONEXT_SMTP_HOST", ""))
+	if n, err := getInt(e, "GONEXT_EMAIL_PORT", 0); err != nil {
+		errs = append(errs, err)
+	} else if n == 0 {
+		if n2, err2 := getInt(e, "GONEXT_SMTP_PORT", 587); err2 != nil {
+			errs = append(errs, err2)
+		} else {
+			cfg.Email.Port = n2
+		}
+	} else {
+		cfg.Email.Port = n
+	}
+	cfg.Email.Username = getString(e, "GONEXT_EMAIL_USERNAME", getString(e, "GONEXT_SMTP_USER", ""))
+	cfg.Email.Password = getString(e, "GONEXT_EMAIL_PASSWORD", getString(e, "GONEXT_SMTP_PASSWORD", ""))
+	cfg.Email.From = getString(e, "GONEXT_EMAIL_FROM", getString(e, "GONEXT_SMTP_FROM", ""))
+	if b, err := getBool(e, "GONEXT_EMAIL_TLS", false); err != nil {
+		errs = append(errs, err)
+	} else {
+		cfg.Email.TLS = b
+	}
+	cfg.Email.AuthMech = strings.ToLower(strings.TrimSpace(getString(e, "GONEXT_EMAIL_AUTH_MECH", "plain")))
+	if b, err := getBool(e, "GONEXT_EMAIL_INSECURE_SKIP_VERIFY", false); err != nil {
+		errs = append(errs, err)
+	} else {
+		cfg.Email.InsecureSkipVerify = b
+	}
+	if d, err := getDuration(e, "GONEXT_EMAIL_DIAL_TIMEOUT", 10*time.Second); err != nil {
+		errs = append(errs, err)
+	} else {
+		cfg.Email.DialTimeout = d
+	}
+	cfg.Email.BrandName = getString(e, "GONEXT_EMAIL_BRAND_NAME", "GoNext")
+	cfg.Email.BrandColor = getString(e, "GONEXT_EMAIL_BRAND_COLOR", "#2563eb")
+	cfg.Email.SiteURL = getString(e, "GONEXT_EMAIL_SITE_URL", "")
+	cfg.Email.SupportEmail = getString(e, "GONEXT_EMAIL_SUPPORT", "")
+
+	// Validate the provider/mech values up-front. Unknown values are
+	// almost always a typo and the error message that lists the valid
+	// set is more useful than a deep failure at first send.
+	switch cfg.Email.Provider {
+	case "smtp", "noop", "log":
+		// ok
+	default:
+		errs = append(errs, fmt.Errorf("GONEXT_EMAIL_PROVIDER %q is not one of smtp|noop|log", cfg.Email.Provider))
+	}
+	switch cfg.Email.AuthMech {
+	case "", "plain", "login", "crammd5":
+		// ok
+	default:
+		errs = append(errs, fmt.Errorf("GONEXT_EMAIL_AUTH_MECH %q is not one of plain|login|crammd5", cfg.Email.AuthMech))
+	}
+	// When Provider="smtp" we require the minimum viable shape
+	// (Host + From). Username may be empty for open-relay-style
+	// internal deployments; the validator only errors if Username is
+	// set without Password — same rule as SMTPConfig.validate().
+	if cfg.Email.Provider == "smtp" {
+		if cfg.Email.Host == "" {
+			errs = append(errs, errors.New("GONEXT_EMAIL_HOST is required when GONEXT_EMAIL_PROVIDER=smtp"))
+		}
+		if cfg.Email.From == "" {
+			errs = append(errs, errors.New("GONEXT_EMAIL_FROM is required when GONEXT_EMAIL_PROVIDER=smtp"))
+		}
+		if cfg.Email.Username != "" && cfg.Email.Password == "" {
+			errs = append(errs, errors.New("GONEXT_EMAIL_PASSWORD is required when GONEXT_EMAIL_USERNAME is set"))
+		}
+	}
+
 	if len(errs) > 0 {
 		return cfg, joinErrs(errs)
 	}

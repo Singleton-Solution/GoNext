@@ -58,6 +58,12 @@ type Config struct {
 	// will not emit beacon scripts and no rum_events rows are written
 	// — the table sits empty until an operator opts in.
 	RUM RUMConfig
+
+	// Email selects and configures the outbound mail transport for
+	// transactional flows (password reset, email verification,
+	// welcome, comment notifications). See [EmailConfig] for the
+	// provider/SMTP/credential matrix.
+	Email EmailConfig
 }
 
 // PerformanceConfig groups opt-out toggles for the performance
@@ -245,4 +251,90 @@ type AuthConfig struct {
 
 	// SessionIdleTTL is the idle expiration. Default 7 days.
 	SessionIdleTTL time.Duration
+}
+
+// EmailConfig configures the outbound mailer.
+//
+// Provider selects which packages/go/email.Sender the chassis wires
+// in:
+//
+//   - "smtp" — the production [email.SMTPSender] backed by Host/Port
+//     and the AuthMech-selected SASL variant. Required for any
+//     real-world deployment.
+//   - "noop" — [email.NoopSender]; sends are recorded in memory but
+//     never go on the wire. Default in tests and the recommended
+//     starting state in local development.
+//   - "log"  — [email.LogSender]; renders messages to slog. Useful for
+//     "what would have been sent" debugging without standing up
+//     MailHog.
+//
+// All credential fields are tagged `redact:"true"` so config dumps
+// reveal length+hash only — see packages/go/config/dump.go for the
+// masking format. From is intentionally NOT redacted because the
+// envelope sender address is operational data an operator needs to
+// see in a debug dump.
+type EmailConfig struct {
+	// Provider is the transport selector. Defaults to "noop" so a
+	// freshly-bootstrapped deployment doesn't blast messages at users
+	// before SMTP is set up. Honors GONEXT_EMAIL_PROVIDER.
+	Provider string
+
+	// Host is the SMTP server hostname. Required when Provider="smtp".
+	// Honors GONEXT_EMAIL_HOST (falls back to GONEXT_SMTP_HOST for
+	// backwards compatibility with the early-bootstrap env names).
+	Host string
+
+	// Port is the SMTP port. Defaults to 587 (submission with
+	// STARTTLS). Honors GONEXT_EMAIL_PORT / GONEXT_SMTP_PORT.
+	Port int
+
+	// Username is the SASL identity. Empty disables auth entirely.
+	// Honors GONEXT_EMAIL_USERNAME / GONEXT_SMTP_USER.
+	Username string
+
+	// Password is the SASL secret. Redacted in dumps. Honors
+	// GONEXT_EMAIL_PASSWORD / GONEXT_SMTP_PASSWORD.
+	Password string `redact:"true"`
+
+	// From is the default envelope-sender address. Required when
+	// Provider="smtp". Honors GONEXT_EMAIL_FROM / GONEXT_SMTP_FROM.
+	From string
+
+	// TLS selects implicit-TLS (port 465) when true. The default
+	// false means STARTTLS on the configured Port (587), which is the
+	// modern submission convention. Honors GONEXT_EMAIL_TLS.
+	TLS bool
+
+	// AuthMech is the SMTP AUTH variant: "plain" (default), "login",
+	// or "crammd5". See packages/go/email.AuthMechanism for the trade
+	// offs. Honors GONEXT_EMAIL_AUTH_MECH.
+	AuthMech string
+
+	// InsecureSkipVerify disables TLS certificate verification. DEV
+	// ONLY — production deployments MUST leave this false. Honors
+	// GONEXT_EMAIL_INSECURE_SKIP_VERIFY.
+	InsecureSkipVerify bool
+
+	// DialTimeout bounds the TCP+TLS handshake. Default 10 seconds.
+	// Honors GONEXT_EMAIL_DIAL_TIMEOUT.
+	DialTimeout time.Duration
+
+	// BrandName is the "Site Name" stamped into every templated
+	// message ("Welcome to <BrandName>"). Falls back to "GoNext" at
+	// render time. Honors GONEXT_EMAIL_BRAND_NAME.
+	BrandName string
+
+	// BrandColor is the CSS color literal used in HTML template
+	// headers and CTAs. Falls back to "#2563eb" at render time.
+	// Honors GONEXT_EMAIL_BRAND_COLOR.
+	BrandColor string
+
+	// SiteURL is the canonical home URL used in template footers and
+	// the welcome "sign in" button. Honors GONEXT_EMAIL_SITE_URL.
+	SiteURL string
+
+	// SupportEmail is the user-facing escalation address printed in
+	// password-reset bodies. Empty hides the "contact support" line.
+	// Honors GONEXT_EMAIL_SUPPORT.
+	SupportEmail string
 }

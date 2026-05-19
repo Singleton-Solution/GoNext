@@ -1,0 +1,13 @@
+Hello {{.UserName}},
+
+Welcome to {{.SiteName}}!
+
+Your account is ready. You can sign in any time at:
+
+  {{.SiteURL}}
+
+If you didn't create this account, you can safely ignore this email — no
+further action is required and your address will not be added to any list.
+
+Thanks,
+The {{.SiteName}} team

@@ -1,0 +1,12 @@
+Hi {{.UserName}},
+
+Please confirm your email address for {{.SiteName}} by visiting the link
+below within {{.ExpiresIn}}:
+
+  {{.VerifyURL}}
+
+If you didn't create an account, you can safely ignore this email — the
+link will expire on its own and no account will be activated.
+
+Thanks,
+The {{.SiteName}} team

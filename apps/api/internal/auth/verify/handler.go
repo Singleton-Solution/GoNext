@@ -32,6 +32,17 @@ type Options struct {
 	// tests.
 	Sender email.Sender
 
+	// Templates, when non-nil, renders the verification message body
+	// from the shared package/go/email templates. When nil the handler
+	// falls back to its built-in minimal body — the chassis ships a
+	// default so the handler is usable without explicit wiring.
+	Templates *email.Templates
+
+	// Brand is the BrandContext fed to template rendering when
+	// Templates is non-nil. Zero-value fields fall back to safe
+	// defaults inside email.WithDefaults.
+	Brand email.BrandContext
+
 	// Limiter is the per-user rate-limit for /send. Defaults to
 	// "1 per minute" with a burst of 1 when not provided. Wiring code
 	// is expected to pass a [ratelimit.Limiter] keyed on user_id.
@@ -227,15 +238,14 @@ func (h *Handler) handleSend(w http.ResponseWriter, r *http.Request) {
 	}
 
 	link := h.buildLink(plain)
-	msg := email.Message{
-		To:       recipient,
-		From:     h.opts.FromAddress,
-		Subject:  h.opts.Subject,
-		TextBody: buildTextBody(link),
-		HTMLBody: buildHTMLBody(link),
-		Tags: map[string]string{
-			"flow": "auth.verify.email",
-		},
+	msg, err := h.buildMessage(recipient, link)
+	if err != nil {
+		h.opts.Log.ErrorContext(ctx, "verify: render template failed",
+			slog.String("err", err.Error()),
+			slog.String("user_id", userID),
+		)
+		writeJSONError(w, http.StatusInternalServerError, "internal_error")
+		return
 	}
 	if err := h.opts.Sender.Send(ctx, msg); err != nil {
 		h.opts.Log.ErrorContext(ctx, "verify: send email failed",
@@ -393,6 +403,64 @@ func (h *Handler) emitAudit(ctx context.Context, r *http.Request, evt string, se
 			slog.String("event", evt),
 		)
 	}
+}
+
+// buildMessage assembles the outbound verification message.
+//
+// When the handler was constructed with a [email.Templates] instance,
+// the message body comes from the shared verify-email template pair
+// (text+HTML). Otherwise the handler falls back to a minimal
+// link-only body — adequate for tests and the no-templates wiring
+// path, but production deployments are expected to pass templates so
+// the message picks up the deployment's brand color and copy.
+func (h *Handler) buildMessage(recipient, link string) (email.Message, error) {
+	tags := map[string]string{
+		"flow":     "auth.verify.email",
+		"template": string(email.TemplateVerifyEmail),
+	}
+	if h.opts.Templates != nil {
+		brand := h.opts.Brand.WithDefaults()
+		data := email.VerifyEmailData{
+			BrandContext: brand,
+			VerifyURL:    link,
+			ExpiresIn:    formatTTL(h.opts.TTL),
+		}
+		msg, err := h.opts.Templates.BuildMessage(email.TemplateVerifyEmail, recipient, h.opts.Subject, data)
+		if err != nil {
+			return email.Message{}, err
+		}
+		msg.From = h.opts.FromAddress
+		// Replace the helper-set Tags with ours so downstream filters
+		// see the flow label as well.
+		msg.Tags = tags
+		return msg, nil
+	}
+	return email.Message{
+		To:       recipient,
+		From:     h.opts.FromAddress,
+		Subject:  h.opts.Subject,
+		TextBody: buildTextBody(link),
+		HTMLBody: buildHTMLBody(link),
+		Tags:     tags,
+	}, nil
+}
+
+// formatTTL renders a duration into a short human-readable string
+// suitable for "the link expires in X" template copy. We round to the
+// nearest hour for durations ≥ 1h and otherwise fall back to the
+// duration's String form.
+func formatTTL(d time.Duration) string {
+	if d <= 0 {
+		return "24 hours"
+	}
+	if d >= time.Hour {
+		hours := int(d.Round(time.Hour) / time.Hour)
+		if hours == 1 {
+			return "1 hour"
+		}
+		return fmt.Sprintf("%d hours", hours)
+	}
+	return d.String()
 }
 
 // buildTextBody returns the plain-text body of the verification

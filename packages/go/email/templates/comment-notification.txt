@@ -1,0 +1,17 @@
+Hi {{.UserName}},
+
+{{.CommenterName}} replied to "{{.PostTitle}}" on {{.SiteName}}:
+
+  {{.CommentExcerpt}}
+
+Read and respond:
+
+  {{.PostURL}}
+
+You're receiving this because you subscribed to comments on this post.
+To stop receiving these notifications, visit:
+
+  {{.UnsubscribeURL}}
+
+Thanks,
+The {{.SiteName}} team

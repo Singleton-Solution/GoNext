@@ -28,8 +28,20 @@
 //
 //   - [SMTPSender] is the production-ready adapter. It speaks plain
 //     SMTP with STARTTLS to the configured host/port, authenticating
-//     with PLAIN auth over the upgraded TLS connection. It honors
+//     with the configured SASL mechanism — PLAIN (default), LOGIN, or
+//     CRAMMD5 — over the upgraded TLS connection. It honors
 //     [SMTPConfig] from the environment (see [LoadSMTPConfig]).
+//
+//   - [Templates] renders the canonical text+HTML message pairs
+//     (welcome, verify-email, password-reset, comment-notification)
+//     from files embedded at build time. [DefaultTemplates] returns
+//     the embedded set; callers can swap in localized variants via
+//     [ParseTemplatesFS].
+//
+//   - [AuditSender] wraps any Sender and emits `email.sent` /
+//     `email.failed` audit rows around every Send. The wrapper is
+//     transport-agnostic, so the same audit shape applies to SMTP,
+//     log, noop, and future hosted-service drivers.
 //
 // # Roadmap (driver stubs, not implemented in v1)
 //
