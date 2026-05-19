@@ -1,0 +1,175 @@
+name: Security Disclosure Check
+
+# Advisory-only PR scan. We grep PR commit messages and modified files for
+# strings that suggest a researcher may have inadvertently dumped vulnerability
+# details into a public PR (instead of using the private disclosure path).
+#
+# When a hit is found, we post a friendly comment reminding the author of the
+# disclosure email and the private advisory form. This workflow MUST NOT block
+# the PR — most matches will be false positives (e.g. tests of an auth-bypass
+# fix, doc updates referencing CVEs, security-baseline.md edits). The goal is
+# a gentle nudge, not a gate.
+#
+# Hook is `pull_request_target` to allow the comment-post step to use the
+# repo-scoped GITHUB_TOKEN. The checkout step pins to the PR head SHA so we
+# never execute attacker-controlled workflow content from the PR; we only
+# read files at that SHA.
+#
+# Related docs: ../SECURITY.md, ../../docs/15-security-policy.md.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: security-disclosure-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: Scan for accidental security disclosure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head (read-only)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+          # Explicit: we do not need credentials here — we are only reading.
+          persist-credentials: false
+
+      - name: Scan commit messages and modified files for disclosure-leak signals
+        id: scan
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          # The trigger phrases. We deliberately use case-insensitive grep and
+          # include both the prefix `vulnerab` (matches vulnerability,
+          # vulnerable, vulnerabilities) and standalone `CVE-`, `exploit`,
+          # `bypass`, and the more specific `auth bypass`.
+          #
+          # We exclude this very workflow file from the file scan so the
+          # workflow does not flag itself when it lands. The exclude list also
+          # covers the security policy docs we expect to legitimately discuss
+          # these terms.
+          PATTERNS='vulnerab|CVE-|exploit|bypass|auth bypass'
+
+          EXCLUDES=(
+            ':!.github/workflows/security-disclosure-check.yml'
+            ':!SECURITY.md'
+            ':!.github/SECURITY.md'
+            ':!docs/13-security-baseline.md'
+            ':!docs/15-security-policy.md'
+            ':!docs/16-bug-bounty.md'
+            ':!.well-known/security.txt'
+            ':!.github/ISSUE_TEMPLATE/security.md'
+          )
+
+          # Commit-message scan.
+          MSG_HITS=""
+          COMMITS=$(git rev-list "$BASE_SHA..$HEAD_SHA")
+          for sha in $COMMITS; do
+            BODY=$(git log -1 --format="%B" "$sha")
+            if echo "$BODY" | grep -iqE "$PATTERNS"; then
+              SUBJECT=$(git log -1 --format="%s" "$sha")
+              MSG_HITS="${MSG_HITS}\n  - ${sha:0:7}  ${SUBJECT}"
+            fi
+          done
+
+          # File-diff scan. `git diff --name-only` first to get the file list,
+          # then a content grep restricted to lines actually added in the PR
+          # (lines beginning with `+` but not `+++`).
+          FILE_HITS=""
+          CHANGED_FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- "${EXCLUDES[@]}" || true)
+          if [ -n "${CHANGED_FILES:-}" ]; then
+            while IFS= read -r f; do
+              [ -z "$f" ] && continue
+              # Only scan files that still exist at HEAD.
+              [ -f "$f" ] || continue
+              # Examine added lines only.
+              ADDED=$(git diff "$BASE_SHA" "$HEAD_SHA" -- "$f" | grep -E '^\+' | grep -vE '^\+\+\+' || true)
+              if echo "$ADDED" | grep -iqE "$PATTERNS"; then
+                FILE_HITS="${FILE_HITS}\n  - ${f}"
+              fi
+            done <<< "$CHANGED_FILES"
+          fi
+
+          if [ -n "$MSG_HITS" ] || [ -n "$FILE_HITS" ]; then
+            {
+              echo "matched=true"
+              {
+                echo 'comment<<EOF'
+                echo "Heads up — this PR touches strings that often signal a security disclosure (\`vulnerab\`, \`CVE-\`, \`exploit\`, \`bypass\`, or \`auth bypass\`)."
+                echo ""
+                echo "**If this PR fixes or describes a real vulnerability that has not yet been publicly disclosed, please stop and use the private path:**"
+                echo ""
+                echo "1. Open a [private security advisory](https://github.com/Singleton-Solution/GoNext/security/advisories/new), or"
+                echo "2. Email <security@gonext.io> with subject \`[SECURITY] GoNext - <summary>\`."
+                echo ""
+                echo "See [\`/SECURITY.md\`](https://github.com/Singleton-Solution/GoNext/blob/main/SECURITY.md) for the full disclosure flow and [\`/docs/16-bug-bounty.md\`](https://github.com/Singleton-Solution/GoNext/blob/main/docs/16-bug-bounty.md) for bounty terms."
+                echo ""
+                echo "If this is a false positive (test fixture, doc update, release notes, etc.) please ignore this comment — the check is advisory only and does not block the PR."
+                if [ -n "$MSG_HITS" ]; then
+                  echo ""
+                  echo "Matched commit messages:"
+                  printf '%b' "$MSG_HITS"
+                fi
+                if [ -n "$FILE_HITS" ]; then
+                  echo ""
+                  echo "Matched files:"
+                  printf '%b' "$FILE_HITS"
+                fi
+                echo ""
+                echo "EOF"
+              }
+            } >> "$GITHUB_OUTPUT"
+            echo "::notice::Disclosure-signal strings detected; posting advisory comment."
+          else
+            echo "matched=false" >> "$GITHUB_OUTPUT"
+            echo "No disclosure-signal strings found."
+          fi
+
+      - name: Post advisory comment
+        if: steps.scan.outputs.matched == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const body = process.env.COMMENT_BODY;
+            if (!body || !body.trim()) {
+              core.info('No comment body produced; skipping.');
+              return;
+            }
+            // Check if we already posted to avoid spamming on every synchronize.
+            const marker = '<!-- security-disclosure-check:v1 -->';
+            const existing = await github.paginate(
+              github.rest.issues.listComments,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                per_page: 100,
+              },
+            );
+            const already = existing.find((c) => c.body && c.body.includes(marker));
+            if (already) {
+              core.info(`Comment already exists at id=${already.id}; skipping.`);
+              return;
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: `${marker}\n${body}`,
+            });
+        env:
+          COMMENT_BODY: ${{ steps.scan.outputs.comment }}

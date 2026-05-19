@@ -1,0 +1,15 @@
+# GoNext security.txt — RFC 9116.
+#
+# Canonical policy: https://github.com/Singleton-Solution/GoNext/blob/main/SECURITY.md
+# Full programmatic policy: https://github.com/Singleton-Solution/GoNext/blob/main/docs/15-security-policy.md
+# Bug bounty: https://github.com/Singleton-Solution/GoNext/blob/main/docs/16-bug-bounty.md
+
+Contact: mailto:security@gonext.io
+Contact: https://github.com/Singleton-Solution/GoNext/security/advisories/new
+Expires: 2027-05-19T20:11:47.000Z
+Encryption: https://gonext.io/.well-known/pgp-key.txt
+Preferred-Languages: en
+Canonical: https://gonext.io/.well-known/security.txt
+Policy: https://github.com/Singleton-Solution/GoNext/blob/main/SECURITY.md
+Hiring: https://github.com/Singleton-Solution/GoNext/blob/main/CONTRIBUTING.md
+Acknowledgments: https://github.com/Singleton-Solution/GoNext/blob/main/SECURITY-HALL-OF-FAME.md
