@@ -70,6 +70,14 @@ const (
 	CapManageThemes         Capability = "manage_themes"
 	CapSwitchThemes         Capability = "switch_themes"
 	CapEditThemes           Capability = "edit_themes"
+	// CapThemeEditParts grants operators write access to the Site Editor
+	// Lite surface — overriding the theme's on-disk template parts
+	// (header, footer, sidebar, etc.) without leaving the admin UI.
+	// The capability is intentionally separate from CapEditThemes:
+	// operators routinely re-skin a header without being trusted to
+	// rewrite the theme package on disk, and a least-privilege design
+	// keeps the editor open to that role. Issue #428.
+	CapThemeEditParts Capability = "theme.edit_parts"
 
 	// Comments.
 	CapModerateComments Capability = "moderate_comments"
