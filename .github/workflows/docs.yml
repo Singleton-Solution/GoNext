@@ -1,0 +1,71 @@
+name: Docs Site
+
+# Builds the @gonext/docs static site whenever the docs app or its content
+# sources change. The output is uploaded as a workflow artifact so reviewers
+# can preview the rendered site without spinning up a deploy.
+#
+# The actual deploy step (Cloudflare Pages / Vercel / S3 — TBD per ops) is
+# intentionally not in this workflow yet: we want the build green and the
+# review process in place before flipping the publish switch on docs.gonext.io.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/docs/**'
+      - 'docs/**'
+      - 'adr/**'
+      - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/docs.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/docs/**'
+      - 'docs/**'
+      - 'adr/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Typecheck
+        run: pnpm --filter @gonext/docs typecheck
+
+      - name: Test
+        run: pnpm --filter @gonext/docs test
+
+      - name: Build
+        run: pnpm --filter @gonext/docs build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-site-${{ github.sha }}
+          path: apps/docs/.next
+          retention-days: 14
+          if-no-files-found: error

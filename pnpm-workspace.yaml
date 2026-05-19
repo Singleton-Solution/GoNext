@@ -1,5 +1,6 @@
 packages:
   - 'apps/web'
   - 'apps/admin'
+  - 'apps/docs'
   - 'packages/ts/*'
   - 'tools/bundle-budget'
