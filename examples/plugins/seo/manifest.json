@@ -1,0 +1,27 @@
+{
+  "apiVersion": "gonext.io/v1",
+  "name": "gonext-seo",
+  "version": "0.1.0",
+  "entry": "seo.wasm",
+  "capabilities": [
+    "posts.read",
+    "posts.write",
+    "hooks.subscribe",
+    "jobs.enqueue"
+  ],
+  "hooks": {
+    "filters": [
+      "the_content"
+    ],
+    "actions": [
+      "wp_head",
+      "save_post"
+    ]
+  },
+  "jobs": [
+    "seo.recompute-scores"
+  ],
+  "requires": {
+    "host": ">=0.1.0"
+  }
+}
