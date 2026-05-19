@@ -26,14 +26,20 @@ import (
 	"time"
 )
 
-// spec is the OpenAPI 3.1 description embedded at build time.
+// spec is the OpenAPI 3.1 description embedded at build time, JSON form.
 //
 // The path is relative to this Go source file, which means it is the same
 // JSON checked into apps/api/openapi/. Keep them in sync by editing the
-// JSON, not by copying.
+// YAML at apps/api/openapi/openapi.yaml — the JSON is derived from it.
 //
 //go:embed spec/gonext.openapi.json
 var spec []byte
+
+// specYAML is the YAML form of the same document, served at
+// /api/openapi.yaml as a convenience for tooling that prefers YAML over JSON.
+//
+//go:embed spec/openapi.yaml
+var specYAML []byte
 
 // specETag is computed once at process start so conditional GETs (If-None-Match)
 // can short-circuit. The spec is read-only at runtime, so a startup-time
@@ -41,6 +47,11 @@ var spec []byte
 // would be marginally stronger but pulls in crypto for no real benefit on
 // a static asset.
 var specETag = `"openapi-` + strconv.Itoa(len(spec)) + `"`
+
+// specYAMLETag is the ETag for the YAML serialization. Distinct from the
+// JSON ETag because the bytes differ — a client that GET-then-conditional
+// against both surfaces should see independent caching.
+var specYAMLETag = `"openapi-yaml-` + strconv.Itoa(len(specYAML)) + `"`
 
 // startedAt is the Last-Modified value we advertise. It's set at package
 // init, which is close enough to "when the binary was built" for caching
@@ -71,6 +82,38 @@ func Handler() http.Handler {
 		// bytes in a bytes.Reader via a thin helper.
 		http.ServeContent(w, r, "gonext.openapi.json", startedAt, newSpecReader())
 	})
+}
+
+// YAMLHandler returns an http.Handler that serves the embedded OpenAPI 3.1
+// document as application/yaml.
+//
+// The contract mirrors Handler(): GET / HEAD only, conditional requests
+// honoured via ETag / Last-Modified, a public 60-second cache. Mount at
+// /api/openapi.yaml — see this package's README for the wire-up.
+func YAMLHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet, http.MethodHead:
+		default:
+			w.Header().Set("Allow", "GET, HEAD")
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
+		w.Header().Set("ETag", specYAMLETag)
+		w.Header().Set("Cache-Control", "public, max-age=60")
+
+		http.ServeContent(w, r, "openapi.yaml", startedAt, newSpecYAMLReader())
+	})
+}
+
+// SpecYAMLBytes returns a copy of the embedded YAML spec. Same contract as
+// SpecBytes — never share the backing array across callers.
+func SpecYAMLBytes() []byte {
+	out := make([]byte, len(specYAML))
+	copy(out, specYAML)
+	return out
 }
 
 // SwaggerUIHandler returns an http.Handler that serves a single-page

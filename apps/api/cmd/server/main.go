@@ -29,6 +29,7 @@ import (
 
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/rum"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/healthz"
+	openapidocs "github.com/Singleton-Solution/GoNext/apps/api/internal/openapi"
 	plugindev "github.com/Singleton-Solution/GoNext/apps/api/internal/plugins/dev"
 	"github.com/Singleton-Solution/GoNext/packages/go/audit"
 	"github.com/Singleton-Solution/GoNext/packages/go/buildinfo"
@@ -323,6 +324,20 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, lo
 		healthz.DBCheck(pool),
 		healthz.RedisCheck(rdb),
 	))
+
+	// OpenAPI surface (issue #310). The JSON form is the production
+	// canonical (every SDK generator targets it); the YAML form is the
+	// human-friendly diff target. Both are public — no auth — because
+	// the document describes the contract, not the data.
+	//
+	// The Swagger UI page is gated on non-prod environments by the
+	// caller; in this binary we mount it unconditionally on dev so a
+	// `make run` developer can poke the API in a browser without env
+	// gymnastics. Production deploys keep the JSON+YAML and drop the UI
+	// by overriding the route table.
+	mux.Handle("GET /openapi.json", openapidocs.Handler())
+	mux.Handle("GET /api/openapi.yaml", openapidocs.YAMLHandler())
+	mux.Handle("GET /docs/", openapidocs.SwaggerUIHandler())
 
 	// In-house RUM (issue #132). The beacon endpoint is mounted
 	// unconditionally — the public theme respects cfg.RUM.Enabled

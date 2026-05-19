@@ -14,3 +14,8 @@ import (
 func newSpecReader() io.ReadSeeker {
 	return bytes.NewReader(spec)
 }
+
+// newSpecYAMLReader is the YAML companion of newSpecReader.
+func newSpecYAMLReader() io.ReadSeeker {
+	return bytes.NewReader(specYAML)
+}
