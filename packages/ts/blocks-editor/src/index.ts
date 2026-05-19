@@ -19,10 +19,18 @@
  */
 
 export {
+  BLOCK_INSERTER_PATTERNS_TAB,
   BlockInserter,
   INSERTER_CATEGORIES,
   type BlockInserterProps,
 } from './block-inserter.tsx';
+
+export type {
+  Pattern,
+  PatternRegistry,
+} from './pattern-types.ts';
+
+export { clonePatternBlocks } from './pattern-clone.ts';
 
 export {
   BlockEditCanvas,
