@@ -1,4 +1,4 @@
--- 000024_personal_access_tokens.up.sql
+-- 000026_personal_access_tokens.up.sql
 --
 -- `personal_access_tokens` — long-lived bearer tokens for programmatic
 -- API access (CI, CLI, external scripts). Unlike browser sessions

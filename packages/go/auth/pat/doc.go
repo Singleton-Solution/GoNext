@@ -2,7 +2,7 @@
 // credentials for programmatic API access (CI, CLI, external scripts).
 //
 // PATs are deliberately NOT sessions. They live in their own table
-// (000024_personal_access_tokens), ride in the Authorization header
+// (000026_personal_access_tokens), ride in the Authorization header
 // instead of a cookie, never rotate, and carry an explicit scope list
 // that the middleware intersects with the issuing user's effective
 // capabilities at every request — the narrower of the two wins.
@@ -38,6 +38,6 @@
 // admin role automatically defangs their CI token without touching
 // the token table.
 //
-// See migrations/000024_personal_access_tokens.up.sql for the storage
+// See migrations/000026_personal_access_tokens.up.sql for the storage
 // model and the design notes that pin every column to a non-goal.
 package pat

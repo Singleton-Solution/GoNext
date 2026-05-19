@@ -1,4 +1,4 @@
--- 000024_personal_access_tokens.down.sql
+-- 000026_personal_access_tokens.down.sql
 --
 -- Rolls back the PAT table and its indexes. DROP TABLE drops indexes
 -- with it, so the index DROPs are redundant but explicit for symmetry.
