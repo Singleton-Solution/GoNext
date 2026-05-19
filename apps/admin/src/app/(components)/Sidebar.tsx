@@ -16,6 +16,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, type ReactElement } from 'react';
+import { GlobalSearch } from '../../components/GlobalSearch';
 
 type NavItem = {
   href: string;
@@ -30,6 +31,11 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: '/comments', label: 'Comments', icon: 'C' },
   { href: '/media', label: 'Media', icon: 'M' },
   { href: '/users', label: 'Users', icon: 'U' },
+  // Search is the full-page result view that the sidebar GlobalSearch
+  // overlay routes to on Enter-without-focus. We expose it as a nav
+  // entry so deep-linked /search?q=… URLs still slot into the IA;
+  // most users will reach it through the always-visible search input.
+  { href: '/search', label: 'Search', icon: 'Sr' },
   { href: '/plugins', label: 'Plugins', icon: 'Pl' },
   // Appearance → Site Editor surface (issue #428). The link points
   // at the lite cut today; v0.2 expands the same section with full
@@ -77,6 +83,11 @@ export function Sidebar(): ReactElement {
           {collapsed ? '>' : '<'}
         </button>
       </div>
+      {!collapsed && (
+        <div className="sidebar__search">
+          <GlobalSearch />
+        </div>
+      )}
       <nav>
         <ul className="sidebar__nav">
           {NAV_ITEMS.map((item) => {

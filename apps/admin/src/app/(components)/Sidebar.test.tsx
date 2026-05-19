@@ -13,6 +13,10 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/posts',
+  // GlobalSearch (mounted inside Sidebar) calls useRouter; stub it so
+  // the render doesn't blow up. The Sidebar tests themselves don't
+  // exercise the router.
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
 }));
 
 import { Sidebar } from './Sidebar';
@@ -28,6 +32,7 @@ describe('Sidebar', () => {
       ['Comments', '/comments'],
       ['Media', '/media'],
       ['Users', '/users'],
+      ['Search', '/search'],
       ['Plugins', '/plugins'],
       ['Settings', '/settings'],
       ['System Status', '/status'],

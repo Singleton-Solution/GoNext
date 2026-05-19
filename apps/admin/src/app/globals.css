@@ -247,3 +247,159 @@ h2 {
 .muted {
   color: var(--color-text-muted);
 }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* GlobalSearch — sidebar-mounted command input. The component must
+ * remain compact in the sidebar gutter; the dropdown floats below
+ * the input and is positioned absolutely so it overlays the nav
+ * without re-flowing the list. */
+.sidebar__search {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.global-search {
+  position: relative;
+}
+
+.global-search__input {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  background: var(--color-bg);
+}
+
+.global-search__input:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+  border-color: var(--color-accent);
+  background: var(--color-surface);
+}
+
+.global-search__results {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  right: 0;
+  z-index: 50;
+  list-style: none;
+  margin: 0;
+  padding: var(--space-1) 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.global-search__empty {
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text-muted);
+}
+
+.global-search__hit {
+  padding: 0;
+}
+
+.global-search__hit a {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text);
+}
+
+.global-search__hit a:hover,
+.global-search__hit--focused a {
+  background: var(--color-bg);
+  text-decoration: none;
+}
+
+.global-search__hit-type {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+.global-search__hit-title {
+  font-weight: 500;
+}
+
+.global-search__hit-excerpt {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.global-search__hit-excerpt mark {
+  background: rgba(37, 99, 235, 0.18);
+  color: var(--color-text);
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+/* /search full page */
+.search-page__list {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.search-page__hit {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+}
+
+.search-page__hit a {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--color-text);
+}
+
+.search-page__hit-type {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+.search-page__hit-title {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.search-page__hit-excerpt {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-muted);
+}
+
+.search-page__hit-excerpt mark {
+  background: rgba(37, 99, 235, 0.18);
+  color: var(--color-text);
+  padding: 0 2px;
+  border-radius: 2px;
+}
