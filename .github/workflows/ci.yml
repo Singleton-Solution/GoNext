@@ -208,7 +208,10 @@ jobs:
         env:
           GOWORK: 'off'
         run: |
-          go run ./tools/openapi-validate apps/api/openapi/gonext.openapi.json
+          # The validator is a separate module (not in go.work). cd into
+          # it so `go run` sees its go.mod; pass the spec via an absolute
+          # path so the relative-path arg doesn't break after cd.
+          cd tools/openapi-validate && go run . "$GITHUB_WORKSPACE/apps/api/openapi/gonext.openapi.json"
       - name: Validator tests
         env:
           GOWORK: 'off'
