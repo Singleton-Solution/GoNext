@@ -403,3 +403,200 @@ h2 {
   padding: 0 2px;
   border-radius: 2px;
 }
+
+/* ---------------------------------------------------------------------------
+ * Setup wizard — the in-browser first-run install surface. Lives at /setup.
+ * The shell mimics the login-card pattern but is roomier because the wizard
+ * has its own multi-step flow + step indicator.
+ * ------------------------------------------------------------------------- */
+.setup {
+  max-width: 640px;
+  margin: 48px auto;
+  padding: 0 var(--space-4);
+}
+
+.setup__header {
+  margin-bottom: var(--space-6);
+  text-align: center;
+}
+
+.setup__header h1 {
+  margin-bottom: var(--space-2);
+}
+
+.setup__step {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-6);
+}
+
+.setup-steps {
+  list-style: none;
+  margin: var(--space-6) 0 0;
+  padding: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.setup-steps__item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  border-top: 2px solid var(--color-border);
+  padding-top: var(--space-2);
+}
+
+.setup-steps__item--current,
+.setup-steps__item--done {
+  color: var(--color-accent);
+  border-top-color: var(--color-accent);
+}
+
+.setup-steps__num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.setup-steps__item--current .setup-steps__num,
+.setup-steps__item--done .setup-steps__num {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: white;
+}
+
+.setup-step h2 {
+  margin-bottom: var(--space-2);
+}
+
+.setup-step__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+.setup-step__error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  margin-bottom: var(--space-4);
+  font-size: 13px;
+}
+
+.setup-step__hint {
+  font-size: 12px;
+  color: #b45309;
+  margin-top: var(--space-1);
+}
+
+.btn-secondary {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-4);
+  font-weight: 500;
+}
+
+.btn-secondary:hover {
+  background: var(--color-bg);
+}
+
+.btn-primary[disabled],
+.btn-secondary[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Strength meter */
+.setup-strength {
+  margin-top: var(--space-1);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setup-strength__track {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.setup-strength__fill {
+  height: 100%;
+  transition: width 120ms ease, background 120ms ease;
+}
+
+.setup-strength__label {
+  font-size: 12px;
+}
+
+/* System check */
+.setup-checks {
+  list-style: none;
+  margin: var(--space-4) 0 var(--space-2);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.setup-checks__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 13px;
+}
+
+.setup-checks__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.setup-checks__label {
+  font-weight: 500;
+  min-width: 140px;
+}
+
+.setup-checks__detail {
+  font-size: 12px;
+}
+
+/* Review step */
+.setup-review {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-4) 0;
+}
+
+.setup-review dt {
+  font-weight: 600;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.setup-review dd {
+  margin: 0;
+  word-break: break-word;
+}
