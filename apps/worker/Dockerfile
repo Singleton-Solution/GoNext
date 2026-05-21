@@ -18,7 +18,7 @@
 # root so go.work, packages/go, and apps/worker are all visible in /src.
 
 # ---------- Stage 1: build ----------
-FROM golang:1.24-alpine AS build
+FROM golang:1.25-alpine AS build
 
 RUN apk add --no-cache git ca-certificates tzdata
 

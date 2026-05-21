@@ -12,7 +12,7 @@
 #     -t ghcr.io/singleton-solution/gonext-api:dev .
 #
 # Layer story (see docs/09-deployment-ops.md §2.2):
-#   1. golang:1.24-alpine builder with module cache mount
+#   1. golang:1.25-alpine builder with module cache mount
 #   2. distroless/static-debian12:nonroot runtime, ~25-30 MB
 #
 # The Go workspace at the repo root (go.work) references this module plus
@@ -22,7 +22,7 @@
 # apps/api visible in /src for `go build` to resolve the workspace.
 
 # ---------- Stage 1: build ----------
-FROM golang:1.24-alpine AS build
+FROM golang:1.25-alpine AS build
 
 # Install build-time tools. ca-certificates and tzdata are pulled in here
 # so the runtime stage can copy them over (distroless/static does ship
@@ -86,6 +86,10 @@ LABEL org.opencontainers.image.title="gonext-api" \
       org.opencontainers.image.created="${BUILD_DATE}"
 
 COPY --from=build /out/api /app/api
+# Seed theme content is embedded via go:embed (packages/go/theme/seed),
+# so the seeder unpacks to GONEXT_THEME_DIR at boot — no in-image theme
+# tree is required. Compose mounts a writable volume at /themes so the
+# seeder can write to it under the distroless `nonroot` user (uid 65532).
 
 # api: 8080 (HTTP), 9090 (metrics — wired up in a later issue).
 EXPOSE 8080 9090
