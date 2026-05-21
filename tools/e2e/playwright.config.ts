@@ -16,6 +16,10 @@ const isCI = !!process.env.CI;
 
 export default defineConfig({
   testDir: './tests',
+  // globalSetup only does work when E2E_FRESH_INSTALL=1; it's a no-op
+  // otherwise so the existing smoke + a11y suites keep working
+  // unchanged. See global-setup.ts for the contract.
+  globalSetup: './global-setup.ts',
   // Match every `*.spec.ts` under `tests/`, including the `a11y/` subtree
   // wired in by issue #250. Helper files under `tests/a11y/helpers/` and
   // `tests/a11y/fixtures/` are excluded by the explicit `.spec.ts` suffix.
