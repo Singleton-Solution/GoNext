@@ -38,6 +38,27 @@ docker compose up
 ```
 
 Every environment variable the API reads is documented in [`.env.example`](.env.example) with default, type, and security notes. For the prose reference (per-section tables, redaction rules, K8s / systemd deployment shapes), see [`docs/17-environment.md`](docs/17-environment.md).
+A fresh checkout becomes a working site in three commands. You'll need Postgres reachable via `DATABASE_URL` and a pepper secret (any high-entropy string) in `GONEXT_AUTH_PEPPER`.
+
+```bash
+# 1. Build the CLI.
+go build -o ./bin/gonext ./cli/gonext
+
+# 2. First-run bootstrap: applies migrations, installs the default
+#    theme, creates the initial super_admin user, and stamps the
+#    site name + URL into the options table. Re-running on an
+#    already-initialized install is a no-op.
+DATABASE_URL='postgres://gonext:gonext@localhost:5432/gonext?sslmode=disable' \
+GONEXT_AUTH_PEPPER='replace-me-with-a-real-secret' \
+  ./bin/gonext init \
+    --admin-email you@example.com \
+    --site-name 'My Site' \
+    --site-url https://example.com
+
+# 3. Run the API + worker (see apps/api, apps/worker).
+```
+
+Pass `--admin-password` (insecure on shared hosts), `--admin-password-stdin` (pipe from a secret manager), or omit both and `init` will prompt with no-echo. Add `--non-interactive` in CI to fail fast on missing fields. The full flag list is in `gonext init --help`.
 
 ## Design documents
 
