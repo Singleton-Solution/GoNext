@@ -22,6 +22,23 @@ A modern, modular content management platform. WordPress's ecosystem promise, bu
 
 WordPress is the most-used CMS in the world, and also the most-exploited. Plugin security holes are the #1 reason commercial sites get breached. GoNext is built on the bet that a sandboxed plugin runtime + signed marketplace + modern stack solves the trust problem WordPress can't.
 
+## Quickstart
+
+```sh
+# 1. Copy the sample env file and edit the secrets.
+cp .env.example .env
+
+# 2. Generate the three required auth secrets.
+openssl rand -base64 32   # paste into GONEXT_AUTH_PEPPER
+openssl rand -base64 32   # paste into GONEXT_AUTH_SESSION_SECRET
+openssl rand -base64 32   # paste into GONEXT_AUTH_CSRF_SECRET
+
+# 3. Bring up Postgres + Redis + MinIO and the API.
+docker compose up
+```
+
+Every environment variable the API reads is documented in [`.env.example`](.env.example) with default, type, and security notes. For the prose reference (per-section tables, redaction rules, K8s / systemd deployment shapes), see [`docs/17-environment.md`](docs/17-environment.md).
+
 ## Design documents
 
 All architectural decisions are documented in [`/docs`](./docs):
@@ -42,6 +59,7 @@ All architectural decisions are documented in [`/docs`](./docs):
 | 11 | [Testing & CI](docs/11-testing-ci.md) | Test pyramid, contract tests, CI |
 | 12 | [Jobs & Cron](docs/12-jobs-cron.md) | Asynq queues, retries, leader election |
 | 13 | [Security Baseline](docs/13-security-baseline.md) | Headers, CSP, secrets, supply chain |
+| 17 | [Environment & Configuration](docs/17-environment.md) | Every env var the loader reads — type, default, deployment patterns |
 
 Proposals for all open questions live in [`/docs/proposals`](./docs/proposals).
 Architecture Decision Records in [`/adr`](./adr).
