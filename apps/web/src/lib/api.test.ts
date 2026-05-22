@@ -11,11 +11,11 @@ import {
   fetchActiveTheme,
   fetchResolvedTemplate,
   fetchArchive,
-  fetchPublicSiteConfig,
   fetchArchivePage,
   fetchAuthorBySlug,
   fetchTermBySlug,
   ApiError,
+  fetchPublicSiteConfig,
 } from './api.ts';
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -170,57 +170,6 @@ describe('fetchArchive', () => {
   });
 });
 
-describe('fetchPublicSiteConfig', () => {
-  it('returns the parsed config on 2xx', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(200, {
-        baseUrl: 'https://example.com',
-        allowIndex: true,
-      }),
-    );
-    const cfg = await fetchPublicSiteConfig();
-    expect(cfg.baseUrl).toBe('https://example.com');
-    expect(cfg.allowIndex).toBe(true);
-  });
-
-  it('strips a stray trailing slash from baseUrl', async () => {
-    // Defense-in-depth: the Go side strips this on load, but if a
-    // future provenance change skips that step the renderer still
-    // produces well-formed URLs.
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(200, {
-        baseUrl: 'https://example.com/',
-        allowIndex: true,
-      }),
-    );
-    const cfg = await fetchPublicSiteConfig();
-    expect(cfg.baseUrl).toBe('https://example.com');
-  });
-
-  it('returns the safe fallback when the API is unreachable', async () => {
-    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('down'));
-    const cfg = await fetchPublicSiteConfig();
-    expect(cfg.baseUrl).toBe('');
-    // CRITICAL: the failure mode must default to "don't index" so
-    // an offline API doesn't promote a staging deployment to
-    // search-engine eligibility.
-    expect(cfg.allowIndex).toBe(false);
-  });
-
-  it('returns the safe fallback on 404', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(404, null),
-    );
-    const cfg = await fetchPublicSiteConfig();
-    expect(cfg).toEqual({ baseUrl: '', allowIndex: false });
-  });
-
-  it('coerces invalid response shapes to the safe fallback', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(200, { baseUrl: 42, allowIndex: 'yes' }),
-    );
-    const cfg = await fetchPublicSiteConfig();
-    expect(cfg).toEqual({ baseUrl: '', allowIndex: false });
 describe('fetchArchivePage', () => {
   it('returns the parsed envelope with total + page metadata', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
@@ -354,5 +303,60 @@ describe('fetchTermBySlug', () => {
     expect(await fetchTermBySlug('', 'news')).toBeNull();
     expect(await fetchTermBySlug('category', '')).toBeNull();
     expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('fetchPublicSiteConfig', () => {
+  it('returns the parsed config on 2xx', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        baseUrl: 'https://example.com',
+        allowIndex: true,
+      }),
+    );
+    const cfg = await fetchPublicSiteConfig();
+    expect(cfg.baseUrl).toBe('https://example.com');
+    expect(cfg.allowIndex).toBe(true);
+  });
+
+  it('strips a stray trailing slash from baseUrl', async () => {
+    // Defense-in-depth: the Go side strips this on load, but if a
+    // future provenance change skips that step the renderer still
+    // produces well-formed URLs.
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        baseUrl: 'https://example.com/',
+        allowIndex: true,
+      }),
+    );
+    const cfg = await fetchPublicSiteConfig();
+    expect(cfg.baseUrl).toBe('https://example.com');
+  });
+
+  it('returns the safe fallback when the API is unreachable', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('down'));
+    const cfg = await fetchPublicSiteConfig();
+    expect(cfg.baseUrl).toBe('');
+    // CRITICAL: the failure mode must default to "don't index" so
+    // an offline API doesn't promote a staging deployment to
+    // search-engine eligibility.
+    expect(cfg.allowIndex).toBe(false);
+  });
+
+  it('returns the safe fallback on 404', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(404, null),
+    );
+    const cfg = await fetchPublicSiteConfig();
+    expect(cfg).toEqual({ baseUrl: '', allowIndex: false });
+  });
+
+  it('coerces invalid response shapes to the safe fallback', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, { baseUrl: 42, allowIndex: 'yes' }),
+    );
+    const cfg = await fetchPublicSiteConfig();
+    expect(cfg).toEqual({ baseUrl: '', allowIndex: false });
   });
 });

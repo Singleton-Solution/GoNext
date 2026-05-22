@@ -62,23 +62,6 @@ export interface Post {
 }
 
 /**
- * Public-site configuration the renderer fetches once per request and
- * stamps into discoverability surfaces (sitemap.xml, Atom feeds,
- * robots.txt). The Go side reads these from `Config.PublicSite` and
- * exposes them at `/api/v1/public-site/config`.
- *
- * `allowIndex` defaults to `false` so a renderer that can't reach the
- * API serves a Disallow-everything robots.txt — the safe failure mode
- * for an unconfigured deployment is "stay out of search results".
- */
-export interface PublicSiteConfig {
-  /** Canonical origin (e.g. `https://example.com`). No trailing slash. */
-  baseUrl: string;
-  /** Whether crawlers may index this deployment. */
-  allowIndex: boolean;
-}
-
-/**
  * Minimal author shape used by the author archive route. We only
  * surface the public-safe fields here — the wp-json/users projection
  * already drops email / roles / capabilities for unauthenticated
@@ -405,22 +388,6 @@ export async function fetchResolvedTemplate(
 }
 
 /**
- * Fetch the archive feed for the home/archive page. The renderer
- * walks blocks for each entry; the API returns the same `Post`
- * shape as `fetchPostBySlug`, minus heavy fields where applicable.
- *
- * Accepts an optional `category` filter (the term slug) for the
- * per-category Atom feed route — when set the renderer asks the Go
- * side to narrow the result set rather than over-fetching.
- */
-export async function fetchArchive(
-  query: {
-    postType?: string;
-    limit?: number;
-    category?: string;
-  } = {},
-  options: { revalidate?: number } = {},
-): Promise<Post[]> {
  * Filters accepted by `fetchArchive`. The home / generic archive page
  * passes the empty shape; the author / category / tag / date routes
  * each add one or two filters so the same endpoint can power all four
@@ -471,7 +438,6 @@ function buildArchiveParams(query: ArchiveQuery): URLSearchParams {
   params.set('status', 'published');
   if (query.postType) params.set('postType', query.postType);
   if (query.limit) params.set('limit', String(query.limit));
-  if (query.category) params.set('category', query.category);
   if (query.page) params.set('page', String(query.page));
   if (query.authorSlug) params.set('authorSlug', query.authorSlug);
   if (query.authorId) params.set('authorId', query.authorId);
@@ -623,6 +589,8 @@ export async function fetchTermBySlug(
   }
 }
 
+// ── Public site config (from PR #416 sitemap/feeds) ──
+
 /**
  * Fetch the public-site config the renderer needs for discoverability
  * surfaces. Falls back to a safe (no-base-url, no-index) shape if the
@@ -653,4 +621,20 @@ export async function fetchPublicSiteConfig(
     if (err instanceof ApiError && err.status === 0) return fallback;
     throw err;
   }
+}
+
+/**
+ * Public-site configuration as seen by the renderer.
+ *
+ * `baseUrl` is the absolute origin used to compose canonical URLs +
+ * sitemap entries. `allowIndex` defaults to `false` so a renderer
+ * that can't reach the API serves a Disallow-everything robots.txt
+ * — the safe failure mode for an unconfigured deployment is "stay
+ * out of search results".
+ */
+export interface PublicSiteConfig {
+  /** Canonical origin (e.g. `https://example.com`). No trailing slash. */
+  baseUrl: string;
+  /** Whether crawlers may index this deployment. */
+  allowIndex: boolean;
 }
