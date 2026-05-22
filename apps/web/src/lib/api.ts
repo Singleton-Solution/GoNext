@@ -76,6 +76,9 @@ export interface PublicSiteConfig {
   baseUrl: string;
   /** Whether crawlers may index this deployment. */
   allowIndex: boolean;
+}
+
+/**
  * Minimal author shape used by the author archive route. We only
  * surface the public-safe fields here — the wp-json/users projection
  * already drops email / roles / capabilities for unauthenticated
