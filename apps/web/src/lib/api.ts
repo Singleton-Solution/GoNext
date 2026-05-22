@@ -62,20 +62,38 @@ export interface Post {
 }
 
 /**
- * Public-site configuration the renderer fetches once per request and
- * stamps into discoverability surfaces (sitemap.xml, Atom feeds,
- * robots.txt). The Go side reads these from `Config.PublicSite` and
- * exposes them at `/api/v1/public-site/config`.
- *
- * `allowIndex` defaults to `false` so a renderer that can't reach the
- * API serves a Disallow-everything robots.txt — the safe failure mode
- * for an unconfigured deployment is "stay out of search results".
+ * Minimal author shape used by the author archive route. We only
+ * surface the public-safe fields here — the wp-json/users projection
+ * already drops email / roles / capabilities for unauthenticated
+ * callers, and we further trim to what the renderer paints.
  */
-export interface PublicSiteConfig {
-  /** Canonical origin (e.g. `https://example.com`). No trailing slash. */
-  baseUrl: string;
-  /** Whether crawlers may index this deployment. */
-  allowIndex: boolean;
+export interface Author {
+  /** Stable identifier — used for revalidation tags + author-{id} template. */
+  id: string;
+  /** URL slug, unique within the user table. */
+  slug: string;
+  /** Display name (used as the archive heading). */
+  name: string;
+  /** Optional bio / description shown above the post list. */
+  description?: string;
+}
+
+/**
+ * Minimal term shape used by category / tag archive routes. The Go
+ * side stores the taxonomy on the term itself; we forward that so the
+ * route can decide which template hierarchy to walk.
+ */
+export interface Term {
+  /** Stable identifier — used for revalidation tags. */
+  id: string;
+  /** URL slug, unique within the taxonomy. */
+  slug: string;
+  /** Human-readable display name. */
+  name: string;
+  /** Taxonomy slug — e.g. "category", "post_tag". */
+  taxonomy: string;
+  /** Optional description shown above the post list. */
+  description?: string;
 }
 
 /**
@@ -205,6 +223,51 @@ function asPost(raw: unknown): Post | null {
   };
 }
 
+function asAuthor(raw: unknown): Author | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  // The wp-json/users surface emits numeric ids; accept either a
+  // number or a string so this also works against the (in progress)
+  // typed /api/v1/users endpoint that returns string ids.
+  let id: string | null = null;
+  if (typeof r.id === 'string' && r.id !== '') id = r.id;
+  else if (typeof r.id === 'number' && Number.isFinite(r.id)) id = String(r.id);
+  const slug = typeof r.slug === 'string' ? r.slug : null;
+  const name = typeof r.name === 'string' ? r.name : slug ?? '';
+  if (!id || !slug) return null;
+  return {
+    id,
+    slug,
+    name,
+    description: typeof r.description === 'string' ? r.description : undefined,
+  };
+}
+
+function asTerm(raw: unknown): Term | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  let id: string | null = null;
+  if (typeof r.id === 'string' && r.id !== '') id = r.id;
+  else if (typeof r.id === 'number' && Number.isFinite(r.id)) id = String(r.id);
+  const slug = typeof r.slug === 'string' ? r.slug : null;
+  const name = typeof r.name === 'string' ? r.name : slug ?? '';
+  // Both `taxonomy` (typed v1 endpoint) and `taxonomySlug` (wp-json
+  // alias) are accepted so callers don't have to know which surface
+  // answered.
+  const taxonomy =
+    (typeof r.taxonomy === 'string' && r.taxonomy) ||
+    (typeof r.taxonomySlug === 'string' && r.taxonomySlug) ||
+    '';
+  if (!id || !slug || !taxonomy) return null;
+  return {
+    id,
+    slug,
+    name,
+    taxonomy,
+    description: typeof r.description === 'string' ? r.description : undefined,
+  };
+}
+
 function asActiveTheme(raw: unknown): ActiveTheme | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
@@ -325,43 +388,217 @@ export async function fetchResolvedTemplate(
 }
 
 /**
- * Fetch the archive feed for the home/archive page. The renderer
- * walks blocks for each entry; the API returns the same `Post`
- * shape as `fetchPostBySlug`, minus heavy fields where applicable.
- *
- * Accepts an optional `category` filter (the term slug) for the
- * per-category Atom feed route — when set the renderer asks the Go
- * side to narrow the result set rather than over-fetching.
+ * Filters accepted by `fetchArchive`. The home / generic archive page
+ * passes the empty shape; the author / category / tag / date routes
+ * each add one or two filters so the same endpoint can power all four
+ * archive types.
  */
-export async function fetchArchive(
-  query: {
-    postType?: string;
-    limit?: number;
-    category?: string;
-  } = {},
-  options: { revalidate?: number } = {},
-): Promise<Post[]> {
+export interface ArchiveQuery {
+  /** Restrict to a single post type — e.g. "post", "page", "book". */
+  postType?: string;
+  /** Page size. Defaults to 10 server-side when omitted. */
+  limit?: number;
+  /** 1-based page number for pagination links. */
+  page?: number;
+  /** Restrict to posts authored by this user slug or numeric id. */
+  authorSlug?: string;
+  authorId?: string;
+  /** Restrict to posts in this term (paired with taxonomy below). */
+  termSlug?: string;
+  taxonomy?: string;
+  /**
+   * Backwards-compat shortcut for category-feed callers (#416 feed
+   * route). When set, forwarded verbatim as `category=<slug>` on the
+   * archive URL. New code should prefer `taxonomy: 'category'` +
+   * `termSlug: <slug>`; this shortcut keeps the feed/[category]
+   * route working without churn.
+   */
+  category?: string;
+  /** Date archive filters — 4-digit year, 1-12 month, 1-31 day. */
+  year?: number;
+  month?: number;
+  day?: number;
+}
+
+/**
+ * Total-count metadata for archive feeds. The renderer uses this to
+ * build "older / newer" pagination links and to short-circuit empty
+ * pages into 404s.
+ */
+export interface ArchivePage {
+  /** Posts on the requested page. May be shorter than `limit`. */
+  posts: Post[];
+  /** Total posts matching the filter, across all pages. */
+  total: number;
+  /** Page size that was honoured (mirrors `limit` when supplied). */
+  perPage: number;
+  /** 1-based page number echoed from the request. */
+  page: number;
+}
+
+/**
+ * Build the query string fragments archive endpoints share. Extracted
+ * so the route-specific fetchers can reuse the same parameter names
+ * without each having to know the canonical spelling.
+ */
+function buildArchiveParams(query: ArchiveQuery): URLSearchParams {
   const params = new URLSearchParams();
   params.set('status', 'published');
   if (query.postType) params.set('postType', query.postType);
   if (query.limit) params.set('limit', String(query.limit));
+  if (query.page) params.set('page', String(query.page));
+  if (query.authorSlug) params.set('authorSlug', query.authorSlug);
+  if (query.authorId) params.set('authorId', query.authorId);
+  if (query.termSlug) params.set('termSlug', query.termSlug);
+  if (query.taxonomy) params.set('taxonomy', query.taxonomy);
   if (query.category) params.set('category', query.category);
+  if (query.year !== undefined) params.set('year', String(query.year));
+  if (query.month !== undefined) params.set('month', String(query.month));
+  if (query.day !== undefined) params.set('day', String(query.day));
+  return params;
+}
+
+/**
+ * Defensive parse of an `{ posts, total, perPage, page }` envelope.
+ * Falls back to the bare `{ posts }` shape for backwards compatibility
+ * with older API stubs. Always returns a valid `ArchivePage`.
+ */
+function asArchivePage(raw: unknown, fallbackPerPage: number, fallbackPage: number): ArchivePage {
+  const empty: ArchivePage = {
+    posts: [],
+    total: 0,
+    perPage: fallbackPerPage,
+    page: fallbackPage,
+  };
+  if (!raw || typeof raw !== 'object') return empty;
+  const r = raw as Record<string, unknown>;
+  const rawPosts = Array.isArray(r.posts) ? (r.posts as unknown[]) : [];
+  const posts = rawPosts.map((p) => asPost(p)).filter((p): p is Post => p !== null);
+  const total =
+    typeof r.total === 'number' && Number.isFinite(r.total)
+      ? r.total
+      : posts.length;
+  const perPage =
+    typeof r.perPage === 'number' && Number.isFinite(r.perPage) && r.perPage > 0
+      ? r.perPage
+      : fallbackPerPage;
+  const page =
+    typeof r.page === 'number' && Number.isFinite(r.page) && r.page > 0
+      ? r.page
+      : fallbackPage;
+  return { posts, total, perPage, page };
+}
+
+/**
+ * Fetch the archive feed for the home/archive page. The renderer
+ * walks blocks for each entry; the API returns the same `Post`
+ * shape as `fetchPostBySlug`, minus heavy fields where applicable.
+ *
+ * Kept as the thin "just give me posts" surface for legacy callers
+ * (the homepage and the [...slug] catch-all). New callers should
+ * prefer `fetchArchivePage` which surfaces total + page metadata.
+ */
+export async function fetchArchive(
+  query: ArchiveQuery = {},
+  options: { revalidate?: number; cookie?: string } = {},
+): Promise<Post[]> {
+  const page = await fetchArchivePage(query, options);
+  return page.posts;
+}
+
+/**
+ * Fetch a paginated slice of an archive feed. Returns the parsed
+ * `{ posts, total, perPage, page }` envelope so the renderer can
+ * decide whether to paint a "next page" link.
+ *
+ * Treats network failure and 404 as "empty page" rather than a hard
+ * error — the archive route still paints the surrounding theme parts
+ * and shows the empty state. A 5xx still throws ApiError so the
+ * caller can surface it.
+ */
+export async function fetchArchivePage(
+  query: ArchiveQuery = {},
+  options: { revalidate?: number; cookie?: string } = {},
+): Promise<ArchivePage> {
+  const params = buildArchiveParams(query);
+  const fallbackPerPage = query.limit ?? 10;
+  const fallbackPage = query.page ?? 1;
   try {
     const raw = await getJson<unknown>(
       `/api/v1/posts?${params.toString()}`,
       options,
     );
-    if (!raw || typeof raw !== 'object') return [];
-    const posts = (raw as { posts?: unknown[] }).posts;
-    if (!Array.isArray(posts)) return [];
-    return posts
-      .map((p) => asPost(p))
-      .filter((p): p is Post => p !== null);
+    return asArchivePage(raw, fallbackPerPage, fallbackPage);
   } catch (err) {
-    if (err instanceof ApiError && err.status === 0) return [];
+    if (err instanceof ApiError && err.status === 0) {
+      return {
+        posts: [],
+        total: 0,
+        perPage: fallbackPerPage,
+        page: fallbackPage,
+      };
+    }
     throw err;
   }
 }
+
+/**
+ * Fetch a user / author by slug. Returns `null` for 404 — the author
+ * archive route renders the 404 template path in that case.
+ *
+ * TODO(#author-by-slug): the `/api/v1/users/by-slug/{slug}` endpoint
+ * is referenced in the BACKLOG and matches the convention of the
+ * existing `/api/v1/posts/by-slug/{slug}` route. Treat unreachable
+ * as "author not found" so the renderer degrades gracefully.
+ */
+export async function fetchAuthorBySlug(
+  slug: string,
+  options: { cookie?: string; revalidate?: number } = {},
+): Promise<Author | null> {
+  if (!slug) return null;
+  try {
+    const raw = await getJson<unknown>(
+      `/api/v1/users/by-slug/${encodeURIComponent(slug)}`,
+      options,
+    );
+    return asAuthor(raw);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 0) return null;
+    throw err;
+  }
+}
+
+/**
+ * Fetch a taxonomy term by slug + taxonomy. Returns `null` for 404 —
+ * the category / tag route renders the 404 template path in that case.
+ *
+ * The lookup is scoped by taxonomy because two taxonomies may ship a
+ * term with the same slug (e.g. a "news" category and a "news" tag);
+ * the route always knows which taxonomy it's serving.
+ *
+ * TODO(#term-by-slug): the `/api/v1/terms/by-slug/{taxonomy}/{slug}`
+ * endpoint is documented in the theme system design but not yet wired
+ * on every environment. Treat unreachable as "term not found".
+ */
+export async function fetchTermBySlug(
+  taxonomy: string,
+  slug: string,
+  options: { cookie?: string; revalidate?: number } = {},
+): Promise<Term | null> {
+  if (!taxonomy || !slug) return null;
+  try {
+    const raw = await getJson<unknown>(
+      `/api/v1/terms/by-slug/${encodeURIComponent(taxonomy)}/${encodeURIComponent(slug)}`,
+      options,
+    );
+    return asTerm(raw);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 0) return null;
+    throw err;
+  }
+}
+
+// ── Public site config (from PR #416 sitemap/feeds) ──
 
 /**
  * Fetch the public-site config the renderer needs for discoverability
@@ -393,4 +630,20 @@ export async function fetchPublicSiteConfig(
     if (err instanceof ApiError && err.status === 0) return fallback;
     throw err;
   }
+}
+
+/**
+ * Public-site configuration as seen by the renderer.
+ *
+ * `baseUrl` is the absolute origin used to compose canonical URLs +
+ * sitemap entries. `allowIndex` defaults to `false` so a renderer
+ * that can't reach the API serves a Disallow-everything robots.txt
+ * — the safe failure mode for an unconfigured deployment is "stay
+ * out of search results".
+ */
+export interface PublicSiteConfig {
+  /** Canonical origin (e.g. `https://example.com`). No trailing slash. */
+  baseUrl: string;
+  /** Whether crawlers may index this deployment. */
+  allowIndex: boolean;
 }

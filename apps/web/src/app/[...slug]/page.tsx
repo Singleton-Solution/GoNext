@@ -1,10 +1,17 @@
 /**
  * Catch-all public-site route.
  *
- * Matches every path that isn't owned by another route file. The
- * params shape is `slug: string[]` — Next gives us the path segments
- * unencoded, which we collapse back into a single slug string the
- * API understands.
+ * Matches every path that isn't owned by a more-specific route file.
+ * Now that `author/[slug]`, `category/[slug]`, `tag/[slug]`, and the
+ * `[year]` / `[year]/[month]` / `[year]/[month]/[day]` date archives
+ * exist, Next's App Router precedence reserves this handler for paths
+ * of four or more segments (single-, two- and three-segment paths are
+ * served by the date routes, which themselves fall through to
+ * `renderSingular` when their segments aren't date-shaped).
+ *
+ * The params shape is `slug: string[]` — Next gives us the path
+ * segments unencoded, which we collapse back into a single slug
+ * string the API understands.
  *
  * Flow:
  *
