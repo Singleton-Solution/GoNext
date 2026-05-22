@@ -406,6 +406,14 @@ export interface ArchiveQuery {
   /** Restrict to posts in this term (paired with taxonomy below). */
   termSlug?: string;
   taxonomy?: string;
+  /**
+   * Backwards-compat shortcut for category-feed callers (#416 feed
+   * route). When set, forwarded verbatim as `category=<slug>` on the
+   * archive URL. New code should prefer `taxonomy: 'category'` +
+   * `termSlug: <slug>`; this shortcut keeps the feed/[category]
+   * route working without churn.
+   */
+  category?: string;
   /** Date archive filters — 4-digit year, 1-12 month, 1-31 day. */
   year?: number;
   month?: number;
@@ -443,6 +451,7 @@ function buildArchiveParams(query: ArchiveQuery): URLSearchParams {
   if (query.authorId) params.set('authorId', query.authorId);
   if (query.termSlug) params.set('termSlug', query.termSlug);
   if (query.taxonomy) params.set('taxonomy', query.taxonomy);
+  if (query.category) params.set('category', query.category);
   if (query.year !== undefined) params.set('year', String(query.year));
   if (query.month !== undefined) params.set('month', String(query.month));
   if (query.day !== undefined) params.set('day', String(query.day));
