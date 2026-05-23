@@ -28,7 +28,7 @@
 -- redirects
 -- =============================================================================
 
-CREATE TABLE IF NOT EXISTS redirects (
+CREATE TABLE IF NOT EXISTS redirect_rules (
     -- Surrogate primary key. UUID v7 keeps inserts B-tree-friendly
     -- (ADR 0003) and gives the admin UI a stable handle for edit/delete.
     id                  UUID PRIMARY KEY DEFAULT gen_uuid_v7(),
@@ -80,15 +80,15 @@ CREATE TABLE IF NOT EXISTS redirects (
     created_by          UUID REFERENCES users(id) ON DELETE SET NULL
 );
 
-COMMENT ON TABLE  redirects IS
+COMMENT ON TABLE  redirect_rules IS
     'Operator-curated URL redirect rules. Consulted by middleware before the renderer; literal rules use a hashmap, regex rules iterate in creation order. Distinct from permalinks (#init) which point at live content.';
-COMMENT ON COLUMN redirects.source_path      IS 'Request path to match (literal) or regex pattern (when is_regex). Leading slash required for literal rules.';
-COMMENT ON COLUMN redirects.destination_path IS 'Target path or absolute URL. May reference $1/$2 capture groups when the rule is a regex.';
-COMMENT ON COLUMN redirects.status           IS 'HTTP redirect status. 301/308 are permanent (cacheable); 302/307 are temporary. Pinned set; other values rejected.';
-COMMENT ON COLUMN redirects.is_regex         IS 'False = hashmap lookup; True = pattern compiled at load and matched in creation order.';
-COMMENT ON COLUMN redirects.hit_count        IS 'Lifetime match counter. Updated by the engine flusher every 30s, not per-request, to keep the hot path lock-free.';
-COMMENT ON COLUMN redirects.last_hit_at      IS 'Wall-clock of the most recent match. NULL until first hit. Updated in the same 30s flush as hit_count.';
-COMMENT ON COLUMN redirects.created_by       IS 'Issuing operator. SET NULL on user delete; the audit log retains the original author.';
+COMMENT ON COLUMN redirect_rules.source_path      IS 'Request path to match (literal) or regex pattern (when is_regex). Leading slash required for literal rules.';
+COMMENT ON COLUMN redirect_rules.destination_path IS 'Target path or absolute URL. May reference $1/$2 capture groups when the rule is a regex.';
+COMMENT ON COLUMN redirect_rules.status           IS 'HTTP redirect status. 301/308 are permanent (cacheable); 302/307 are temporary. Pinned set; other values rejected.';
+COMMENT ON COLUMN redirect_rules.is_regex         IS 'False = hashmap lookup; True = pattern compiled at load and matched in creation order.';
+COMMENT ON COLUMN redirect_rules.hit_count        IS 'Lifetime match counter. Updated by the engine flusher every 30s, not per-request, to keep the hot path lock-free.';
+COMMENT ON COLUMN redirect_rules.last_hit_at      IS 'Wall-clock of the most recent match. NULL until first hit. Updated in the same 30s flush as hit_count.';
+COMMENT ON COLUMN redirect_rules.created_by       IS 'Issuing operator. SET NULL on user delete; the audit log retains the original author.';
 
 -- =============================================================================
 -- Constraints + Indexes
@@ -99,21 +99,21 @@ COMMENT ON COLUMN redirects.created_by       IS 'Issuing operator. SET NULL on u
 -- match paths), so uniqueness is on the (source, is_regex) pair, not
 -- source alone. Authors who try to create a duplicate literal rule get
 -- a 409 from the admin UI translating the UNIQUE violation.
-CREATE UNIQUE INDEX IF NOT EXISTS redirects_source_kind_uniq_idx
-    ON redirects (source_path, is_regex);
+CREATE UNIQUE INDEX IF NOT EXISTS redirect_rules_source_kind_uniq_idx
+    ON redirect_rules (source_path, is_regex);
 
 -- Hot-path lookup index. The engine bulk-loads literal rules into an
 -- in-process hashmap at boot, but admin queries ("show me all rules
 -- for /blog/*") still hit Postgres. The composite (is_regex,
 -- created_at) lets the admin list paginate by created_at within a
 -- regex-vs-literal filter without sorting in memory.
-CREATE INDEX IF NOT EXISTS redirects_kind_created_at_idx
-    ON redirects (is_regex, created_at DESC);
+CREATE INDEX IF NOT EXISTS redirect_rules_kind_created_at_idx
+    ON redirect_rules (is_regex, created_at DESC);
 
 -- "Top traffic" admin tab orders by hit_count DESC. Partial index on
 -- hit_count > 0 so cold rules (never hit) don't take up space in the
 -- index — the tab is explicitly about traffic, so unhit rows are
 -- correctly absent.
-CREATE INDEX IF NOT EXISTS redirects_hit_count_idx
-    ON redirects (hit_count DESC)
+CREATE INDEX IF NOT EXISTS redirect_rules_hit_count_idx
+    ON redirect_rules (hit_count DESC)
     WHERE hit_count > 0;

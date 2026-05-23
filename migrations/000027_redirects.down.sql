@@ -5,7 +5,7 @@
 -- symmetry with the up migration and to make the down semantics
 -- explicit when read in isolation.
 
-DROP INDEX IF EXISTS redirects_hit_count_idx;
-DROP INDEX IF EXISTS redirects_kind_created_at_idx;
-DROP INDEX IF EXISTS redirects_source_kind_uniq_idx;
-DROP TABLE IF EXISTS redirects;
+DROP INDEX IF EXISTS redirect_rules_hit_count_idx;
+DROP INDEX IF EXISTS redirect_rules_kind_created_at_idx;
+DROP INDEX IF EXISTS redirect_rules_source_kind_uniq_idx;
+DROP TABLE IF EXISTS redirect_rules;

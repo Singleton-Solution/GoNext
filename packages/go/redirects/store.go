@@ -193,7 +193,7 @@ func newPgxStoreFromQuerier(q pgxQuerier) *PgxStore {
 }
 
 const insertSQL = `
-INSERT INTO redirects (source_path, destination_path, status, is_regex, created_by)
+INSERT INTO redirect_rules (source_path, destination_path, status, is_regex, created_by)
 VALUES ($1, $2, $3, $4, $5)
 RETURNING id, hit_count, last_hit_at, created_at
 `
@@ -236,7 +236,7 @@ func (s *PgxStore) Create(ctx context.Context, rule Rule) (Rule, error) {
 const selectByIDSQL = `
 SELECT id, source_path, destination_path, status, is_regex,
        hit_count, last_hit_at, created_at, created_by
-FROM redirects
+FROM redirect_rules
 WHERE id = $1
 `
 
@@ -254,7 +254,7 @@ func (s *PgxStore) Get(ctx context.Context, id uuid.UUID) (Rule, error) {
 }
 
 const updateSQL = `
-UPDATE redirects
+UPDATE redirect_rules
 SET source_path = $2, destination_path = $3, status = $4, is_regex = $5
 WHERE id = $1
 RETURNING hit_count, last_hit_at, created_at, created_by
@@ -296,7 +296,7 @@ func (s *PgxStore) Update(ctx context.Context, rule Rule) (Rule, error) {
 	return out, nil
 }
 
-const deleteSQL = `DELETE FROM redirects WHERE id = $1`
+const deleteSQL = `DELETE FROM redirect_rules WHERE id = $1`
 
 // Delete removes a rule. Idempotent.
 func (s *PgxStore) Delete(ctx context.Context, id uuid.UUID) error {
@@ -309,7 +309,7 @@ func (s *PgxStore) Delete(ctx context.Context, id uuid.UUID) error {
 const listSQL = `
 SELECT id, source_path, destination_path, status, is_regex,
        hit_count, last_hit_at, created_at, created_by
-FROM redirects
+FROM redirect_rules
 WHERE ($1::TIMESTAMPTZ IS NULL OR created_at < $1)
 ORDER BY created_at DESC
 LIMIT $2
@@ -343,7 +343,7 @@ func (s *PgxStore) List(ctx context.Context, before time.Time, limit int) ([]Rul
 const snapshotSQL = `
 SELECT id, source_path, destination_path, status, is_regex,
        hit_count, last_hit_at, created_at, created_by
-FROM redirects
+FROM redirect_rules
 ORDER BY created_at ASC
 `
 
@@ -405,7 +405,7 @@ func (s *PgxStore) BulkIncrementHits(ctx context.Context, deltas []HitDelta) err
 		lasts = append(lasts, a.last)
 	}
 	const sql = `
-UPDATE redirects AS r
+UPDATE redirect_rules AS r
 SET hit_count   = r.hit_count + d.cnt,
     last_hit_at = GREATEST(r.last_hit_at, d.lst)
 FROM unnest($1::uuid[], $2::bigint[], $3::timestamptz[]) AS d(id, cnt, lst)
