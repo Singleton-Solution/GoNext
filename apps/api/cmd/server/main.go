@@ -29,6 +29,7 @@ import (
 
 	adminmedia "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/media"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/customizer"
+	adminredirects "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/redirects"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/rum"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/healthz"
 	restcomments "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/comments"
@@ -48,6 +49,7 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/plugins/lifecycle"
 	"github.com/Singleton-Solution/GoNext/packages/go/policy"
 	redisclient "github.com/Singleton-Solution/GoNext/packages/go/redis"
+	"github.com/Singleton-Solution/GoNext/packages/go/redirects"
 	"github.com/Singleton-Solution/GoNext/packages/go/session"
 	"github.com/Singleton-Solution/GoNext/packages/go/shutdown"
 	"github.com/Singleton-Solution/GoNext/packages/go/theme/seed"
@@ -203,7 +205,27 @@ func run(ctx context.Context) error {
 	// reset) shares the same instance.
 	sessions := session.NewWithClient(rdb, logger)
 
-	mux := buildRouter(cfg, pool, rdb, sessions, themeDir, logger)
+	// Redirect rules engine (issue: WordPress-parity 301 admin). The
+	// engine consults a snapshot of the redirect_rules table and serves
+	// 3xx responses for matched paths BEFORE the renderer mux ever
+	// sees them — a request for /old-page returning 301 must never
+	// also incur a renderer DB lookup that would 404 anyway. The
+	// flusher goroutine batches hit-count writes every 30s so the
+	// hot path stays lock-free.
+	//
+	// Reload errors are non-fatal at boot: an empty engine serves
+	// no redirects, which is the same posture as a fresh install.
+	redirectStore := redirects.NewPgxStore(pool)
+	redirectEngine := redirects.NewEngine(redirectStore)
+	if reloadErr := redirectEngine.Reload(ctx); reloadErr != nil {
+		logger.Warn("redirects: initial reload failed; serving empty rule set", "err", reloadErr)
+	}
+	redirectEngine.Start()
+	orch.MustRegister(logger, "redirects.engine", func(stopCtx context.Context) error {
+		return redirectEngine.Stop(stopCtx)
+	})
+
+	mux := buildRouter(cfg, pool, rdb, sessions, themeDir, logger, redirectStore, redirectEngine)
 
 	// Build the middleware chain. Early Hints (issue #122) sits AFTER
 	// Recovery (so a panicking hints provider doesn't crash the
@@ -242,6 +264,11 @@ func run(ctx context.Context) error {
 		httpx.RequestID(),
 		httpx.Logger(logger, "/healthz", "/readyz"),
 		httpmetrics.Middleware(metricsReg.Prometheus()),
+		// Redirect rules sit AFTER request-id / logger (so a 301
+		// shows up in the access log with the rest of the request
+		// trail) but BEFORE the mux: a matched rule short-circuits
+		// the renderer entirely.
+		redirects.Middleware(redirectEngine),
 	)
 
 	srv, err := httpx.New(httpx.Options{
@@ -316,7 +343,7 @@ func run(ctx context.Context) error {
 // enable DevMode, so they never see this surface — registering the
 // route conditionally (rather than gating at request time) is the
 // strongest guarantee we can offer.
-func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, sessions *session.Manager, themeDir string, logger *slog.Logger) http.Handler {
+func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, sessions *session.Manager, themeDir string, logger *slog.Logger, redirectStore redirects.Store, redirectEngine *redirects.Engine) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
@@ -387,6 +414,23 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 	} else {
 		logger.Info("admin/media: routes mounted",
 			slog.String("base", "/api/v1/admin/media"),
+		)
+	}
+
+	// Redirect rules admin (WordPress-parity 301 administration). The
+	// engine is wired into the middleware chain ABOVE this router,
+	// so a matched rule never reaches the mux. The admin handlers
+	// here let operators create/edit/delete rules and call Reload on
+	// the engine when they mutate state.
+	if err := adminredirects.Mount(mux, "/api/v1/admin/redirects", adminredirects.Deps{
+		Store:  redirectStore,
+		Engine: redirectEngine,
+		Logger: logger,
+	}); err != nil {
+		logger.Warn("admin/redirects: failed to mount routes", slog.Any("err", err))
+	} else {
+		logger.Info("admin/redirects: routes mounted",
+			slog.String("base", "/api/v1/admin/redirects"),
 		)
 	}
 
