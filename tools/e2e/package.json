@@ -10,6 +10,7 @@
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
     "test:list": "playwright test --list",
+    "e2e:smoke": "E2E_FRESH_INSTALL=1 playwright test tests/install-and-publish.spec.ts --project=chromium",
     "install-browsers": "playwright install --with-deps",
     "typecheck": "tsc --noEmit"
   },

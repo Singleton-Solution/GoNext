@@ -19,6 +19,12 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["playwright.config.ts", "tests/**/*.ts", "fixtures/**/*.ts"],
+  "include": [
+    "playwright.config.ts",
+    "global-setup.ts",
+    "tests/**/*.ts",
+    "fixtures/**/*.ts",
+    "lib/**/*.ts"
+  ],
   "exclude": ["node_modules", "test-results", "playwright-report"]
 }

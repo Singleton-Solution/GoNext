@@ -85,6 +85,16 @@ a11y-chromium: ## Run the a11y subset on chromium only (fast local loop).
 	@cd tools/e2e && pnpm run test:a11y:chromium
 
 # ---------------------------------------------------------------------------
+# End-to-end smoke (fresh install -> publish -> public-site render)
+
+.PHONY: e2e-smoke
+e2e-smoke: ## Run the fresh-install happy-path smoke against a running stack.
+	@echo "==> Running e2e smoke (tools/e2e/tests/install-and-publish.spec.ts)"
+	@# Wipes the e2e database; gated behind E2E_ALLOW_DESTRUCTIVE so a
+	@# stray invocation can't nuke a real one.
+	@cd tools/e2e && E2E_ALLOW_DESTRUCTIVE=1 pnpm run e2e:smoke
+
+# ---------------------------------------------------------------------------
 # Lint
 
 .PHONY: lint lint-go lint-js lint-md
