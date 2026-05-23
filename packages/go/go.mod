@@ -3,6 +3,8 @@ module github.com/Singleton-Solution/GoNext/packages/go
 go 1.25.0
 
 require (
+	github.com/HugoSmits86/nativewebp v1.3.0
+	github.com/Kagami/go-avif v0.1.0
 	github.com/alicebob/miniredis/v2 v2.38.0
 	github.com/coreos/go-oidc/v3 v3.18.0
 	github.com/evanphx/json-patch/v5 v5.9.11
@@ -26,6 +28,7 @@ require (
 	github.com/tetratelabs/wazero v1.11.0
 	github.com/wI2L/jsondiff v0.7.1
 	golang.org/x/crypto v0.51.0
+	golang.org/x/image v0.40.0
 	golang.org/x/mod v0.36.0
 	golang.org/x/net v0.53.0
 	golang.org/x/oauth2 v0.36.0

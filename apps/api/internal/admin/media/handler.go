@@ -34,6 +34,13 @@ type Deps struct {
 	// Policy resolves the media.* capability checks. Required.
 	Policy policy.Policy
 
+	// Processor enqueues the media.process task after a successful
+	// upload. Optional — when nil the upload still succeeds and the
+	// row is committed, but no variants are generated. Tests that
+	// don't exercise the pipeline can omit this; production wiring
+	// passes the taskspec-backed adapter.
+	Processor ProcessEnqueuer
+
 	// Logger receives structured log lines. nil falls back to
 	// slog.Default — useful for tests; production wiring should always
 	// pass a service logger.
@@ -65,12 +72,13 @@ func (d Deps) validate() error {
 }
 
 type handlers struct {
-	store    Store
-	putter   ObjectPutter
-	policy   policy.Policy
-	logger   *slog.Logger
-	now      func() time.Time
-	maxBytes int64
+	store     Store
+	putter    ObjectPutter
+	policy    policy.Policy
+	processor ProcessEnqueuer
+	logger    *slog.Logger
+	now       func() time.Time
+	maxBytes  int64
 }
 
 // Mount wires the media routes onto mux under base (typically
@@ -98,12 +106,13 @@ func Mount(mux *http.ServeMux, base string, deps Deps) error {
 	}
 
 	h := &handlers{
-		store:    deps.Store,
-		putter:   deps.Putter,
-		policy:   deps.Policy,
-		logger:   deps.Logger,
-		now:      deps.Now,
-		maxBytes: maxBytes,
+		store:     deps.Store,
+		putter:    deps.Putter,
+		policy:    deps.Policy,
+		processor: deps.Processor,
+		logger:    deps.Logger,
+		now:       deps.Now,
+		maxBytes:  maxBytes,
 	}
 	base = strings.TrimRight(base, "/")
 	mux.Handle("POST "+base, h.gate(policy.CapMediaUpload, h.upload))
@@ -269,6 +278,23 @@ func (h *handlers) upload(w http.ResponseWriter, r *http.Request, pr policy.Prin
 		return
 	}
 	asset.PublicURL = h.putter.PublicURL(asset.StorageKey)
+
+	// Fire the image-processing pipeline. We do this AFTER the row is
+	// committed so the asset is queryable even if the enqueue fails;
+	// the upload itself is the user-visible work and a worker outage
+	// must not lose uploads. The error path logs at warn rather than
+	// error because a missing variant is a degraded experience, not a
+	// broken one — the original is always available through PublicURL.
+	if h.processor != nil {
+		if err := h.processor.Enqueue(r.Context(), asset.ID, asset.StorageKey, asset.MimeType); err != nil {
+			h.logger.WarnContext(r.Context(), "admin/media: enqueue processing failed",
+				slog.String("asset_id", asset.ID),
+				slog.String("storage_key", asset.StorageKey),
+				slog.Any("err", err),
+			)
+		}
+	}
+
 	router.WriteJSON(w, http.StatusCreated, asset)
 }
 
@@ -312,8 +338,19 @@ func (h *handlers) list(w http.ResponseWriter, r *http.Request, _ policy.Princip
 	}
 	for i := range page.Data {
 		page.Data[i].PublicURL = h.putter.PublicURL(page.Data[i].StorageKey)
+		populateVariantURLs(page.Data[i].Variants, h.putter)
 	}
 	router.WriteJSON(w, http.StatusOK, page)
+}
+
+// populateVariantURLs renders the per-variant PublicURL field. Same
+// rendering convention as Asset.PublicURL — the URL is computed from
+// the storage key each request rather than stored — so a bucket
+// migration doesn't have to touch the variants column.
+func populateVariantURLs(vs []Variant, putter ObjectPutter) {
+	for i := range vs {
+		vs[i].PublicURL = putter.PublicURL(vs[i].StorageKey)
+	}
 }
 
 // get handles GET /admin/media/{id}.
@@ -334,6 +371,7 @@ func (h *handlers) get(w http.ResponseWriter, r *http.Request, _ policy.Principa
 		return
 	}
 	asset.PublicURL = h.putter.PublicURL(asset.StorageKey)
+	populateVariantURLs(asset.Variants, h.putter)
 	router.WriteJSON(w, http.StatusOK, asset)
 }
 
@@ -380,6 +418,7 @@ func (h *handlers) update(w http.ResponseWriter, r *http.Request, _ policy.Princ
 		return
 	}
 	asset.PublicURL = h.putter.PublicURL(asset.StorageKey)
+	populateVariantURLs(asset.Variants, h.putter)
 	router.WriteJSON(w, http.StatusOK, asset)
 }
 

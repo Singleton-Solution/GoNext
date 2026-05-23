@@ -16,9 +16,9 @@ import (
 // tests assert on the string but production callers never see this
 // because the real S3 putter implements the same interface.
 type MemoryPutter struct {
-	mu      sync.Mutex
-	stored  map[string][]byte
-	putErr  error
+	mu     sync.Mutex
+	stored map[string][]byte
+	putErr error
 }
 
 // NewMemoryPutter returns an empty in-memory putter.
