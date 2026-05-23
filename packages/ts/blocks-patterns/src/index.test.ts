@@ -2,8 +2,9 @@
  * Tests for the top-level @gonext/blocks-patterns surface.
  *
  * Contract under test:
- *   1. `CORE_PATTERNS` contains exactly the ten first-party patterns,
- *      in the documented insertion order.
+ *   1. `CORE_PATTERNS` contains exactly the twenty first-party patterns,
+ *      in the documented insertion order. The original ten retain their
+ *      positions; the ten additions follow.
  *   2. Each pattern carries the required fields with non-empty values.
  *   3. Each pattern's `blocks` field round-trips through the blocks-sdk
  *      `BlockRegistry.validate()` cleanly once `@gonext/blocks-core`'s
@@ -22,6 +23,7 @@ import {
 import { BUILT_IN_PATTERN_CATEGORIES } from './categories.ts';
 
 const EXPECTED_IDS = [
+  // Original ten — order preserved from #401.
   'core/hero-with-cta',
   'core/three-column-features',
   'core/pricing-three-tier',
@@ -32,10 +34,21 @@ const EXPECTED_IDS = [
   'core/header-logo-nav',
   'core/footer-multi-column',
   'core/post-grid',
+  // Ten additions.
+  'core/faq-accordion',
+  'core/team-grid',
+  'core/stat-counter-row',
+  'core/newsletter-signup',
+  'core/comparison-table',
+  'core/bullet-list-with-icons',
+  'core/timeline-vertical',
+  'core/quote-with-portrait',
+  'core/image-text-split',
+  'core/image-text-split-reversed',
 ];
 
 describe('@gonext/blocks-patterns surface', () => {
-  it('exports exactly the ten first-party patterns, in order', () => {
+  it('exports exactly the twenty first-party patterns, in order', () => {
     expect(CORE_PATTERNS.map((p) => p.id)).toEqual(EXPECTED_IDS);
   });
 
@@ -106,6 +119,14 @@ describe('@gonext/blocks-patterns surface', () => {
         expect(typeof k).toBe('string');
         expect(k.length).toBeGreaterThan(0);
       }
+    }
+  });
+
+  it('every pattern id is unique across the catalog', () => {
+    const seen = new Set<string>();
+    for (const p of CORE_PATTERNS) {
+      expect(seen.has(p.id)).toBe(false);
+      seen.add(p.id);
     }
   });
 });
