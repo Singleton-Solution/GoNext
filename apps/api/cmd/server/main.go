@@ -441,6 +441,9 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 		logger.Info("setup: routes mounted",
 			slog.String("status", "/api/v1/setup/status"),
 			slog.String("install", "/api/v1/setup/install"),
+		)
+	}
+
 	// Public comments REST surface (this issue). Anonymous- and
 	// logged-in-friendly. Mounts at /api/v1/posts/{id}/comments. The
 	// store is the package's in-memory implementation for the same
