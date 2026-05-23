@@ -137,24 +137,44 @@ fmt-js: ## Format JS/TS code.
 
 # ---------------------------------------------------------------------------
 # Dev stack (docker-compose)
+#
+# `make up` brings up the FULL dev stack (data + app services) by composing
+# the base docker-compose.yml with docker-compose.dev.yml. The override
+# adds api, worker, admin, web, and a one-shot migrate runner; the base
+# keeps Postgres, Redis, and MinIO. We export COMPOSE_FILE so subsequent
+# `docker compose ...` calls in this shell pick up both files without the
+# operator typing them out — this is the "docker compose run --rm api psql"
+# escape hatch that doesn't go through the Makefile.
 
-.PHONY: up down logs restart psql redis-cli
-up: ## Start the local dev stack (Postgres, Redis, MinIO).
-	@docker compose up -d
+COMPOSE_FILES := -f docker-compose.yml -f docker-compose.dev.yml
+export COMPOSE_FILE := docker-compose.yml:docker-compose.dev.yml
 
-down: ## Stop the local dev stack.
-	@docker compose down
+.PHONY: up up-data down logs ps restart psql redis-cli smoke
+up: ## Start the full local dev stack (data + apps).
+	@docker compose $(COMPOSE_FILES) up -d --wait
+
+up-data: ## Start only the data services (Postgres, Redis, MinIO).
+	@docker compose -f docker-compose.yml up -d --wait
+
+down: ## Stop the local dev stack (preserves volumes).
+	@docker compose $(COMPOSE_FILES) down
 
 logs: ## Tail logs from the dev stack.
-	@docker compose logs -f
+	@docker compose $(COMPOSE_FILES) logs -f
+
+ps: ## List dev stack container status.
+	@docker compose $(COMPOSE_FILES) ps
 
 restart: down up ## Restart the dev stack.
 
 psql: ## Open psql against the dev database.
-	@docker compose exec postgres psql -U gonext -d gonext_dev
+	@docker compose -f docker-compose.yml exec postgres psql -U gonext -d gonext_dev
 
 redis-cli: ## Open redis-cli against the dev redis.
-	@docker compose exec redis redis-cli
+	@docker compose -f docker-compose.yml exec redis redis-cli
+
+smoke: ## Bring up the stack, probe every service's /healthz, and tear it down.
+	@./tools/compose-smoke/compose-smoke.sh
 
 # ---------------------------------------------------------------------------
 # Bench

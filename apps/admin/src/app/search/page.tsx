@@ -16,7 +16,7 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState, type ReactElement } from 'react';
+import { Suspense, useEffect, useState, type ReactElement } from 'react';
 import { api, ApiError } from '../api-client';
 import type { SearchHit } from '../../components/GlobalSearch';
 
@@ -39,7 +39,27 @@ function hitHref(h: SearchHit): string {
   }
 }
 
+// Next 15 prerenders client pages at build time and refuses to do so for
+// any component that reaches for `useSearchParams` outside a Suspense
+// boundary (the "missing-suspense-with-csr-bailout" error). The fix is to
+// hoist the URL-reading body into a child and wrap the export in
+// <Suspense>. Static prerender of the page shell is fine; the params-aware
+// inner component bails to client render at request time.
 export default function SearchPage(): ReactElement {
+  return (
+    <Suspense
+      fallback={
+        <div className="search-page">
+          <h1>Search</h1>
+        </div>
+      }
+    >
+      <SearchPageBody />
+    </Suspense>
+  );
+}
+
+function SearchPageBody(): ReactElement {
   const params = useSearchParams();
   const q = (params?.get('q') ?? '').trim();
 

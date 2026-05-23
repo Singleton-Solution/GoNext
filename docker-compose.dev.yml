@@ -1,0 +1,190 @@
+# GoNext local development overlay.
+#
+# This file overlays the base docker-compose.yml to add the application
+# services (api, worker, admin, web) and a one-shot migrate runner that
+# applies the schema + seeds the default theme before api/worker start.
+#
+# The base file ships only data services (Postgres, Redis, MinIO) — the
+# overlay adds everything that talks to them. Splitting the file this way
+# preserves a "data services only" path for contributors who want to run
+# the API outside Compose (e.g. `make up && cd apps/api && go run ./cmd/server`)
+# while still offering a one-command "everything" experience via the
+# new `make up` target (which composes both files).
+#
+# Usage:
+#
+#   # Stand up data + apps:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#   # Or via the convenience target:
+#   make up
+#
+# Service map (in startup order, by dependency):
+#
+#   postgres, redis, minio   (from base) — data plane
+#       └── migrate          (one-shot)  — applies migrations + seeds theme
+#               ├── api      (HTTP)      — :8080 → :8080
+#               ├── worker   (Asynq)     — Redis-only, no HTTP
+#               └── admin    (Next.js)   — :3000 → :3001 (host)
+#                       (web is currently a placeholder; included so the
+#                        build path is exercised in CI smoke runs.)
+#
+# Health: api exposes /healthz (liveness) and /readyz (readiness, probes
+# DB + Redis). The smoke harness in tools/compose-smoke polls both.
+
+name: gonext-dev
+
+# ---------------------------------------------------------------------------
+# x-fragments — DRY shared snippets for the Go services.
+# ---------------------------------------------------------------------------
+
+x-go-env: &go-env
+  # Required by every Go binary in the workspace.
+  DATABASE_URL: postgres://gonext:gonext_dev_only@postgres:5432/gonext_dev?sslmode=disable
+  REDIS_URL: redis://redis:6379/0
+  # MinIO sits at the cluster-internal hostname — apps default to AWS
+  # endpoint resolution when AWS_ENDPOINT_URL is empty, so we set it
+  # explicitly here. The dev creds match the MinIO root creds in
+  # docker-compose.yml.
+  AWS_ENDPOINT_URL: http://minio:9000
+  AWS_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: gonext
+  AWS_SECRET_ACCESS_KEY: gonext_dev_only_change_me
+  GONEXT_S3_BUCKET: gonext-media
+  GONEXT_S3_PATH_STYLE: "true"
+  GONEXT_S3_USE_SSL: "false"
+  # All three auth secrets are required and validated at boot. The
+  # values below are dev-only; production deploys MUST override them
+  # via a secrets manager — see docs/13-security-baseline.md §5.
+  GONEXT_AUTH_PEPPER: dev-only-pepper-32-bytes-replace-in-prod-aaaaaaaa
+  GONEXT_AUTH_SESSION_SECRET: dev-only-session-32-bytes-replace-in-prod-bbbb
+  GONEXT_AUTH_CSRF_SECRET: dev-only-csrf-32-bytes-replace-in-prod-cccccccc
+  # Human-readable logs in dev. JSON in prod (the default).
+  GONEXT_LOG_LEVEL: INFO
+  GONEXT_LOG_FORMAT: text
+  GONEXT_ENV: development
+
+services:
+  # -------------------------------------------------------------------------
+  # migrate — one-shot runner that applies the schema and seeds the default
+  # theme. Both api and worker depend on it via service_completed_successfully
+  # so they refuse to start against an out-of-date schema.
+  # -------------------------------------------------------------------------
+  migrate:
+    build:
+      context: .
+      dockerfile: cli/gonext/Dockerfile
+    image: gonext-cli:dev
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *go-env
+      GONEXT_MIGRATION_DIR: /migrations
+      GONEXT_THEME_DIR: /themes
+    command: ["migrate", "up"]
+
+  # -------------------------------------------------------------------------
+  # api — HTTP server. Exposes /healthz, /readyz, /openapi.json, /docs/.
+  # Depends on postgres+redis being healthy AND migrate having completed.
+  # -------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: gonext-api:dev
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *go-env
+      PORT: "8080"
+      # The seeder writes the unpacked theme tree here on first boot.
+      # A named volume keeps the writes persistent across `compose down`
+      # and avoids the distroless `nonroot` user (uid 65532) running
+      # into a read-only image layer.
+      GONEXT_THEME_DIR: /themes
+    ports:
+      - "8080:8080"
+    volumes:
+      - api-themes:/themes
+    # The api binary doesn't ship a shell — its HEALTHCHECK is declared
+    # at the orchestrator level. Compose-internal probe hits /healthz
+    # using curl from the postgres image is impractical; instead we
+    # rely on a TCP-connect-style check by polling externally via the
+    # compose-smoke script. The healthcheck stanza below is best-effort
+    # using the upstream busybox wget pattern (the smoke harness is the
+    # authoritative readiness gate).
+    # No HEALTHCHECK in-image: distroless has no shell. Compose probes
+    # externally via tools/compose-smoke/compose-smoke.sh.
+
+  # -------------------------------------------------------------------------
+  # worker — Asynq consumer. No HTTP listener today; the smoke harness
+  # asserts it stays up (no crash loop) for the duration of the probe.
+  # -------------------------------------------------------------------------
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    image: gonext-worker:dev
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *go-env
+
+  # -------------------------------------------------------------------------
+  # admin — Next.js dashboard. Talks to api over the compose network.
+  # The placeholder skeleton currently exits 0 with a stdout message;
+  # once the real Next.js app lands the same image binds :3000.
+  # -------------------------------------------------------------------------
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://api:8080
+    image: gonext-admin:dev
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_API_URL: http://api:8080
+      PORT: "3000"
+    ports:
+      - "3001:3000"
+
+  # -------------------------------------------------------------------------
+  # web — public site (Next.js). Placeholder, included so the build
+  # graph is exercised in CI smoke runs.
+  # -------------------------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://api:8080
+    image: gonext-web:dev
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_API_URL: http://api:8080
+      PORT: "3000"
+    ports:
+      - "3000:3000"
+
+volumes:
+  api-themes:
