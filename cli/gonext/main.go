@@ -12,6 +12,7 @@ import (
 
 	"github.com/Singleton-Solution/GoNext/cli/gonext/cmd/bench"
 	cmdconfig "github.com/Singleton-Solution/GoNext/cli/gonext/cmd/config"
+	initcmd "github.com/Singleton-Solution/GoNext/cli/gonext/cmd/init"
 	"github.com/Singleton-Solution/GoNext/cli/gonext/cmd/migrate"
 	"github.com/Singleton-Solution/GoNext/cli/gonext/cmd/plugin"
 	"github.com/Singleton-Solution/GoNext/cli/gonext/cmd/revisions"
@@ -36,6 +37,8 @@ func main() {
 		os.Exit(theme.Run(args[1:], os.Stdout, os.Stderr))
 	case args[0] == "plugin":
 		os.Exit(plugin.RunOS(args[1:]))
+	case args[0] == "init":
+		os.Exit(initcmd.RunOS(args[1:]))
 	case args[0] == "migrate":
 		os.Exit(migrate.RunOS(args[1:]))
 	case args[0] == "revisions":
@@ -64,11 +67,13 @@ Commands (planned):
   revisions  Manage block-editor revision history
   jobs       Inspect and manage background jobs (queue, failed, drain, cron)
   bench      Run synthetic performance benchmarks
+  init       First-run bootstrap (schema + theme + initial admin)
   version    Print version information
 
 Available now:
   bench             Run synthetic load against a GoNext install
   config dump       Print the effective configuration with secrets masked
+  init              First-run bootstrap: schema + theme + admin user
   migrate           Apply / roll back / inspect database migrations
   plugin test       Run the plugin contract checks against a bundle
   theme test        Run the theme contract suite against a theme on disk
