@@ -31,6 +31,7 @@ import (
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/customizer"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/rum"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/healthz"
+	restcomments "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/comments"
 	openapidocs "github.com/Singleton-Solution/GoNext/apps/api/internal/openapi"
 	plugindev "github.com/Singleton-Solution/GoNext/apps/api/internal/plugins/dev"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/setup"
@@ -440,6 +441,26 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 		logger.Info("setup: routes mounted",
 			slog.String("status", "/api/v1/setup/status"),
 			slog.String("install", "/api/v1/setup/install"),
+		)
+	}
+
+	// Public comments REST surface (this issue). Anonymous- and
+	// logged-in-friendly. Mounts at /api/v1/posts/{id}/comments. The
+	// store is the package's in-memory implementation for the same
+	// reasons the admin surface uses one — the Postgres backend
+	// lands in a follow-up that wires the wider DAO. CORS allows the
+	// Email.SiteURL origin (the canonical public-site URL today;
+	// promoted to a dedicated PublicSite.BaseURL once that field
+	// graduates from #190 to config.Config).
+	if err := restcomments.Mount(mux, "/api/v1/posts", restcomments.Deps{
+		Store:       restcomments.NewMemoryStore(),
+		Logger:      logger,
+		AllowOrigin: cfg.Email.SiteURL,
+	}); err != nil {
+		logger.Warn("rest/comments: failed to mount routes", slog.Any("err", err))
+	} else {
+		logger.Info("rest/comments: routes mounted",
+			slog.String("base", "/api/v1/posts"),
 		)
 	}
 

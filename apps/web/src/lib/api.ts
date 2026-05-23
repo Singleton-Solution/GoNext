@@ -392,6 +392,76 @@ export async function fetchResolvedTemplate(
  * passes the empty shape; the author / category / tag / date routes
  * each add one or two filters so the same endpoint can power all four
  * archive types.
+ * Public comments shape returned by the API. Mirrors
+ * `apps/api/internal/rest/comments`. Defensive parsing strips
+ * anything we don't expect so a future field addition doesn't
+ * silently break the renderer.
+ */
+export interface PublicComment {
+  id: string;
+  post_id: string;
+  parent_id?: string;
+  path: string;
+  depth: number;
+  author_display_name: string;
+  content: string;
+  created_at: string;
+}
+
+function asPublicComment(raw: unknown): PublicComment | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const id = typeof r.id === 'string' ? r.id : null;
+  const postId = typeof r.post_id === 'string' ? r.post_id : null;
+  const path = typeof r.path === 'string' ? r.path : null;
+  if (!id || !postId || !path) return null;
+  return {
+    id,
+    post_id: postId,
+    parent_id: typeof r.parent_id === 'string' ? r.parent_id : undefined,
+    path,
+    depth: typeof r.depth === 'number' ? r.depth : path.split('.').length,
+    author_display_name:
+      typeof r.author_display_name === 'string' ? r.author_display_name : 'Anonymous',
+    content: typeof r.content === 'string' ? r.content : '',
+    created_at: typeof r.created_at === 'string' ? r.created_at : '',
+  };
+}
+
+/**
+ * Fetch the approved comments for a post.
+ *
+ * Returns an empty list on failure (network down, endpoint
+ * unavailable). The catch-all route renders the rest of the page
+ * regardless — "comments unavailable" is a softer failure than
+ * "post page errored".
+ */
+export async function fetchPostComments(
+  postId: string,
+  options: { revalidate?: number; cookie?: string } = {},
+): Promise<PublicComment[]> {
+  if (!postId) return [];
+  try {
+    const raw = await getJson<unknown>(
+      `/api/v1/posts/${encodeURIComponent(postId)}/comments`,
+      options,
+    );
+    if (!raw || typeof raw !== 'object') return [];
+    const data = (raw as { data?: unknown[] }).data;
+    if (!Array.isArray(data)) return [];
+    return data
+      .map((row) => asPublicComment(row))
+      .filter((c): c is PublicComment => c !== null);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 0) return [];
+    return [];
+  }
+}
+
+/**
+ * Fetch the archive feed for the home/archive page. The renderer
+ * walks blocks for each entry; the API returns the same `Post`
+ * shape as `fetchPostBySlug`, minus heavy fields where applicable.
  */
 export interface ArchiveQuery {
   /** Restrict to a single post type — e.g. "post", "page", "book". */
