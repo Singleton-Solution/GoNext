@@ -2,7 +2,7 @@
 
 A modern, modular content management platform. WordPress's ecosystem promise, built on Go + Next.js + Postgres, with a sandboxed plugin runtime so you can actually trust what you install.
 
-> **Status**: Pre-development. Design phase complete. ~150 implementation tasks are being filed as GitHub issues. Contributors welcome.
+> **Status**: Pre-1.0. ~137 PRs landed; the platform boots, serves a themed page, and now ships a first-run setup wizard. Contributors welcome.
 
 ## What this is
 
@@ -18,9 +18,67 @@ A modern, modular content management platform. WordPress's ecosystem promise, bu
 - Not a headless-only CMS. The admin and editor are first-class.
 - Not feature parity with every WordPress feature. We aim at the 95% of common use cases, done well.
 
-## Why it exists
+## Quickstart
 
-WordPress is the most-used CMS in the world, and also the most-exploited. Plugin security holes are the #1 reason commercial sites get breached. GoNext is built on the bet that a sandboxed plugin runtime + signed marketplace + modern stack solves the trust problem WordPress can't.
+You have two paths to a working install. Pick one.
+
+### Path A — Browser (the WordPress route)
+
+The fastest way to a usable site. Mirrors WordPress's `/wp-admin/install.php`.
+
+```sh
+# 1. Bring up Postgres + Redis + MinIO.
+make up
+
+# 2. Apply migrations (one shot — idempotent on subsequent runs).
+make build-go && ./apps/api/bin/gonext migrate up
+
+# 3. Start the API and admin.
+#    In two terminals (or use your preferred process manager):
+go run ./apps/api/cmd/server                             # API on :8080
+pnpm --filter @gonext/admin dev                          # Admin on :3001
+```
+
+Then open **http://localhost:3001/setup** in your browser. The setup wizard walks you through:
+
+1. Welcome + system check
+2. Administrator email + password (≥12 characters, enforced server-side)
+3. Site name + URL
+4. Review + confirm
+5. Auto-redirect into the admin dashboard, already logged in
+
+After the wizard succeeds the `/setup` route is permanently locked — every endpoint under `/api/v1/setup/*` returns `423 Locked` and the admin middleware stops redirecting to it. You can re-open the install window only by dropping the `core.site.installation_completed_at` row from the `options` table (psql, out-of-band).
+
+> *Screenshot of the wizard goes here once the design system lands.*
+
+### Path B — CLI (the scripted route)
+
+For deployments where the admin UI isn't reachable from the operator's workstation (CI, Kubernetes init container, air-gapped bootstrap):
+
+```sh
+make up
+./apps/api/bin/gonext migrate up
+./apps/api/bin/gonext init \
+    --admin-email=admin@example.com \
+    --admin-password='correct-horse-battery-staple' \
+    --site-name='Acme CMS' \
+    --site-url=https://acme.example.com
+```
+
+The CLI hits the same `POST /api/v1/setup/install` endpoint the wizard uses, so the lock behavior is identical — a second invocation returns the same `423 already_installed` code.
+
+> The `gonext init` subcommand is scaffolded but not yet shipped; track its delivery in [issue #TBD]. Until then, use Path A.
+
+## Where to go next
+
+- `docs/00-architecture-overview.md` — the foundation. Read first.
+- `docs/06-auth-permissions.md` — argon2id, sessions, roles, the setup wizard's security model.
+- `docs/09-deployment-ops.md` — Docker, Kubernetes, env vars, multi-region.
+- `docs/13-security-baseline.md` — CSP, secret handling, supply-chain posture.
+- `docs/11-testing-ci.md` — running the test pyramid locally.
+
+Proposals for all open questions live in [`/docs/proposals`](./docs/proposals).
+Architecture Decision Records in [`/adr`](./adr).
 
 ## Quickstart
 
@@ -40,8 +98,6 @@ docker compose up
 Every environment variable the API reads is documented in [`.env.example`](.env.example) with default, type, and security notes. For the prose reference (per-section tables, redaction rules, K8s / systemd deployment shapes), see [`docs/17-environment.md`](docs/17-environment.md).
 
 ## Design documents
-
-All architectural decisions are documented in [`/docs`](./docs):
 
 | # | Document | What it covers |
 |---|---|---|
@@ -63,6 +119,8 @@ All architectural decisions are documented in [`/docs`](./docs):
 
 Proposals for all open questions live in [`/docs/proposals`](./docs/proposals).
 Architecture Decision Records in [`/adr`](./adr).
+| 15 | [Security Policy](docs/15-security-policy.md) | Vulnerability disclosure, SLA |
+| 16 | [Bug Bounty](docs/16-bug-bounty.md) | Scope, rewards |
 
 ## Roadmap
 

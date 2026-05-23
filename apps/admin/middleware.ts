@@ -112,8 +112,77 @@ function buildCSP(nonce: string): string {
   return parts.join('; ');
 }
 
-export function middleware(request: NextRequest): NextResponse {
+/**
+ * Resolves the API base URL for the SSR-side install-status probe. The
+ * client-facing var is NEXT_PUBLIC_API_URL; in-cluster SSR fetches use
+ * GONEXT_API_URL when the admin pod talks to the API service over a
+ * service-internal name. Both default to http://localhost:8080 so a
+ * `make up` developer doesn't need to set anything.
+ */
+function apiBaseURL(): string {
+  return (
+    process.env.GONEXT_API_URL ??
+    process.env.NEXT_PUBLIC_API_URL ??
+    'http://localhost:8080'
+  );
+}
+
+/**
+ * Probes the API for install status. Returns true iff the API reports
+ * `installation_completed: false` (i.e. the wizard should be reached).
+ * Any network failure or unexpected shape returns false — the
+ * middleware fails OPEN on the install probe because the wizard itself
+ * shows a clearer error than a redirect loop would.
+ */
+async function isUninstalled(): Promise<boolean> {
+  try {
+    const res = await fetch(`${apiBaseURL()}/api/v1/setup/status`, {
+      method: 'GET',
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return false;
+    const json = (await res.json()) as { installation_completed?: boolean };
+    return json.installation_completed === false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Decides whether the requested path should be redirected to /setup
+ * when the install lock is open. We never redirect /setup itself (or
+ * any of its sub-routes) so the wizard can render; we never redirect
+ * static assets either (those are filtered by the matcher below but
+ * we keep the guard here defensively).
+ */
+function shouldGateForSetup(pathname: string): boolean {
+  if (pathname === '/setup' || pathname.startsWith('/setup/')) return false;
+  // The admin root and every login/post/page route gates on setup.
+  // Logout / OAuth callbacks etc. would also gate, but a brand-new
+  // install has no session to log out of anyway.
+  return true;
+}
+
+export async function middleware(request: NextRequest): Promise<NextResponse> {
   const nonce = generateNonce();
+
+  // Install-lock gate. If the deployment has no users yet AND the
+  // requested path isn't already the setup wizard, redirect there
+  // before doing anything else. The CSP header still rides along on
+  // the redirect response so the wizard's own page inherits the same
+  // strict policy.
+  if (shouldGateForSetup(request.nextUrl.pathname)) {
+    const uninstalled = await isUninstalled();
+    if (uninstalled) {
+      const target = new URL('/setup', request.nextUrl);
+      const redirect = NextResponse.redirect(target);
+      redirect.headers.set('Content-Security-Policy', buildCSP(nonce));
+      redirect.headers.set('X-Script-Nonce', nonce);
+      return redirect;
+    }
+  }
+
   const response = NextResponse.next({
     request: {
       headers: (() => {
