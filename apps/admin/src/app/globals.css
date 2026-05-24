@@ -79,6 +79,29 @@ h2 {
   min-height: 100vh;
 }
 
+/*
+ * Public shell — wraps unauthenticated surfaces (/login, /setup, …).
+ * Full-viewport flex container that centers the page content card.
+ * Intentionally has no chrome of its own; per-surface CSS (.login-card,
+ * .setup) supplies the card styling.
+ */
+.public-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--space-6);
+  background: var(--color-bg);
+}
+
+.public-shell__content {
+  width: 100%;
+  /* Wide enough to host the setup wizard's step indicator without
+     squeezing it; per-surface CSS (.login-card, .setup) constrains
+     itself tighter for the simpler forms. */
+  max-width: 720px;
+}
+
 .app-shell__main {
   flex: 1;
   min-width: 0;
@@ -199,7 +222,11 @@ h2 {
 
 .login-card {
   max-width: 360px;
-  margin: 80px auto;
+  /* margin: auto centers when the parent is a block container;
+     under .public-shell (flex) the parent handles centering, so
+     auto resolves to 0 horizontally. The vertical breathing room
+     is provided by .public-shell's padding. */
+  margin: 0 auto;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -411,7 +438,11 @@ h2 {
  * ------------------------------------------------------------------------- */
 .setup {
   max-width: 640px;
-  margin: 48px auto;
+  /* Under .public-shell (flex), horizontal centering is parent-driven
+     and the vertical breathing room comes from .public-shell's padding.
+     Keep the inner side padding so narrow viewports don't pin content
+     to the edge. */
+  margin: 0 auto;
   padding: 0 var(--space-4);
 }
 
