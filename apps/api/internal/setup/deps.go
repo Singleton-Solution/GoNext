@@ -13,6 +13,16 @@ import (
 // timestamp for audit purposes.
 const InstallationOptionKey = "core.site.installation_completed_at"
 
+// LegacyInstallationOptionKey is the pre-fix value of
+// InstallationOptionKey used by an early build of `gonext init`. The
+// canonical key (above) is what the handler writes today; this constant
+// exists so the lock check can ALSO recognize databases bootstrapped by
+// the pre-fix CLI before they re-run init. The defensive read is
+// belt-and-suspenders alongside migration
+// 000028_options_installation_key_compat.up.sql, which performs the
+// same migration once at schema-upgrade time.
+const LegacyInstallationOptionKey = "core.installation_completed_at"
+
 // SiteNameOptionKey + SiteURLOptionKey are the keys the install handler
 // writes alongside the lock so the freshly-seeded site has the operator's
 // chosen values rather than the placeholders from migration 000008.

@@ -296,8 +296,21 @@ func (h *Handler) Install(w http.ResponseWriter, r *http.Request) {
 // installCompleted reads the install marker, treating any non-nil read
 // as "not yet installed" rather than panicking. The caller maps a read
 // error to a 500 separately.
+//
+// Reads the canonical key first; on a miss, falls back to the legacy
+// key (LegacyInstallationOptionKey) so a database bootstrapped by a
+// pre-fix `gonext init` that hasn't yet run migration 000028 still
+// reports installation_completed=true. The fallback is intentionally
+// read-only — rewriting the row at status-check time would silently
+// drift the schema; the canonical migration is the authoritative
+// place to forward the row.
 func (h *Handler) installCompleted(ctx context.Context) (bool, error) {
-	return h.d.Options.Has(ctx, InstallationOptionKey)
+	if ok, err := h.d.Options.Has(ctx, InstallationOptionKey); err != nil {
+		return false, err
+	} else if ok {
+		return true, nil
+	}
+	return h.d.Options.Has(ctx, LegacyInstallationOptionKey)
 }
 
 // validationError is a tiny carrier that lets validate() return a

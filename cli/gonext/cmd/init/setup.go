@@ -29,7 +29,25 @@ import (
 // complement each other: active_theme detects pre-init databases
 // that were bootstrapped by `migrate up --seed-default-theme` (and
 // would otherwise have init double-seed the row).
-const installationCompletedKey = "core.installation_completed_at"
+//
+// The value matches setup.InstallationOptionKey in
+// apps/api/internal/setup so the in-browser install wizard and the
+// CLI agree on a single canonical row. An earlier version of init
+// wrote to "core.installation_completed_at" (no .site. segment);
+// legacyInstallationCompletedKey below preserves that name so
+// existing databases bootstrapped by the pre-fix CLI are detected
+// and migrated forward.
+const installationCompletedKey = "core.site.installation_completed_at"
+
+// legacyInstallationCompletedKey is the pre-fix value of
+// installationCompletedKey. We probe for it during the idempotency
+// check and, if present, copy the row to the new canonical key and
+// drop the old — a one-time, in-process migration that runs the
+// next time `gonext init` is invoked against a previously
+// bootstrapped install. The same intent is captured statically by
+// migration 000028_options_installation_key_compat for databases
+// that never re-run init.
+const legacyInstallationCompletedKey = "core.installation_completed_at"
 
 // siteNameKey and siteURLKey are the canonical options keys for the
 // human-facing site metadata captured by `gonext init`. These match
@@ -278,6 +296,11 @@ func openPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 // without ever running this command — the active_theme row exists
 // but installation_completed_at does not. We treat that combination
 // as "already installed" and patch the explicit gate.
+//
+// A pre-fix CLI wrote the marker under legacyInstallationCompletedKey.
+// We detect that row here and migrate it forward to the canonical
+// key so the setup handler (which reads only the canonical key)
+// also sees the install as complete on the very next request.
 func alreadyInstalled(ctx context.Context, pool *pgxpool.Pool) (bool, bool, error) {
 	// Probe the explicit gate first. A row here is the authoritative
 	// "this install was bootstrapped by gonext init" signal.
@@ -300,6 +323,18 @@ func alreadyInstalled(ctx context.Context, pool *pgxpool.Pool) (bool, bool, erro
 		return true, false, nil
 	}
 
+	// Legacy-key probe. If a previous-version CLI wrote the marker
+	// under "core.installation_completed_at", carry it forward to the
+	// canonical key and drop the old row. The setup handler reads only
+	// the canonical key, so without this migration `/api/v1/setup/status`
+	// would falsely report installation_completed=false on an already
+	// bootstrapped install.
+	if migrated, err := migrateLegacyInstallationKey(ctx, pool); err != nil {
+		return false, false, fmt.Errorf("migrate legacy %s: %w", legacyInstallationCompletedKey, err)
+	} else if migrated {
+		return true, false, nil
+	}
+
 	// Fallback probe: active_theme. If present, an earlier `migrate
 	// up` already produced a usable install — running init again
 	// would clobber the admin and re-seed the theme.
@@ -314,6 +349,56 @@ func alreadyInstalled(ctx context.Context, pool *pgxpool.Pool) (bool, bool, erro
 		return false, false, fmt.Errorf("probe %s: %w", seed.ActiveThemeOptionKey, err)
 	}
 	return exists, exists, nil
+}
+
+// migrateLegacyInstallationKey copies the legacy
+// "core.installation_completed_at" row (if any) to the canonical
+// "core.site.installation_completed_at" key, then deletes the
+// legacy row. Idempotent: running it twice is a no-op once the
+// legacy row is gone. Returns (true, nil) iff the migration ran.
+//
+// The function exits early on the "fresh DB / no options table"
+// path so a brand-new install isn't penalized by an extra round
+// trip. The work is best-effort transactional — both statements
+// run in a single tx so a failure mid-migration can't leave the
+// canonical key written without the legacy key dropped.
+func migrateLegacyInstallationKey(ctx context.Context, pool *pgxpool.Pool) (bool, error) {
+	var legacyValue string
+	err := pool.QueryRow(ctx,
+		`SELECT value::text FROM options WHERE key = $1`,
+		legacyInstallationCompletedKey,
+	).Scan(&legacyValue)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
+		if isUndefinedTable(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("read legacy row: %w", err)
+	}
+	tx, err := pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO options (key, value, autoload, is_protected)
+		VALUES ($1, $2::jsonb, TRUE, FALSE)
+		ON CONFLICT (key) DO NOTHING
+	`, installationCompletedKey, legacyValue); err != nil {
+		return false, fmt.Errorf("copy to canonical key: %w", err)
+	}
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM options WHERE key = $1`,
+		legacyInstallationCompletedKey,
+	); err != nil {
+		return false, fmt.Errorf("delete legacy row: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("commit: %w", err)
+	}
+	return true, nil
 }
 
 // isUndefinedTable returns true iff err is a Postgres
