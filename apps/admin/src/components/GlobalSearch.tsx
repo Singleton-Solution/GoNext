@@ -28,7 +28,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { ChangeEvent, KeyboardEvent, ReactElement } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { api, ApiError } from '../app/api-client';
+import { api, ApiError } from '@/lib/api-client';
 
 // DEBOUNCE_MS is the input-to-fetch delay. Tuned for fast typists:
 // 200 ms is short enough that the dropdown feels live, long enough
