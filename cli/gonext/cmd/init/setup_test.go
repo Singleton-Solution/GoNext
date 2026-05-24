@@ -292,6 +292,213 @@ func TestSetup_BackfillsCompletedAtFromThemeRow(t *testing.T) {
 	mustOptionExists(t, ctx, pool, installationCompletedKey)
 }
 
+// TestSetup_MigratesLegacyInstallationKey covers the upgrade path: a
+// database previously bootstrapped by a pre-fix `gonext init` carries
+// the marker under the old key ("core.installation_completed_at").
+// Re-running init must (a) report alreadyDone=true, (b) write the
+// canonical key, and (c) drop the legacy row. Without this, the setup
+// handler (which reads only the canonical key) would falsely report
+// installation_completed=false on an already-bootstrapped install.
+func TestSetup_MigratesLegacyInstallationKey(t *testing.T) {
+	t.Parallel()
+	dsn := containers.Postgres(t)
+	if dsn == "" {
+		t.Skip("docker not available")
+	}
+	root := repoRoot(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	applyMigrations(t, dsn, filepath.Join(root, "migrations"))
+
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("pgxpool: %v", err)
+	}
+	t.Cleanup(pool.Close)
+
+	// Pre-seed: write ONLY the legacy key. Migration 000028 (applied
+	// above) would normally have moved it forward, so we re-insert it
+	// post-migration to simulate the in-the-wild case of a database
+	// that wrote the legacy row AFTER migration 000028 was created but
+	// BEFORE the operator upgraded the CLI binary (or, equivalently,
+	// any install that pre-dates migration 000028 entirely).
+	const legacyValue = "2026-01-15T09:00:00Z"
+	if _, err := pool.Exec(ctx, `
+		DELETE FROM options
+		WHERE key IN ('core.installation_completed_at',
+		              'core.site.installation_completed_at')
+	`); err != nil {
+		t.Fatalf("clean pre-existing rows: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO options (key, value, autoload, is_protected)
+		VALUES ('core.installation_completed_at', to_jsonb($1::text), TRUE, FALSE)
+	`, legacyValue); err != nil {
+		t.Fatalf("seed legacy row: %v", err)
+	}
+
+	opts := SetupOptions{
+		DSN:            dsn,
+		MigrationDir:   filepath.Join(root, "migrations"),
+		Pepper:         []byte("pepperpepperpepper"),
+		AdminEmail:     "owner@example.com",
+		AdminPassword:  "verylongpassword",
+		SkipMigrations: true,
+		SkipThemeSeed:  true,
+	}
+	already, err := Setup(ctx, opts)
+	if err != nil {
+		t.Fatalf("Setup: %v", err)
+	}
+	if !already {
+		t.Fatal("expected alreadyDone=true via legacy-key migration")
+	}
+
+	// Canonical key now exists and carries the legacy value.
+	mustOptionEquals(t, ctx, pool, installationCompletedKey, legacyValue)
+
+	// Legacy row is gone — no leftover under the old name.
+	var stillExists bool
+	if err := pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM options WHERE key = $1)`,
+		legacyInstallationCompletedKey,
+	).Scan(&stillExists); err != nil {
+		t.Fatalf("probe legacy: %v", err)
+	}
+	if stillExists {
+		t.Errorf("legacy key still present after migration")
+	}
+}
+
+// TestMigration000028_MovesLegacyRowForward verifies the SQL-level
+// migration in isolation. We apply migrations 1..27, hand-write the
+// legacy row, then run 000028 directly and assert the row was moved.
+// This is the path a database that NEVER re-runs `gonext init` takes
+// — the migration runner is what carries it forward.
+func TestMigration000028_MovesLegacyRowForward(t *testing.T) {
+	t.Parallel()
+	dsn := containers.Postgres(t)
+	if dsn == "" {
+		t.Skip("docker not available")
+	}
+	root := repoRoot(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	// Apply migrations 1..27 only — leaves the schema in the pre-fix
+	// state where the legacy key is what older CLIs would have written.
+	migDir := filepath.Join(root, "migrations")
+	pre := preMigrations(t, migDir, 27)
+	applyMigrationFiles(t, dsn, pre)
+
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("pgxpool: %v", err)
+	}
+	t.Cleanup(pool.Close)
+
+	const legacyValue = "2025-09-01T00:00:00Z"
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO options (key, value, autoload, is_protected)
+		VALUES ('core.installation_completed_at', to_jsonb($1::text), TRUE, FALSE)
+	`, legacyValue); err != nil {
+		t.Fatalf("seed legacy row: %v", err)
+	}
+
+	// Apply migration 000028.
+	applyMigrationFiles(t, dsn, []string{
+		filepath.Join(migDir, "000028_options_installation_key_compat.up.sql"),
+	})
+
+	// Canonical row carries the legacy value.
+	var got string
+	if err := pool.QueryRow(ctx,
+		`SELECT value #>> '{}' FROM options WHERE key = $1`,
+		"core.site.installation_completed_at",
+	).Scan(&got); err != nil {
+		t.Fatalf("read canonical: %v", err)
+	}
+	if got != legacyValue {
+		t.Errorf("canonical value = %q, want %q", got, legacyValue)
+	}
+
+	// Legacy row is gone.
+	var stillExists bool
+	if err := pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM options WHERE key = $1)`,
+		"core.installation_completed_at",
+	).Scan(&stillExists); err != nil {
+		t.Fatalf("probe legacy: %v", err)
+	}
+	if stillExists {
+		t.Errorf("legacy row still present after 000028")
+	}
+}
+
+// preMigrations returns the absolute paths of every *.up.sql up to and
+// including the given last version, sorted lexically. Used by the
+// migration-isolation test above to apply a deterministic prefix of
+// the migration set without pulling in pkg/migrate's full machinery.
+func preMigrations(t *testing.T, dir string, last int) []string {
+	t.Helper()
+	matches, err := filepath.Glob(filepath.Join(dir, "*.up.sql"))
+	if err != nil {
+		t.Fatalf("glob migrations: %v", err)
+	}
+	var out []string
+	for _, m := range matches {
+		base := filepath.Base(m)
+		// File names start with NNNNNN_; parse the leading six digits.
+		if len(base) < 6 {
+			continue
+		}
+		n := 0
+		for i := 0; i < 6; i++ {
+			c := base[i]
+			if c < '0' || c > '9' {
+				n = -1
+				break
+			}
+			n = n*10 + int(c-'0')
+		}
+		if n <= 0 || n > last {
+			continue
+		}
+		out = append(out, m)
+	}
+	if len(out) == 0 {
+		t.Fatalf("no migrations matched in %s", dir)
+	}
+	return out
+}
+
+// applyMigrationFiles runs the listed *.up.sql files in argument order
+// against dsn. A thin wrapper around the same connect-and-exec loop
+// applyMigrations uses; kept separate so callers can drive a specific
+// subset (e.g. "everything up to 27 plus 28 itself").
+func applyMigrationFiles(t *testing.T, dsn string, files []string) {
+	t.Helper()
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	for _, m := range files {
+		body, err := os.ReadFile(m)
+		if err != nil {
+			t.Fatalf("read %s: %v", m, err)
+		}
+		if _, err := db.ExecContext(ctx, string(body)); err != nil {
+			t.Fatalf("apply %s: %v", filepath.Base(m), err)
+		}
+	}
+}
+
 // applyMigrations is a stripped-down version of the importer's
 // mustApplyMigrations: same idea, lives in this package to keep test
 // isolation.

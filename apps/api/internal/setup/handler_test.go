@@ -168,6 +168,49 @@ func TestStatus_AfterInstall(t *testing.T) {
 	}
 }
 
+// TestStatus_AfterInstall_LegacyKey covers the post-fix → pre-migration
+// window where a database was bootstrapped by an early `gonext init`
+// build that wrote the marker under the old key
+// ("core.installation_completed_at") and migration 000028 hasn't run
+// yet. The handler's defensive read MUST recognize that row so the
+// /setup wizard doesn't falsely re-arm on the operator.
+func TestStatus_AfterInstall_LegacyKey(t *testing.T) {
+	f := newFixture(t)
+	// Seed ONLY the legacy key — simulating a database written by the
+	// pre-fix CLI before migration 000028 lands.
+	_ = f.options.Write(context.Background(), LegacyInstallationOptionKey, "2026-05-22T12:00:00Z")
+
+	w := doGet(t, f.handler.Status)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status: got %d, want 200", w.Code)
+	}
+	var out statusResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !out.InstallationCompleted {
+		t.Error("installation_completed: want true (defensive read of legacy key)")
+	}
+}
+
+// TestInstall_RejectsSecondAttempt_LegacyKey verifies the install lock
+// also honors the legacy key. A second install attempt against a
+// database carrying only the legacy marker must return 423 Locked.
+func TestInstall_RejectsSecondAttempt_LegacyKey(t *testing.T) {
+	f := newFixture(t)
+	_ = f.options.Write(context.Background(), LegacyInstallationOptionKey, "2026-05-22T12:00:00Z")
+
+	w := doPost(t, f.handler.Install, validBody(), "203.0.113.1:5000")
+	if w.Code != http.StatusLocked {
+		t.Fatalf("install: got %d, want 423 (legacy lock)", w.Code)
+	}
+	var out errorResponse
+	_ = json.Unmarshal(w.Body.Bytes(), &out)
+	if out.Code != "already_installed" {
+		t.Errorf("code: got %q, want already_installed", out.Code)
+	}
+}
+
 func TestStatus_MethodNotAllowed(t *testing.T) {
 	f := newFixture(t)
 	r := httptest.NewRequest(http.MethodPost, "/api/v1/setup/status", nil)
