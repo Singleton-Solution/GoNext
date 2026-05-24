@@ -23,6 +23,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	goredis "github.com/redis/go-redis/v9"
@@ -31,8 +32,13 @@ import (
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/customizer"
 	adminredirects "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/redirects"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/rum"
+	"github.com/Singleton-Solution/GoNext/apps/api/internal/auth/login"
+	authsessions "github.com/Singleton-Solution/GoNext/apps/api/internal/auth/sessions"
+	authverify "github.com/Singleton-Solution/GoNext/apps/api/internal/auth/verify"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/healthz"
 	restcomments "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/comments"
+	restposts "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/posts"
+	restsearch "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/search"
 	openapidocs "github.com/Singleton-Solution/GoNext/apps/api/internal/openapi"
 	plugindev "github.com/Singleton-Solution/GoNext/apps/api/internal/plugins/dev"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/setup"
@@ -41,15 +47,19 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/buildinfo"
 	"github.com/Singleton-Solution/GoNext/packages/go/config"
 	"github.com/Singleton-Solution/GoNext/packages/go/db"
+	"github.com/Singleton-Solution/GoNext/packages/go/email"
 	"github.com/Singleton-Solution/GoNext/packages/go/httpx"
 	"github.com/Singleton-Solution/GoNext/packages/go/log"
 	gonextmetrics "github.com/Singleton-Solution/GoNext/packages/go/metrics"
+	authmw "github.com/Singleton-Solution/GoNext/packages/go/middleware/auth"
 	"github.com/Singleton-Solution/GoNext/packages/go/middleware/earlyhints"
 	httpmetrics "github.com/Singleton-Solution/GoNext/packages/go/middleware/metrics"
 	"github.com/Singleton-Solution/GoNext/packages/go/plugins/lifecycle"
 	"github.com/Singleton-Solution/GoNext/packages/go/policy"
+	"github.com/Singleton-Solution/GoNext/packages/go/ratelimit"
 	redisclient "github.com/Singleton-Solution/GoNext/packages/go/redis"
 	"github.com/Singleton-Solution/GoNext/packages/go/redirects"
+	pkgsearch "github.com/Singleton-Solution/GoNext/packages/go/search"
 	"github.com/Singleton-Solution/GoNext/packages/go/session"
 	"github.com/Singleton-Solution/GoNext/packages/go/shutdown"
 	"github.com/Singleton-Solution/GoNext/packages/go/theme/seed"
@@ -506,6 +516,163 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 		logger.Info("rest/comments: routes mounted",
 			slog.String("base", "/api/v1/posts"),
 		)
+	}
+
+	// -----------------------------------------------------------------
+	// Auth + REST surface wiring (K3 verify finding, issues #424/#427).
+	//
+	// The five blocks below mount route packages whose handlers already
+	// exist but were never reachable because main.go forgot to call
+	// their Mount/Routes helpers. Without these the admin UI renders
+	// but POST /api/v1/auth/login 404s — i.e. no user can sign in.
+	//
+	// Persistence here is the same trade-off the rest of buildRouter
+	// makes today: pgxpool-backed adapters where the SQL already exists
+	// (login.UserLookup, verify.PgxUserVerifier), in-memory stores for
+	// surfaces whose pgx DAO is still in flight (posts). Migrating
+	// posts to PgStore lands in the same follow-up that wires the
+	// shared DAO across the renderer and admin paths.
+	// -----------------------------------------------------------------
+
+	// Login (POST /api/v1/auth/login). Two-bucket limiter (per-IP +
+	// per-email) backed by memory in this binary; production deploys
+	// will swap NewMemoryLimiter -> NewRedisLimiter once the auth
+	// limiter has dedicated Redis prefixes carved out. TOTPLookup /
+	// Rehash / Intermediate are deliberately nil — 2FA is gated by a
+	// follow-up (no enrolment table yet), so leaving them nil is the
+	// right shape: login.Deps.validate() accepts that combination.
+	ipLoginLim, ipErr := ratelimit.NewMemoryLimiter(ratelimit.Policy{
+		Capacity:   20,
+		RefillRate: 20.0 / (5 * 60),
+	})
+	emailLoginLim, emailErr := ratelimit.NewMemoryLimiter(ratelimit.Policy{
+		Capacity:   5,
+		RefillRate: 5.0 / (15 * 60),
+	})
+	if sessions == nil {
+		logger.Warn("login: skipping mount; session manager is nil")
+	} else if ipErr != nil || emailErr != nil {
+		logger.Warn("login: failed to build rate limiters",
+			slog.Any("ip_err", ipErr),
+			slog.Any("email_err", emailErr))
+	} else {
+		loginLimiter, lalErr := ratelimit.NewLoginAttemptLimiter(ratelimit.LoginAttemptOptions{
+			IPLimiter:    &ratelimit.IPLimiter{Limiter: ipLoginLim},
+			EmailLimiter: emailLoginLim,
+		})
+		if lalErr != nil {
+			logger.Warn("login: failed to build login limiter", slog.Any("err", lalErr))
+		} else {
+			loginAudit := audit.NewEmitter(audit.NewMemoryStore())
+			if err := login.Mount(mux, login.Deps{
+				Lookup:             userLookupByEmail(pool),
+				Sessions:           sessions,
+				Pepper:             []byte(cfg.Auth.Pepper),
+				SessionAbsoluteTTL: cfg.Auth.SessionTTL,
+				SessionIdleTTL:     cfg.Auth.SessionIdleTTL,
+				Limiter:            loginLimiter,
+				AuditEmitter:       loginAudit,
+				Insecure:           cfg.Env != "production",
+				Log:                logger,
+			}); err != nil {
+				logger.Warn("login: failed to mount", slog.Any("err", err))
+			} else {
+				logger.Info("login: routes mounted", slog.String("base", "/api/v1/auth/login"))
+			}
+		}
+	}
+
+	// Sessions API (GET/DELETE /api/v1/auth/sessions[/{id}]). Mounted
+	// behind RequireSession — these endpoints are useless to an
+	// anonymous caller and rejecting at the middleware layer keeps the
+	// "is the cookie valid" check off the per-handler path.
+	if sessions != nil {
+		sessionsHandlers := authsessions.NewHandlers(
+			sessions,
+			audit.NewEmitter(audit.NewMemoryStore()),
+			authsessions.WithLogger(logger),
+		)
+		guarded := authmw.RequireSession(sessions)(sessionsHandlers.Routes())
+		// http.ServeMux's "PATH" pattern matches both /sessions and
+		// /sessions/{id}; we add the explicit /{id} pattern so the
+		// sub-mux receives the trailing-path forms cleanly.
+		mux.Handle("/api/v1/auth/sessions", guarded)
+		mux.Handle("/api/v1/auth/sessions/", guarded)
+		logger.Info("auth/sessions: routes mounted",
+			slog.String("base", "/api/v1/auth/sessions"))
+	} else {
+		logger.Warn("auth/sessions: skipping mount; session manager is nil")
+	}
+
+	// Email verification flow (POST /api/v1/auth/verify/send, GET
+	// /api/v1/auth/verify). The send endpoint is RequireSession; the
+	// GET endpoint is anonymous (token possession IS the credential).
+	if pool == nil || rdb == nil {
+		logger.Warn("auth/verify: skipping mount; pool or redis is nil")
+	} else if verifyUsers, err := authverify.NewPgxUserVerifier(pool); err != nil {
+		logger.Warn("auth/verify: failed to build user verifier", slog.Any("err", err))
+	} else if verifyTokens, err := authverify.NewRedisTokenStore(rdb); err != nil {
+		logger.Warn("auth/verify: failed to build token store", slog.Any("err", err))
+	} else {
+		verifyBase := strings.TrimRight(cfg.Email.SiteURL, "/")
+		if verifyBase == "" {
+			verifyBase = "http://localhost"
+		}
+		verifyHandler, err := authverify.New(authverify.Options{
+			Tokens:    verifyTokens,
+			Users:     verifyUsers,
+			Sender:    email.NewNoopSender(),
+			VerifyURL: verifyBase + "/api/v1/auth/verify",
+			Log:       logger,
+		})
+		if err != nil {
+			logger.Warn("auth/verify: failed to build handler", slog.Any("err", err))
+		} else {
+			verifyHandler.Routes(mux, authmw.RequireSession(sessions))
+			logger.Info("auth/verify: routes mounted",
+				slog.String("send", "/api/v1/auth/verify/send"),
+				slog.String("verify", "/api/v1/auth/verify"))
+		}
+	}
+
+	// Posts REST surface (CRUD over /api/v1/posts). MemoryStore is
+	// intentional here — the PgStore lands with the shared DAO follow-
+	// up; the in-memory implementation keeps the K4 e2e able to drive
+	// the admin end-to-end against a stubbed corpus.
+	if err := restposts.Mount(mux, "/api/v1/posts", restposts.Deps{
+		Store:    restposts.NewMemoryStore(),
+		Policy:   policy.NewBasicPolicy(policy.DefaultRoleCapabilities()),
+		Audit:    audit.NewEmitter(audit.NewMemoryStore()),
+		Logger:   logger,
+		PostType: restposts.PostTypePost,
+	}); err != nil {
+		logger.Warn("rest/posts: failed to mount", slog.Any("err", err))
+	} else {
+		logger.Info("rest/posts: routes mounted", slog.String("base", "/api/v1/posts"))
+	}
+
+	// Public search (GET /api/v1/search). Backed by the FTS Store
+	// from packages/go/search (issue #119) against the existing
+	// posts.search_vector index. The IP-keyed limiter throttles the
+	// public surface — 5 req/s burst, 0.5 r/s steady — which matches
+	// the doc-default for unauthenticated read paths.
+	searchLimiter, slErr := ratelimit.NewMemoryLimiter(ratelimit.Policy{
+		Capacity:   5,
+		RefillRate: 0.5,
+	})
+	if pool == nil {
+		logger.Warn("rest/search: skipping mount; pool is nil")
+	} else if slErr != nil {
+		logger.Warn("rest/search: failed to build limiter", slog.Any("err", slErr))
+	} else {
+		searchStore := pkgsearch.NewStore(pool)
+		searchHandler := restsearch.NewHandler(searchStore, logger)
+		if err := restsearch.Mount(mux, "/api/v1", searchLimiter, searchHandler); err != nil {
+			logger.Warn("rest/search: failed to mount", slog.Any("err", err))
+		} else {
+			logger.Info("rest/search: routes mounted",
+				slog.String("base", "/api/v1/search"))
+		}
 	}
 
 	if cfg.Plugins.DevMode {
