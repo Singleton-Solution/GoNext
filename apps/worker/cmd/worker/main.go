@@ -24,6 +24,7 @@ import (
 
 	"github.com/hibiken/asynq"
 
+	workermedia "github.com/Singleton-Solution/GoNext/apps/worker/internal/media"
 	"github.com/Singleton-Solution/GoNext/packages/go/buildinfo"
 	"github.com/Singleton-Solution/GoNext/packages/go/config"
 	jobsasynq "github.com/Singleton-Solution/GoNext/packages/go/jobs/asynq"
@@ -109,12 +110,26 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("parse REDIS_URL: %w", err)
 	}
 
-	srv, _, err := jobsasynq.New(redisOpt, jobsasynq.Config{
+	srv, mux, err := jobsasynq.New(redisOpt, jobsasynq.Config{
 		Logger:  logger,
 		Metrics: mreg.Prometheus(),
 	})
 	if err != nil {
 		return fmt.Errorf("jobs/asynq: %w", err)
+	}
+
+	// Heavy-media tasks. Registered in stub mode for the boot-time
+	// skeleton — the package consults the PATH and the wired storage
+	// handles to decide between the real handler and the stub.
+	// Production wiring (when the worker grows S3 access) replaces
+	// the zero-value Deps with real Source/Sink implementations.
+	//
+	// See apps/worker/internal/media for the dispatch contract.
+	mediaTaskRegistry := taskspec.NewRegistry()
+	if _, err := workermedia.Register(mux, mediaTaskRegistry, workermedia.Deps{
+		Logger: logger,
+	}); err != nil {
+		return fmt.Errorf("worker/media: register: %w", err)
 	}
 
 	// Registration order (locked in by issue #112):

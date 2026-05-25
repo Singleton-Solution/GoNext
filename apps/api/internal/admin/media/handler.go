@@ -41,6 +41,17 @@ type Deps struct {
 	// passes the taskspec-backed adapter.
 	Processor ProcessEnqueuer
 
+	// VideoProcessor enqueues media.video.transcode for video/* mime
+	// types. Optional — nil means no transcoding is fired (the upload
+	// row is still committed and queryable; the player will fall back
+	// to the raw video src). Issue #52.
+	VideoProcessor ProcessEnqueuer
+
+	// PDFProcessor enqueues media.pdf.process for application/pdf
+	// mime types. Optional — nil means no thumbnail/text extraction
+	// is fired. Issue #60.
+	PDFProcessor ProcessEnqueuer
+
 	// Logger receives structured log lines. nil falls back to
 	// slog.Default — useful for tests; production wiring should always
 	// pass a service logger.
@@ -72,13 +83,15 @@ func (d Deps) validate() error {
 }
 
 type handlers struct {
-	store     Store
-	putter    ObjectPutter
-	policy    policy.Policy
-	processor ProcessEnqueuer
-	logger    *slog.Logger
-	now       func() time.Time
-	maxBytes  int64
+	store          Store
+	putter         ObjectPutter
+	policy         policy.Policy
+	processor      ProcessEnqueuer
+	videoProcessor ProcessEnqueuer
+	pdfProcessor   ProcessEnqueuer
+	logger         *slog.Logger
+	now            func() time.Time
+	maxBytes       int64
 }
 
 // Mount wires the media routes onto mux under base (typically
@@ -106,13 +119,15 @@ func Mount(mux *http.ServeMux, base string, deps Deps) error {
 	}
 
 	h := &handlers{
-		store:     deps.Store,
-		putter:    deps.Putter,
-		policy:    deps.Policy,
-		processor: deps.Processor,
-		logger:    deps.Logger,
-		now:       deps.Now,
-		maxBytes:  maxBytes,
+		store:          deps.Store,
+		putter:         deps.Putter,
+		policy:         deps.Policy,
+		processor:      deps.Processor,
+		videoProcessor: deps.VideoProcessor,
+		pdfProcessor:   deps.PDFProcessor,
+		logger:         deps.Logger,
+		now:            deps.Now,
+		maxBytes:       maxBytes,
 	}
 	base = strings.TrimRight(base, "/")
 	mux.Handle("POST "+base, h.gate(policy.CapMediaUpload, h.upload))
@@ -288,6 +303,30 @@ func (h *handlers) upload(w http.ResponseWriter, r *http.Request, pr policy.Prin
 	if h.processor != nil {
 		if err := h.processor.Enqueue(r.Context(), asset.ID, asset.StorageKey, asset.MimeType); err != nil {
 			h.logger.WarnContext(r.Context(), "admin/media: enqueue processing failed",
+				slog.String("asset_id", asset.ID),
+				slog.String("storage_key", asset.StorageKey),
+				slog.Any("err", err),
+			)
+		}
+	}
+
+	// MIME-routed pipelines. Video uploads go through the HLS
+	// transcoder (#52); PDFs go through pdftoppm + pdftotext (#60).
+	// Both follow the same "log on enqueue failure, never fail the
+	// upload" policy as the image pipeline — the row is the user-
+	// visible artifact, derivatives are a follow-up.
+	if h.videoProcessor != nil && strings.HasPrefix(strings.ToLower(asset.MimeType), "video/") {
+		if err := h.videoProcessor.Enqueue(r.Context(), asset.ID, asset.StorageKey, asset.MimeType); err != nil {
+			h.logger.WarnContext(r.Context(), "admin/media: enqueue video transcode failed",
+				slog.String("asset_id", asset.ID),
+				slog.String("storage_key", asset.StorageKey),
+				slog.Any("err", err),
+			)
+		}
+	}
+	if h.pdfProcessor != nil && strings.EqualFold(strings.TrimSpace(asset.MimeType), "application/pdf") {
+		if err := h.pdfProcessor.Enqueue(r.Context(), asset.ID, asset.StorageKey, asset.MimeType); err != nil {
+			h.logger.WarnContext(r.Context(), "admin/media: enqueue pdf process failed",
 				slog.String("asset_id", asset.ID),
 				slog.String("storage_key", asset.StorageKey),
 				slog.Any("err", err),

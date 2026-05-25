@@ -77,6 +77,31 @@ type Asset struct {
 	// not yet completed; clients should treat absence as "fall back
 	// to the original via PublicURL".
 	Variants []Variant `json:"variants,omitempty"`
+
+	// HLSURL is the public URL of the HLS playlist produced by the
+	// media.video.transcode task (#52). Empty for non-video assets
+	// and for video assets whose transcode hasn't completed yet; the
+	// public player should fall back to PublicURL when this is
+	// empty.
+	HLSURL string `json:"hls_url,omitempty"`
+
+	// HasExtractedText is true when the media_text table has a row
+	// for this asset (#60). The detail page surfaces a "View
+	// extracted text" link based on this flag; the full payload
+	// lives behind a separate endpoint to keep the list response
+	// from ballooning on long documents.
+	HasExtractedText bool `json:"has_extracted_text,omitempty"`
+
+	// IsProxied is true when the row represents a remotely-hosted
+	// asset registered in proxy mode by the migration importer
+	// (#187). The image proxy serves the bytes via SourceURL; the
+	// admin grid surfaces a "proxied" badge so an operator can tell
+	// at a glance which assets are local vs remote.
+	IsProxied bool `json:"is_proxied,omitempty"`
+
+	// SourceURL is the origin URL for proxied assets. Empty for
+	// locally-stored assets.
+	SourceURL string `json:"source_url,omitempty"`
 }
 
 // Variant is one rendition produced by packages/go/media/imageproc.
