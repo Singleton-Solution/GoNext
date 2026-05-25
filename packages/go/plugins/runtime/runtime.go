@@ -109,6 +109,13 @@ type Runtime struct {
 	// the debug.LogHub satisfies LogPublisher and is registered here
 	// at construction by WithLogPublisher.
 	logPublisher LogPublisher
+
+	// platform carries the optional plugin-platform ABI configuration
+	// (secrets, audit, cron). nil when WithPlatform was not supplied;
+	// the host-function dispatchers nil-check before invoking the
+	// underlying services. Configured via WithPlatform — see
+	// host_platform.go.
+	platform *platformContext
 }
 
 // wazeroRuntime is an alias for wazero.Runtime, kept under a local
@@ -149,6 +156,12 @@ type runtimeConfig struct {
 	// coexist: whichever option lands last wins for the memory cap
 	// specifically.
 	limits *limits.Limits
+
+	// platform, when non-nil, installs the plugin platform ABIs
+	// (gn_secrets_get and, via follow-up commits, gn_audit_emit and
+	// gn_cron_register). Configured via WithPlatform — see
+	// host_platform.go.
+	platform *platformContext
 }
 
 // WithLogger injects the structured logger. If unset, slog.Default is
@@ -295,6 +308,7 @@ func New(ctx context.Context, opts ...Option) (*Runtime, error) {
 		extraHosts:   cfg.extraHosts,
 		enforcer:     enforcer,
 		logPublisher: cfg.logPublisher,
+		platform:     cfg.platform,
 	}
 
 	// Register the built-in "env" host module that exposes the minimum

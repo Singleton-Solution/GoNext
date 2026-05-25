@@ -89,6 +89,16 @@ func (r *Runtime) registerEnvHost(ctx context.Context) error {
 	// does not require any constructor-time wiring on Runtime itself.
 	r.registerObservabilityHost(b)
 
+	// Platform ABIs (gn_secrets_get, plus gn_audit_emit and
+	// gn_cron_register in follow-up commits) live in the same "env"
+	// namespace so guests find every gn_* import under the same
+	// module. Exports are only added when the runtime was constructed
+	// WithPlatform AND the matching service is configured; otherwise
+	// they're absent and a guest importing them fails at instantiation
+	// with the standard wazero "missing import" error, which is the
+	// correct outcome for "platform not configured".
+	r.addPlatformExports(b)
+
 	if _, err := b.Instantiate(ctx); err != nil {
 		return fmt.Errorf("instantiate %q host module: %w", hostModuleName, err)
 	}
