@@ -6,4 +6,5 @@ use (
 	./cli/gonext
 	./examples/plugins/seo
 	./packages/go
+	./packages/go/sdk
 )
