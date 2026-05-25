@@ -63,12 +63,12 @@ export interface MediaUpdateBody {
 
 /**
  * The chip-filter classes the grid exposes. "all" means "no filter
- * chip selected"; "image"/"video"/"document" map to the server-side
- * mime-class predicate. The server treats any other value as a 400
- * — we keep this union narrow on the client so a typo can't sneak
- * through.
+ * chip selected"; "image"/"video"/"document"/"audio" map to the
+ * server-side mime-class predicate. The server treats any other value
+ * as a 400 — we keep this union narrow on the client so a typo can't
+ * sneak through.
  */
-export type MediaTypeFilter = 'all' | 'image' | 'video' | 'document';
+export type MediaTypeFilter = 'all' | 'image' | 'video' | 'document' | 'audio';
 
 /**
  * Local UI state for an upload-in-progress row. The dropzone holds
