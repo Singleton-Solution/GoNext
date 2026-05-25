@@ -21,19 +21,22 @@ class NoopResizeObserver {
   unobserve(): void {}
   disconnect(): void {}
 }
-if (typeof globalThis.ResizeObserver === 'undefined') {
-  // @ts-expect-error — assigning to the global is intentional here.
-  globalThis.ResizeObserver = NoopResizeObserver;
+const globalAny = globalThis as unknown as {
+  ResizeObserver?: typeof NoopResizeObserver;
+};
+if (typeof globalAny.ResizeObserver === 'undefined') {
+  globalAny.ResizeObserver = NoopResizeObserver;
 }
 
 // Radix Select also reads `hasPointerCapture`, which jsdom doesn't
 // implement on HTMLElement.prototype. Default to a noop so the
 // pointer-capture branch is a no-op in tests.
-if (typeof Element !== 'undefined' && !Element.prototype.hasPointerCapture) {
-  // @ts-expect-error — adding a polyfill to the prototype.
-  Element.prototype.hasPointerCapture = () => false;
-}
-if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
-  // @ts-expect-error — adding a polyfill to the prototype.
-  Element.prototype.scrollIntoView = () => {};
+if (typeof Element !== 'undefined') {
+  const elementProto = Element.prototype as unknown as Record<string, unknown>;
+  if (!elementProto.hasPointerCapture) {
+    elementProto.hasPointerCapture = () => false;
+  }
+  if (!elementProto.scrollIntoView) {
+    elementProto.scrollIntoView = () => {};
+  }
 }
