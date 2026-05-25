@@ -215,4 +215,40 @@ describe('SiteEditorClient', () => {
       expect(screen.getByTestId('site-editor-banner')).toBeInTheDocument();
     });
   });
+
+  it('renders the brand headline with an italic-accent <em> on "parts"', async () => {
+    fetchPartsMock.mockResolvedValueOnce(makeResponse());
+
+    render(<SiteEditorClient />);
+
+    await waitFor(() => screen.getByTestId('site-editor-rail'));
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading.textContent).toContain('Template');
+    const em = heading.querySelector('em');
+    expect(em).not.toBeNull();
+    expect(em?.textContent).toBe('parts');
+  });
+
+  it('renders the autosave dot indicator next to the status pip', async () => {
+    fetchPartsMock.mockResolvedValueOnce(makeResponse());
+
+    render(<SiteEditorClient />);
+
+    await waitFor(() => screen.getByTestId('site-editor-rail'));
+    // Dot belongs inside the status pip so the brand's "alive" pulse
+    // sits where operators look for save state.
+    const status = screen.getByTestId('site-editor-status');
+    expect(status.querySelector('[data-testid="site-editor-autosave-dot"]')).not.toBeNull();
+  });
+
+  it('snapshots the toolbar so the brand chrome is locked in', async () => {
+    fetchPartsMock.mockResolvedValueOnce(makeResponse());
+
+    const { container } = render(<SiteEditorClient />);
+
+    await waitFor(() => screen.getByTestId('site-editor-rail'));
+    // Snapshot the rail nav — the dark-surface treatment is the most
+    // brand-distinctive part of this surface.
+    expect(container.querySelector('nav[aria-label="Template parts"]')).toMatchSnapshot();
+  });
 });
