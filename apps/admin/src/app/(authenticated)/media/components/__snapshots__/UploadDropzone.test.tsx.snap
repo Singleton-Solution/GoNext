@@ -1,0 +1,60 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`UploadDropzone > matches the brand snapshot for the resting dropzone surface 1`] = `
+<div
+  class="group relative rounded-lg bg-paper-3 border-2 border-dashed px-6 py-7 text-center transition-colors transition-shadow duration-[160ms] ease-brand hover:border-emerald border-border-strong"
+  data-testid="upload-dropzone"
+>
+  <div
+    class="flex flex-col items-center gap-2"
+  >
+    <svg
+      aria-hidden="true"
+      class="lucide lucide-cloud-upload transition-colors duration-[160ms] ease-brand group-hover:text-emerald-bright text-fg-subtle"
+      fill="none"
+      height="28"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="28"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M12 13v8"
+      />
+      <path
+        d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"
+      />
+      <path
+        d="m8 17 4-4 4 4"
+      />
+    </svg>
+    <p
+      class="font-sans text-sm text-ink-soft m-0"
+    >
+      Drag and drop files here, or
+       
+      <button
+        class="inline bg-transparent border-0 p-0 m-0 cursor-pointer font-sans text-sm font-medium text-emerald-deep underline-offset-4 hover:underline focus-visible:outline-none focus-visible:shadow-focus"
+        type="button"
+      >
+        choose a file
+      </button>
+      .
+    </p>
+    <p
+      class="font-mono text-2xs text-fg-subtle m-0"
+    >
+      Images, video, audio, and files up to 50 MB.
+    </p>
+  </div>
+  <input
+    class="hidden"
+    data-testid="upload-file-input"
+    multiple=""
+    type="file"
+  />
+</div>
+`;

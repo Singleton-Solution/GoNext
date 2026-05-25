@@ -113,4 +113,35 @@ describe('MediaDetailClient', () => {
     expect(mocks.deleteMedia).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
   });
+
+  it('exposes a copy-to-clipboard button on the storage URL panel', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    render(<MediaDetailClient initial={asset} />);
+
+    const copy = screen.getByTestId('copy-url-button');
+    fireEvent.click(copy);
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith('memory:///k/logo.png');
+    });
+  });
+
+  it('renders the EXIF / metadata table with mono values', () => {
+    render(<MediaDetailClient initial={asset} />);
+    const meta = screen.getByTestId('media-detail-metadata');
+    // The mime type and storage key appear in the table body — they
+    // live in <dd> nodes with the brand's font-mono class. Asserting
+    // textContent (rather than a className-coupled assertion) keeps
+    // the test resistant to Tailwind output changes.
+    expect(meta.textContent).toContain('image/png');
+    expect(meta.textContent).toContain('k/logo.png');
+  });
+
+  it('matches the brand snapshot for the storage URL panel', () => {
+    render(<MediaDetailClient initial={asset} />);
+    expect(screen.getByTestId('media-detail-storage')).toMatchSnapshot();
+  });
 });

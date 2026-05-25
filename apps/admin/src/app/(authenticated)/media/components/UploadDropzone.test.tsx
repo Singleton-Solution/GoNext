@@ -101,4 +101,12 @@ describe('UploadDropzone', () => {
       expect(screen.getByText('b.png')).toBeInTheDocument();
     });
   });
+
+  it('matches the brand snapshot for the resting dropzone surface', () => {
+    // Snapshot the empty resting state — paper-3 surface, dashed
+    // border-strong, UploadCloud glyph, choose-a-file button. Pins
+    // the class shape against accidental token drift.
+    const { container } = render(<UploadDropzone onUploaded={vi.fn()} />);
+    expect(container.querySelector('[data-testid="upload-dropzone"]')).toMatchSnapshot();
+  });
 });

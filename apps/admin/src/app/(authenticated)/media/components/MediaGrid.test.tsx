@@ -87,4 +87,48 @@ describe('MediaGrid', () => {
     render(<MediaGrid initialData={{ data: [], pagination: { next_cursor: '' } }} />);
     expect(screen.getByTestId('upload-dropzone')).toBeInTheDocument();
   });
+
+  it('renders the brand headline with the italic accent on "library"', () => {
+    mocks.listMedia.mockResolvedValue({ data: [], pagination: { next_cursor: '' } });
+    render(<MediaGrid initialData={{ data: [], pagination: { next_cursor: '' } }} />);
+    // The Headline primitive composes <em> children with the brand's
+    // italic-accent rule; the heading text reads "Media library."
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading).toHaveTextContent('Media library.');
+    const accent = heading.querySelector('em');
+    expect(accent).not.toBeNull();
+    expect(accent?.textContent).toBe('library');
+  });
+
+  it('exposes the full chip set including Images, Video, Files and Audio', () => {
+    mocks.listMedia.mockResolvedValue({ data: [], pagination: { next_cursor: '' } });
+    render(<MediaGrid initialData={{ data: [], pagination: { next_cursor: '' } }} />);
+    // The brand spec calls out Images / Video / Files / Audio in
+    // addition to the catch-all "All" chip.
+    expect(screen.getByTestId('filter-chip-all')).toBeInTheDocument();
+    expect(screen.getByTestId('filter-chip-image')).toBeInTheDocument();
+    expect(screen.getByTestId('filter-chip-video')).toBeInTheDocument();
+    expect(screen.getByTestId('filter-chip-document')).toBeInTheDocument();
+    expect(screen.getByTestId('filter-chip-audio')).toBeInTheDocument();
+  });
+
+  it('matches the brand snapshot for the chip row', () => {
+    mocks.listMedia.mockResolvedValue({ data: [], pagination: { next_cursor: '' } });
+    render(<MediaGrid initialData={{ data: [], pagination: { next_cursor: '' } }} />);
+    // Snapshot the tablist subtree only — this pins the class shape
+    // (emerald-soft active, paper-2 idle, pill radius) without
+    // dragging the empty-state / dropzone DOM into the snapshot.
+    const tablist = screen.getByRole('tablist');
+    expect(tablist).toMatchSnapshot();
+  });
+
+  it('renders the hover-overlay edit + delete affordances per tile', () => {
+    mocks.listMedia.mockResolvedValue({ data: [tile('a')], pagination: { next_cursor: '' } });
+    render(<MediaGrid initialData={{ data: [tile('a')], pagination: { next_cursor: '' } }} />);
+    // Both affordances are part of the brand spec: emerald edit +
+    // lavender delete. They're test-ID'd so the brand surface is
+    // pinned even though the overlay is opacity-0 until hover.
+    expect(screen.getByTestId('tile-edit-a')).toBeInTheDocument();
+    expect(screen.getByTestId('tile-delete-a')).toBeInTheDocument();
+  });
 });

@@ -1,0 +1,91 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MediaDetailClient > matches the brand snapshot for the storage URL panel 1`] = `
+<div
+  class="flex flex-col gap-2"
+  data-testid="media-detail-storage"
+>
+  <span
+    class="font-sans text-xs font-medium uppercase tracking-[0.12em] text-fg-subtle"
+  >
+    Storage URL
+  </span>
+  <div
+    class="flex items-center gap-2 rounded-md border border-border bg-paper-3 pl-3 pr-1 py-[6px] transition-colors duration-[160ms] ease-brand hover:border-border-strong"
+  >
+    <a
+      class="flex-1 min-w-0 font-mono text-xs text-ink-soft truncate no-underline hover:text-ink"
+      href="memory:///k/logo.png"
+      rel="noreferrer"
+      target="_blank"
+      title="memory:///k/logo.png"
+    >
+      memory:///k/logo.png
+    </a>
+    <a
+      aria-label="Open in new tab"
+      class="inline-flex h-7 w-7 items-center justify-center rounded-sm text-fg-subtle transition-colors duration-[160ms] ease-brand hover:bg-paper-2 hover:text-ink focus-visible:outline-none focus-visible:shadow-focus"
+      href="memory:///k/logo.png"
+      rel="noreferrer"
+      target="_blank"
+    >
+      <svg
+        aria-hidden="true"
+        class="lucide lucide-external-link"
+        fill="none"
+        height="12"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+        width="12"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M15 3h6v6"
+        />
+        <path
+          d="M10 14 21 3"
+        />
+        <path
+          d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
+        />
+      </svg>
+    </a>
+    <button
+      aria-label="Copy storage URL"
+      class="inline-flex h-7 items-center gap-1 rounded-sm px-2 font-sans text-2xs font-medium transition-colors duration-[160ms] ease-brand focus-visible:outline-none focus-visible:shadow-focus bg-emerald text-emerald-ink hover:bg-emerald-deep hover:text-paper"
+      data-testid="copy-url-button"
+      type="button"
+    >
+      <svg
+        aria-hidden="true"
+        class="lucide lucide-copy"
+        fill="none"
+        height="12"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+        width="12"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect
+          height="14"
+          rx="2"
+          ry="2"
+          width="14"
+          x="8"
+          y="8"
+        />
+        <path
+          d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"
+        />
+      </svg>
+      Copy
+    </button>
+  </div>
+</div>
+`;
