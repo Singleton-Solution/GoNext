@@ -1,5 +1,6 @@
 /**
- * Comments — single comment detail + reply.
+ * Comments — single comment detail + reply, restyled against the
+ * Living-Systems brand.
  *
  * Server component that fetches the target comment + its
  * surrounding thread (the parent, sibling replies, and immediate
@@ -8,15 +9,22 @@
  * may add a dedicated `?thread=<root>` query for efficiency; the
  * shape stays compatible.
  *
- * The reply form is delegated to a small client island so the
- * server component stays free of mutation logic.
+ * Layout: a two-column grid on wide viewports — the focused
+ * comment + ReplyForm in the main paper-2 card, with the surrounding
+ * thread in a paper-2 sidebar. Below 800px the sidebar stacks under
+ * the main card. The reply form is delegated to a small client
+ * island so the server component stays free of mutation logic.
  */
+import { ArrowLeft } from 'lucide-react';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { type ReactElement } from 'react';
+
+import { Headline } from '@/components/ui/headline';
 import { apiBaseUrl } from '@/lib/api-client';
+import { cn } from '@/lib/utils';
+
 import { StatusBadge } from '../components/StatusBadge';
-import styles from '../comments.module.css';
 import {
   toComment,
   toListResponse,
@@ -129,14 +137,27 @@ export default async function CommentDetailPage(
 
   if (!target) {
     return (
-      <section>
-        <div className={styles.headerBar}>
-          <h1>Comment</h1>
-          <Link href="/comments">Back to list</Link>
+      <section className="flex flex-col gap-6">
+        <div className="flex items-center justify-between border-b border-border pb-4">
+          <Headline as="h1" size="sub">
+            Comment
+          </Headline>
+          <Link
+            href="/comments"
+            className="inline-flex items-center gap-1 font-sans text-sm text-emerald-deep hover:underline"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Back to list
+          </Link>
         </div>
-        <div className={styles.error} role="alert">
-          <h2>Comment not found</h2>
-          <p className="muted">
+        <div
+          role="alert"
+          className="rounded-lg border border-danger/30 bg-danger-soft/60 p-6"
+        >
+          <h2 className="m-0 mb-2 font-display text-xl font-bold text-ink">
+            Comment not found
+          </h2>
+          <p className="m-0 font-sans text-sm text-fg-muted">
             We couldn&apos;t find a comment with that id. It may have been
             permanently deleted, or the API may not be reachable.
           </p>
@@ -149,77 +170,109 @@ export default async function CommentDetailPage(
   const surrounding = thread ? relatedComments(target, thread.data) : [];
 
   return (
-    <section>
-      <div className={styles.headerBar}>
-        <h1>Comment</h1>
-        <Link href="/comments">Back to list</Link>
+    <section className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border pb-4">
+        <div className="flex flex-col gap-2">
+          <span className="font-sans text-xs font-medium uppercase tracking-wide text-emerald-deep">
+            Community · moderation
+          </span>
+          <Headline as="h1" size="sub">
+            Single <em>comment</em>.
+          </Headline>
+        </div>
+        <Link
+          href="/comments"
+          className="inline-flex items-center gap-1 font-sans text-sm text-emerald-deep hover:underline"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Back to list
+        </Link>
       </div>
 
-      <div className={styles.detail}>
-        <div className={styles.detailCard}>
-          <div className={styles.detailHeader}>
-            <div>
-              <strong>{target.authorDisplayName}</strong>{' '}
-              <span className="muted">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <article className="rounded-lg border border-border bg-paper-2 p-5 shadow-xs">
+          <header className="mb-3 flex items-baseline justify-between gap-2 border-b border-border-subtle pb-3">
+            <div className="font-sans text-sm">
+              <strong className="font-semibold text-ink">
+                {target.authorDisplayName}
+              </strong>{' '}
+              <span className="text-fg-muted">
                 on{' '}
                 <Link
                   href={{ pathname: `/posts/${target.postId}/edit` }}
-                  className={styles.postLink}
+                  className="text-emerald-deep hover:underline"
                 >
                   {target.postTitle || '(untitled)'}
                 </Link>
               </span>
             </div>
             <StatusBadge status={target.status} />
-          </div>
-          <div className={styles.metaRow}>
+          </header>
+          <div className="mb-3 flex flex-wrap items-center gap-3 font-mono text-xs text-fg-subtle">
             <span>{formatDate(target.createdAt)}</span>
             {target.parentId && (
               <span>
                 in reply to{' '}
                 <Link
                   href={{ pathname: `/comments/${target.parentId}` }}
-                  className={styles.postLink}
+                  className="text-emerald-deep hover:underline"
                 >
                   earlier comment
                 </Link>
               </span>
             )}
           </div>
-          <p>{target.content}</p>
+          <p className="m-0 font-sans text-base leading-normal text-ink">
+            {target.content}
+          </p>
 
-          <ReplyForm commentId={target.id} />
-        </div>
+          <div className="mt-6 border-t border-border-subtle pt-4">
+            <ReplyForm commentId={target.id} />
+          </div>
+        </article>
 
-        <aside className={styles.detailCard} aria-label="Thread">
-          <h2 style={{ fontSize: 16, marginTop: 0 }}>Thread</h2>
+        <aside
+          aria-label="Thread"
+          className="rounded-lg border border-border bg-paper-2 p-5 shadow-xs"
+        >
+          <h2 className="m-0 mb-3 font-display text-base font-extrabold tracking-tight text-ink">
+            Thread
+          </h2>
           {surrounding.length === 0 ? (
-            <p className="muted">No related comments.</p>
+            <p className="m-0 font-sans text-sm text-fg-muted">
+              No related comments.
+            </p>
           ) : (
-            <ul className={styles.threadList}>
-              {surrounding.map((c) => (
-                <li
-                  key={c.id}
-                  className={
-                    c.id === target.id
-                      ? `${styles.threadItem} ${styles.threadItemActive}`
-                      : styles.threadItem
-                  }
-                >
-                  <div className={styles.metaRow}>
-                    <strong>{c.authorDisplayName}</strong>
-                    <StatusBadge status={c.status} />
-                  </div>
-                  <Link
-                    href={{ pathname: `/comments/${c.id}` }}
-                    style={{ fontSize: 13 }}
+            <ul className="m-0 flex flex-col gap-2 p-0">
+              {surrounding.map((c) => {
+                const isActive = c.id === target.id;
+                return (
+                  <li
+                    key={c.id}
+                    className={cn(
+                      'list-none rounded-md border p-3 transition-colors',
+                      isActive
+                        ? 'border-emerald bg-emerald-soft/40'
+                        : 'border-border bg-paper-3 hover:border-border-strong',
+                    )}
                   >
-                    {c.content.length > 140
-                      ? c.content.slice(0, 140) + '…'
-                      : c.content}
-                  </Link>
-                </li>
-              ))}
+                    <div className="mb-1 flex items-center gap-2">
+                      <strong className="font-sans text-xs font-semibold text-ink">
+                        {c.authorDisplayName}
+                      </strong>
+                      <StatusBadge status={c.status} />
+                    </div>
+                    <Link
+                      href={{ pathname: `/comments/${c.id}` }}
+                      className="font-sans text-xs leading-normal text-fg-muted hover:text-ink"
+                    >
+                      {c.content.length > 140
+                        ? c.content.slice(0, 140) + '…'
+                        : c.content}
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </aside>

@@ -1,7 +1,8 @@
 'use client';
 
 /**
- * Client island for the Comments list.
+ * Client island for the Comments list, restyled against the
+ * Living-Systems brand.
  *
  * Mirrors the PostListClient pattern: a server component fetches the
  * first page and hands it to this island, which owns:
@@ -11,6 +12,12 @@
  *  - Per-row quick actions (Approve / Spam / Trash buttons that hit
  *    the single-row PATCH endpoint).
  *  - "Load more" pagination via the API's opaque next_cursor.
+ *
+ * Visual treatment: emerald-soft active chips + paper-3 inactive
+ * chips, paper-2 table chrome with paper-3 head row, lavender
+ * avatar circles, monospace timestamps. The quick-action row uses
+ * the shared `<Button>` ghost variant so the row's CTA cluster
+ * reads as auxiliary rather than competing with the bulk bar.
  *
  * REST dependency: `/api/v1/admin/comments` is the freshly-landed
  * endpoint in `apps/api/internal/admin/comments`. The component is
@@ -27,10 +34,13 @@ import {
   useTransition,
   type ReactElement,
 } from 'react';
+
+import { Button } from '@/components/ui/button';
 import { api, ApiError } from '@/lib/api-client';
+import { cn } from '@/lib/utils';
+
 import { BulkActionBar } from './components/BulkActionBar';
 import { StatusBadge } from './components/StatusBadge';
-import styles from './comments.module.css';
 import {
   excerpt,
   STATUS_FILTERS,
@@ -170,22 +180,24 @@ export function CommentListClient({
       try {
         const updated = patcher
           ? await patcher(id, status)
-          : (await api.patch<WireComment>(`/api/v1/admin/comments/${id}`, {
-              status,
-            }).then((w) => ({
-              id: w.id,
-              postId: w.post_id,
-              postTitle: w.post_title,
-              parentId: w.parent_id,
-              path: w.path,
-              authorUserId: w.author_user_id,
-              authorDisplayName: w.author_display_name,
-              content: w.content,
-              contentFormat: w.content_format,
-              status: w.status,
-              createdAt: w.created_at,
-              updatedAt: w.updated_at,
-            })));
+          : await api
+              .patch<WireComment>(`/api/v1/admin/comments/${id}`, {
+                status,
+              })
+              .then((w) => ({
+                id: w.id,
+                postId: w.post_id,
+                postTitle: w.post_title,
+                parentId: w.parent_id,
+                path: w.path,
+                authorUserId: w.author_user_id,
+                authorDisplayName: w.author_display_name,
+                content: w.content,
+                contentFormat: w.content_format,
+                status: w.status,
+                createdAt: w.created_at,
+                updatedAt: w.updated_at,
+              }));
         setComments((prev) =>
           prev.map((c) => (c.id === id ? { ...c, ...updated } : c)),
         );
@@ -211,7 +223,7 @@ export function CommentListClient({
       try {
         const updated = bulker
           ? await bulker(ids, action)
-          : (await api
+          : await api
               .post<{ updated: WireComment[]; count: number }>(
                 '/api/v1/admin/comments/bulk',
                 { ids, action },
@@ -231,7 +243,7 @@ export function CommentListClient({
                   createdAt: w.created_at,
                   updatedAt: w.updated_at,
                 })),
-              ));
+              );
         const byId = new Map(updated.map((c) => [c.id, c] as const));
         setComments((prev) =>
           prev.map((c) => (byId.has(c.id) ? byId.get(c.id)! : c)),
@@ -284,7 +296,7 @@ export function CommentListClient({
   if (comments.length === 0) {
     const hasFilter = currentStatus !== 'any';
     return (
-      <div>
+      <div className="flex flex-col gap-4">
         <CommentsToolbar
           currentStatus={currentStatus}
           onStatusClick={handleStatusClick}
@@ -293,16 +305,27 @@ export function CommentListClient({
           isBulkPending={isBulkPending}
           isPending={isPending}
         />
-        <div className={styles.empty} role="status">
+        <div
+          role="status"
+          className="rounded-lg border border-dashed border-border bg-paper-2 px-8 py-12 text-center"
+        >
           {hasFilter ? (
             <>
-              <h2>No comments match that filter</h2>
-              <p>Try a different status, or clear the filter.</p>
+              <h2 className="m-0 mb-2 font-display text-xl font-bold text-ink">
+                No comments match that filter
+              </h2>
+              <p className="m-0 font-sans text-sm text-fg-muted">
+                Try a different status, or clear the filter.
+              </p>
             </>
           ) : (
             <>
-              <h2>No comments yet</h2>
-              <p>When your posts attract conversation, it shows up here.</p>
+              <h2 className="m-0 mb-2 font-display text-xl font-bold text-ink">
+                No comments <em className="font-serif italic font-normal text-emerald-deep">yet</em>.
+              </h2>
+              <p className="m-0 font-sans text-sm text-fg-muted">
+                When your posts attract conversation, it shows up here.
+              </p>
             </>
           )}
         </div>
@@ -311,7 +334,7 @@ export function CommentListClient({
   }
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
       <CommentsToolbar
         currentStatus={currentStatus}
         onStatusClick={handleStatusClick}
@@ -322,81 +345,137 @@ export function CommentListClient({
       />
 
       {actionError && (
-        <p className="muted" role="alert" style={{ marginBottom: 12 }}>
+        <p role="alert" className="m-0 font-sans text-sm text-danger">
           {actionError}
         </p>
       )}
 
-      <div className={styles.tableWrap}>
-        <table className={styles.table} aria-label="Comments">
-          <thead>
+      <div className="overflow-hidden rounded-lg border border-border bg-paper-2 shadow-xs">
+        <table className="w-full border-collapse font-sans text-sm">
+          <thead className="bg-paper-3">
             <tr>
-              <th scope="col" style={{ width: 32 }}>
+              <th scope="col" className="border-b border-border px-3 py-2 text-left" style={{ width: 32 }}>
                 <input
                   type="checkbox"
                   aria-label="Select all comments"
                   checked={allSelected}
                   onChange={(e) => handleSelectAll(e.target.checked)}
+                  className="accent-emerald"
                 />
               </th>
-              <th scope="col" style={{ width: 48 }}>
-                <span className="visually-hidden">Avatar</span>
+              <th
+                scope="col"
+                className="border-b border-border px-3 py-2 text-left"
+                style={{ width: 48 }}
+              >
+                <span className="sr-only">Avatar</span>
               </th>
-              <th scope="col">Author</th>
-              <th scope="col">Comment</th>
-              <th scope="col">On post</th>
-              <th scope="col">Status</th>
-              <th scope="col">Date</th>
-              <th scope="col">Actions</th>
+              <th
+                scope="col"
+                className="border-b border-border px-3 py-2 text-left font-mono text-[10px] font-semibold uppercase tracking-wide text-fg-subtle"
+              >
+                Author
+              </th>
+              <th
+                scope="col"
+                className="border-b border-border px-3 py-2 text-left font-mono text-[10px] font-semibold uppercase tracking-wide text-fg-subtle"
+              >
+                Comment
+              </th>
+              <th
+                scope="col"
+                className="border-b border-border px-3 py-2 text-left font-mono text-[10px] font-semibold uppercase tracking-wide text-fg-subtle"
+              >
+                On post
+              </th>
+              <th
+                scope="col"
+                className="border-b border-border px-3 py-2 text-left font-mono text-[10px] font-semibold uppercase tracking-wide text-fg-subtle"
+              >
+                Status
+              </th>
+              <th
+                scope="col"
+                className="border-b border-border px-3 py-2 text-left font-mono text-[10px] font-semibold uppercase tracking-wide text-fg-subtle"
+              >
+                Date
+              </th>
+              <th
+                scope="col"
+                className="border-b border-border px-3 py-2 text-left font-mono text-[10px] font-semibold uppercase tracking-wide text-fg-subtle"
+              >
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
-            {comments.map((c) => (
-              <tr key={c.id}>
-                <td>
+            {comments.map((c, i) => (
+              <tr
+                key={c.id}
+                className={cn(
+                  'transition-colors hover:bg-paper-3',
+                  i === comments.length - 1
+                    ? ''
+                    : 'border-b border-border-subtle',
+                )}
+              >
+                <td className="px-3 py-3 align-top">
                   <input
                     type="checkbox"
                     aria-label={`Select comment by ${c.authorDisplayName}`}
                     checked={selected.has(c.id)}
                     onChange={() => handleSelectRow(c.id)}
+                    className="accent-emerald"
                   />
                 </td>
-                <td>
-                  <span className={styles.avatar} aria-hidden="true">
+                <td className="px-3 py-3 align-top">
+                  <span
+                    aria-hidden="true"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-pill border border-border bg-lavender-soft font-display text-xs font-bold text-lavender-deep"
+                  >
                     {avatarInitial(c.authorDisplayName)}
                   </span>
                 </td>
-                <td>{c.authorDisplayName}</td>
-                <td className={styles.excerpt}>
-                  <Link href={{ pathname: `/comments/${c.id}` }}>
+                <td className="px-3 py-3 align-top font-sans text-sm text-ink">
+                  {c.authorDisplayName}
+                </td>
+                <td className="max-w-[360px] px-3 py-3 align-top">
+                  <Link
+                    href={{ pathname: `/comments/${c.id}` }}
+                    className="font-sans text-sm leading-normal text-ink underline-offset-2 hover:underline hover:text-emerald-deep"
+                  >
                     {excerpt(c.content, 200)}
                   </Link>
                 </td>
-                <td>
+                <td className="px-3 py-3 align-top">
                   <Link
                     href={{ pathname: `/posts/${c.postId}/edit` }}
-                    className={styles.postLink}
+                    className="font-sans text-xs text-emerald-deep hover:underline"
                   >
                     {c.postTitle || '(untitled)'}
                   </Link>
                 </td>
-                <td>
+                <td className="px-3 py-3 align-top">
                   <StatusBadge status={c.status} />
                 </td>
-                <td>{formatDate(c.createdAt)}</td>
-                <td>
-                  <div className={styles.quickActions}>
+                <td className="px-3 py-3 align-top font-mono text-xs tabular-nums text-fg-muted">
+                  {formatDate(c.createdAt)}
+                </td>
+                <td className="px-3 py-3 align-top">
+                  <div className="flex flex-wrap gap-1">
                     {QUICK_ACTIONS.map((a) => (
-                      <button
+                      <Button
                         key={a.status}
                         type="button"
-                        className={styles.quickAction}
+                        variant="ghost"
+                        size="sm"
                         onClick={() => void applyPatch(c.id, a.status)}
                         disabled={busyId === c.id || c.status === a.status}
                         aria-label={`${a.label} comment by ${c.authorDisplayName}`}
+                        className="h-7 px-2 font-sans text-xs"
                       >
                         {a.label}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </td>
@@ -407,21 +486,22 @@ export function CommentListClient({
       </div>
 
       {loadMoreError && (
-        <p className="muted" role="alert" style={{ marginTop: 12 }}>
+        <p role="alert" className="m-0 font-sans text-sm text-danger">
           {loadMoreError}
         </p>
       )}
 
       {cursor && (
-        <div className={styles.loadMoreWrap}>
-          <button
+        <div className="flex justify-center">
+          <Button
             type="button"
-            className={styles.bulkApply}
+            variant="default"
+            size="sm"
             onClick={handleLoadMore}
             disabled={isLoadingMore}
           >
             {isLoadingMore ? 'Loading…' : 'Load more'}
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -447,11 +527,11 @@ function CommentsToolbar({
 }: CommentsToolbarProps): ReactElement {
   return (
     <div
-      className={styles.toolbar}
+      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-paper-2 p-3 shadow-xs"
       aria-busy={isPending ? 'true' : 'false'}
     >
       <div
-        className={styles.chipGroup}
+        className="inline-flex flex-wrap gap-2"
         role="group"
         aria-label="Filter by status"
       >
@@ -461,11 +541,14 @@ function CommentsToolbar({
             <button
               key={f.value}
               type="button"
-              className={
-                active ? `${styles.chip} ${styles.chipActive}` : styles.chip
-              }
               aria-pressed={active}
               onClick={() => onStatusClick(f.value)}
+              className={cn(
+                'rounded-pill border px-3 py-[3px] font-sans text-xs font-medium transition-colors duration-[160ms] ease-brand',
+                active
+                  ? 'border-emerald bg-emerald-soft text-emerald-deep shadow-xs'
+                  : 'border-border bg-transparent text-fg-muted hover:border-emerald hover:bg-emerald-soft/40 hover:text-emerald-deep',
+              )}
             >
               {f.label}
             </button>

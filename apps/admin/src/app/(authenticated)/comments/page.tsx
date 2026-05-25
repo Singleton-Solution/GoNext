@@ -10,12 +10,19 @@
  * Filter state lives in the URL: `?status=pending` etc. Reload of
  * a filtered URL restores the same view, and browser back/forward
  * works without extra wiring.
+ *
+ * Visual treatment: Headline (`Comment <em>moderation</em>.`) on
+ * the cream surface, with a filter-chip toolbar and ResourceList-
+ * style table inside the CommentListClient island. The skeleton +
+ * error states use the brand's paper-2 + danger-soft tokens.
  */
 import { cookies } from 'next/headers';
 import { Suspense, type ReactElement } from 'react';
+
+import { Headline } from '@/components/ui/headline';
 import { apiBaseUrl } from '@/lib/api-client';
+
 import { CommentListClient } from './CommentListClient';
-import styles from './comments.module.css';
 import {
   toListResponse,
   type CommentListResponse,
@@ -27,19 +34,21 @@ export const dynamic = 'force-dynamic';
 
 function Skeleton(): ReactElement {
   return (
-    <div className={styles.tableWrap} aria-busy="true" aria-live="polite">
-      <div style={{ padding: 'var(--space-4)' }}>
-        <span className="visually-hidden">Loading comments…</span>
+    <div
+      className="overflow-hidden rounded-lg border border-border bg-paper-2"
+      aria-busy="true"
+      aria-live="polite"
+    >
+      <div className="p-4">
+        <span className="sr-only">Loading comments…</span>
         {Array.from({ length: 6 }).map((_, idx) => (
           <div
             key={idx}
+            className="my-3 h-4 rounded-xs"
             style={{
-              height: 18,
-              margin: 'var(--space-3) 0',
               background:
-                'linear-gradient(90deg, #eef0f3 0%, #f6f7f9 50%, #eef0f3 100%)',
+                'linear-gradient(90deg, var(--paper-3) 0%, var(--paper-2) 50%, var(--paper-3) 100%)',
               backgroundSize: '200% 100%',
-              borderRadius: 4,
             }}
           />
         ))}
@@ -50,12 +59,17 @@ function Skeleton(): ReactElement {
 
 function FetchFailureState({ reason }: { reason: string }): ReactElement {
   return (
-    <div className={styles.error} role="alert">
-      <h2>Couldn&apos;t load comments</h2>
-      <p className="muted">
-        We couldn&apos;t fetch the list from the GoNext API ({reason}).
-        Try reloading; if it keeps failing the admin API may not be
-        reachable yet.
+    <div
+      role="alert"
+      className="rounded-lg border border-danger/30 bg-danger-soft/60 p-6"
+    >
+      <h2 className="m-0 mb-2 font-display text-xl font-bold text-ink">
+        Couldn&apos;t load comments
+      </h2>
+      <p className="m-0 font-sans text-sm text-fg-muted">
+        We couldn&apos;t fetch the list from the GoNext API ({reason}). Try
+        reloading; if it keeps failing the admin API may not be reachable
+        yet.
       </p>
     </div>
   );
@@ -146,9 +160,19 @@ async function CommentsListServer({
 
 export default function CommentsPage(props: PageProps): ReactElement {
   return (
-    <section>
-      <div className={styles.headerBar}>
-        <h1>Comments</h1>
+    <section className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2 border-b border-border pb-4">
+        <span className="font-sans text-xs font-medium uppercase tracking-wide text-emerald-deep">
+          Community
+        </span>
+        <Headline as="h1" size="sub">
+          Comment <em>moderation</em>.
+        </Headline>
+        <p className="m-0 max-w-[540px] font-sans text-sm text-fg-muted">
+          Approve, spam, or trash incoming threads. The queue filters by{' '}
+          <em className="font-serif italic text-emerald-deep">status</em> and
+          syncs to the URL so reloads keep their place.
+        </p>
       </div>
       <Suspense fallback={<Skeleton />}>
         <CommentsListServer searchParams={props.searchParams} />

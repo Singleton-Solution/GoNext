@@ -1,28 +1,39 @@
 'use client';
 
 /**
- * StatusCard — one section of the System Status grid.
+ * StatusCard — one section of the System Status grid, restyled
+ * against the Living-Systems brand.
  *
- * Renders a title, a colored "traffic light" badge, an optional
- * one-line summary, and a list of key/value detail rows. The card is
- * pure-presentational: every page section builds the title/tone/rows
- * locally and hands them down. Layout + styling come from inline
- * styles so the card stays self-contained ahead of the design-system
- * extraction (#34).
+ * Visual treatment follows the data-viz language from
+ * `docs/design/ui_kits/admin/pulse.html`: the card surface is a
+ * tone-tinted paper-2 panel, the heading reads as a small-caps
+ * eyebrow, the value/value rows are tabular monospace, and the
+ * status badge uses a soft brand-token tint instead of the
+ * pre-brand traffic-light hexes.
  *
- * Tone colors:
+ * Tone → tint mapping (canonical, mirrored from the handoff):
  *
- *   ok      green  — section is healthy.
- *   warn    amber  — section is degraded but functioning (e.g. high
- *                    queue depth, in_use approaching max_conns).
- *   error   red    — section reported an Error or a hard fault.
- *   unknown grey   — source not configured; nothing to report.
+ *   ok      → emerald-soft surface · emerald-deep text  (healthy)
+ *   warn    → lavender-soft surface · lavender-deep text (degraded)
+ *   error   → danger-soft surface · danger text          (critical)
+ *   unknown → paper-3 surface · fg-subtle text           (skipped)
  *
- * The badge text mirrors the tone in plain English so the page is
- * usable for operators who rely on screen readers or who have color-
- * vision differences.
+ * Lucide icons (`CheckCircle2 / AlertTriangle / XCircle / MinusCircle`)
+ * stand in for the textual badge so a glance gives operators the
+ * same state read as the verbose label. The badge text mirrors the
+ * tone in plain English for screen readers and color-vision
+ * differences.
  */
-import type { CSSProperties, ReactElement, ReactNode } from 'react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  MinusCircle,
+  XCircle,
+  type LucideIcon,
+} from 'lucide-react';
+import type { ReactElement, ReactNode } from 'react';
+
+import { cn } from '@/lib/utils';
 import type { StatusTone } from '../types';
 
 export interface StatusCardRow {
@@ -59,105 +70,42 @@ export interface StatusCardProps {
 const TONE_LABEL: Record<StatusTone, string> = {
   ok: 'Healthy',
   warn: 'Degraded',
-  error: 'Error',
-  unknown: 'Unknown',
+  error: 'Critical',
+  unknown: 'Skipped',
 };
 
-const TONE_COLORS: Record<StatusTone, { bg: string; fg: string; border: string }> = {
-  ok: { bg: '#dcfce7', fg: '#166534', border: '#86efac' },
-  warn: { bg: '#fef3c7', fg: '#92400e', border: '#fde68a' },
-  error: { bg: '#fee2e2', fg: '#991b1b', border: '#fecaca' },
-  unknown: { bg: '#f3f4f6', fg: '#4b5563', border: '#e5e7eb' },
+const TONE_ICON: Record<StatusTone, LucideIcon> = {
+  ok: CheckCircle2,
+  warn: AlertTriangle,
+  error: XCircle,
+  unknown: MinusCircle,
 };
 
-const styles: Record<string, CSSProperties> = {
-  card: {
-    background: 'var(--color-surface, #ffffff)',
-    border: '1px solid var(--color-border, #e4e6ea)',
-    borderRadius: 6,
-    padding: 16,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 10,
-    minHeight: 160,
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  title: {
-    margin: 0,
-    fontSize: 14,
-    fontWeight: 600,
-    color: 'var(--color-text, #1c2024)',
-  },
-  summary: {
-    color: 'var(--color-text-muted, #6b7280)',
-    fontSize: 13,
-    margin: 0,
-  },
-  rows: {
-    listStyle: 'none',
-    padding: 0,
-    margin: 0,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
-    fontSize: 13,
-  },
-  row: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 12,
-    color: 'var(--color-text, #1c2024)',
-  },
-  rowLabel: {
-    color: 'var(--color-text-muted, #6b7280)',
-  },
-  rowValue: {
-    fontFeatureSettings: '"tnum"',
-    fontVariantNumeric: 'tabular-nums',
-  },
-  errorBanner: {
-    padding: '6px 8px',
-    borderRadius: 4,
-    background: '#fef2f2',
-    color: '#991b1b',
-    fontSize: 12,
-    border: '1px solid #fecaca',
-  },
+/**
+ * Card surface tint per tone. Maps to the four brand-soft surfaces
+ * declared in `tokens.css`. The hairline left-edge keeps the badge
+ * legible without leaning on a hard border colour.
+ */
+const TONE_CARD: Record<StatusTone, string> = {
+  ok: 'bg-emerald-soft/40 border-emerald/30',
+  warn: 'bg-lavender-soft/60 border-lavender/30',
+  error: 'bg-danger-soft border-danger/30',
+  unknown: 'bg-paper-3 border-border',
 };
 
-function badgeStyle(tone: StatusTone): CSSProperties {
-  const c = TONE_COLORS[tone];
-  return {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '2px 8px',
-    borderRadius: 999,
-    background: c.bg,
-    color: c.fg,
-    border: `1px solid ${c.border}`,
-    fontSize: 12,
-    fontWeight: 600,
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
-  };
-}
+const TONE_BADGE: Record<StatusTone, string> = {
+  ok: 'bg-emerald-soft text-emerald-deep',
+  warn: 'bg-lavender-soft text-lavender-deep',
+  error: 'bg-danger-soft text-danger',
+  unknown: 'bg-paper-3 text-fg-subtle',
+};
 
-function dotStyle(tone: StatusTone): CSSProperties {
-  const c = TONE_COLORS[tone];
-  return {
-    width: 8,
-    height: 8,
-    borderRadius: '50%',
-    background: c.fg,
-    display: 'inline-block',
-  };
-}
+const TONE_ICON_TINT: Record<StatusTone, string> = {
+  ok: 'text-emerald-deep',
+  warn: 'text-lavender-deep',
+  error: 'text-danger',
+  unknown: 'text-fg-subtle',
+};
 
 export function StatusCard({
   title,
@@ -167,39 +115,71 @@ export function StatusCard({
   errorMessage,
   testId,
 }: StatusCardProps): ReactElement {
+  const Icon = TONE_ICON[tone];
   return (
     <article
-      style={styles.card}
       data-testid={testId}
       data-tone={tone}
       aria-label={title}
+      className={cn(
+        'flex min-h-[160px] flex-col gap-3 rounded-lg border p-5 shadow-xs',
+        'transition-shadow duration-[160ms] ease-brand hover:shadow-md',
+        TONE_CARD[tone],
+      )}
     >
-      <div style={styles.header}>
-        <h2 style={styles.title}>{title}</h2>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Icon
+            aria-hidden="true"
+            className={cn('h-4 w-4 flex-shrink-0', TONE_ICON_TINT[tone])}
+          />
+          <h2 className="m-0 font-sans text-sm font-semibold leading-tight text-ink">
+            {title}
+          </h2>
+        </div>
         <span
-          style={badgeStyle(tone)}
           role="status"
           aria-label={`${title}: ${TONE_LABEL[tone]}`}
+          className={cn(
+            'inline-flex items-center gap-[6px] rounded-pill px-2 py-[2px] font-mono text-[10px] font-semibold uppercase tracking-wide',
+            TONE_BADGE[tone],
+          )}
         >
-          <span aria-hidden="true" style={dotStyle(tone)} />
+          <span
+            aria-hidden="true"
+            className={cn(
+              'h-[6px] w-[6px] rounded-pill bg-current',
+              tone === 'ok' && 'animate-pulse',
+            )}
+          />
           {TONE_LABEL[tone]}
         </span>
       </div>
 
       {errorMessage ? (
-        <p style={styles.errorBanner} role="alert">
+        <p
+          role="alert"
+          className="rounded-sm border border-danger/30 bg-danger-soft/70 px-2 py-1 font-mono text-xs text-danger"
+        >
           {errorMessage}
         </p>
       ) : summary ? (
-        <p style={styles.summary}>{summary}</p>
+        <p className="m-0 font-sans text-sm leading-normal text-fg-muted">
+          {summary}
+        </p>
       ) : null}
 
       {rows && rows.length > 0 ? (
-        <ul style={styles.rows}>
+        <ul className="m-0 flex list-none flex-col gap-1 p-0 font-sans text-sm">
           {rows.map((row) => (
-            <li key={row.label} style={styles.row}>
-              <span style={styles.rowLabel}>{row.label}</span>
-              <span style={styles.rowValue}>{row.value}</span>
+            <li
+              key={row.label}
+              className="flex justify-between gap-3 text-ink"
+            >
+              <span className="text-fg-subtle">{row.label}</span>
+              <span className="font-mono tabular-nums text-ink">
+                {row.value}
+              </span>
             </li>
           ))}
         </ul>
