@@ -23,17 +23,41 @@
  *     tell the inspector apart from the canvas selection chrome at a
  *     glance.
  *
- * Everything is visual-only: no Lexical wiring, no save side-effects.
- * The admin app composes these around the existing `<BlockEditCanvas>`
- * + `<BlockInserter>` to land the full editor surface.
+ *   - `<EditorWorkspace>` — **the editor-UX integration point**. This
+ *     is the single place the chrome composes the three P2 editor-UX
+ *     pieces together:
+ *       · the paste-handler (`onPaste`) — mounted on the canvas
+ *         container, so any Cmd+V over the document surface routes
+ *         through Docs/Word/Notion/Markdown detection;
+ *       · the dnd-kit `<SortableBlockList>` — wraps the block list
+ *         in a SortableContext + selection provider so the canvas,
+ *         outline, and list view share a single selection set;
+ *       · the `<DocumentOutline>` + `<ListView>` panels — rendered
+ *         in a side rail, toggled via `<OutlineToggle>`.
+ *     Issues #213, #117, #111 all funnel through this one component
+ *     so the rest of the chrome stays untouched.
+ *
+ * Everything else here is visual-only: no Lexical wiring, no save
+ * side-effects. The admin app composes these around the existing
+ * `<BlockEditCanvas>` + `<BlockInserter>` to land the full editor
+ * surface.
  */
 'use client';
 
 import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
   useState,
   type CSSProperties,
+  type ClipboardEvent as ReactClipboardEvent,
   type ReactNode,
 } from 'react';
+import type { BlockTree } from '@gonext/blocks-sdk';
+import { SelectionProvider, SortableBlockList } from './dnd/index.ts';
+import { DocumentOutline, ListView } from './outline/index.ts';
+import { onPaste as runPasteHandler } from './paste-handler.ts';
 
 /* ─── Top bar ──────────────────────────────────────────────────── */
 
@@ -436,6 +460,269 @@ export function UncontrolledInspectorTabs({
         onChange?.(id);
       }}
       className={className}
+    />
+  );
+}
+
+/* ─── Outline toggle ───────────────────────────────────────────── */
+
+export interface OutlineToggleProps {
+  /** Current open state. */
+  open: boolean;
+  /** Toggle handler. */
+  onToggle: (next: boolean) => void;
+  className?: string;
+}
+
+const outlineToggleStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  padding: '6px 10px',
+  background: 'transparent',
+  border: '1px solid var(--forest-border, #2C3D33)',
+  color: 'var(--fg-on-forest, #F0EAD8)',
+  borderRadius: 'var(--r-md, 8px)',
+  fontFamily:
+    "var(--font-sans, 'Geist', -apple-system, system-ui, sans-serif)",
+  fontSize: 'var(--t-xs, 12px)',
+  fontWeight: 500,
+  cursor: 'pointer',
+};
+
+const outlineToggleActiveStyle: CSSProperties = {
+  ...outlineToggleStyle,
+  background: 'var(--forest-3, #22322A)',
+  borderColor: 'var(--emerald, #10B981)',
+};
+
+/**
+ * Small chrome button that opens / closes the outline + list-view
+ * rail. Designed for the top bar's action slot. The "active" styling
+ * mirrors the view-switcher's on-pill so authors can tell at a glance
+ * which side panel is open.
+ */
+export function OutlineToggle({
+  open,
+  onToggle,
+  className,
+}: OutlineToggleProps) {
+  return (
+    <button
+      type="button"
+      aria-pressed={open}
+      aria-label={open ? 'Close outline' : 'Open outline'}
+      data-testid="outline-toggle"
+      data-active={open ? 'true' : 'false'}
+      className={className}
+      onClick={() => onToggle(!open)}
+      style={open ? outlineToggleActiveStyle : outlineToggleStyle}
+    >
+      {/* Tree-line glyph; inline SVG so we don't take a lucide dep. */}
+      <svg
+        aria-hidden="true"
+        width="14"
+        height="14"
+        viewBox="0 0 14 14"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M2 3h10M4 7h8M6 11h6" />
+      </svg>
+      Outline
+    </button>
+  );
+}
+
+/* ─── Editor workspace — single integration point ─────────────── */
+
+export type EditorWorkspaceSidePanel = 'outline' | 'list' | 'none';
+
+export interface EditorWorkspaceProps {
+  /** The current block tree. */
+  blocks: BlockTree;
+  /** Called when the user reorders blocks via drag-drop. */
+  onReorder: (nextIds: string[]) => void;
+  /**
+   * Called when the user pastes a clipboard payload over the canvas.
+   * The handler runs Docs/Word/Notion/Markdown detection and emits
+   * the resulting BlockTree. The host is responsible for splicing
+   * the tree into its state.
+   */
+  onPaste: (blocks: BlockTree) => void;
+  /** Currently selected block client id. */
+  selectedClientId?: string;
+  /** Called when a row in the outline or list view is clicked. */
+  onSelectBlock: (clientId: string) => void;
+  /** The canvas itself — usually <BlockEditCanvas>. */
+  canvas: ReactNode;
+  /**
+   * Resolves a block id to the React node that renders inside the
+   * sortable row. Defaults to a no-op (the canvas is the body). When
+   * supplied, the workspace uses dnd-kit's sortable row chrome over
+   * the canvas's render.
+   */
+  renderSortableRow?: (id: string, selected: boolean) => ReactNode;
+  /** Which side panel is open (controlled). */
+  sidePanel?: EditorWorkspaceSidePanel;
+  /** Optional className for layout overrides. */
+  className?: string;
+}
+
+const workspaceStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  gap: 'var(--s-5, 20px)',
+  alignItems: 'start',
+  width: '100%',
+};
+
+const sidePanelStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--s-4, 16px)',
+  width: 280,
+  flexShrink: 0,
+};
+
+/**
+ * The integration container. Wires up the paste handler on the
+ * canvas wrapper, mounts a `<SelectionProvider>` so the canvas +
+ * side panels share selection state, and exposes the optional
+ * sortable row chrome.
+ *
+ * The component itself is intentionally thin — its job is to *wire*,
+ * not to author behaviour. Each underlying primitive is tested in
+ * its own file; the only thing tested here is the wiring.
+ */
+export function EditorWorkspace({
+  blocks,
+  onReorder,
+  onPaste,
+  selectedClientId,
+  onSelectBlock,
+  canvas,
+  renderSortableRow,
+  sidePanel = 'none',
+  className,
+}: EditorWorkspaceProps) {
+  // Flat client-id list, used by both the sortable wrapper and the
+  // outline/list panels. We resolve fallback ids the same way the
+  // outline + list view do so cross-panel selection stays consistent.
+  const ids = useMemo(() => {
+    const out: string[] = [];
+    blocks.forEach((b, i) => {
+      out.push(b.clientId ?? `${b.type}-${i}`);
+    });
+    return out;
+  }, [blocks]);
+
+  const onPasteHandler = useCallback(
+    (event: ReactClipboardEvent<HTMLDivElement>) => {
+      // We accept React's synthetic event but the underlying handler
+      // wants the native ClipboardEvent — they share the same
+      // `clipboardData` shape so a cast is safe.
+      const result = runPasteHandler(event.nativeEvent);
+      if (result !== null) {
+        event.preventDefault();
+        onPaste(result);
+      }
+    },
+    [onPaste],
+  );
+
+  return (
+    <SelectionProvider initialIds={selectedClientId ? [selectedClientId] : []}>
+      <div
+        className={className}
+        data-testid="editor-workspace"
+        style={workspaceStyle}
+      >
+        <div
+          data-testid="editor-workspace-canvas"
+          onPaste={onPasteHandler}
+          style={{ minWidth: 0 }}
+        >
+          {renderSortableRow !== undefined ? (
+            <SortableBlockList
+              ids={ids}
+              renderItem={renderSortableRow}
+              onReorder={onReorder}
+              externalSelectionProvider
+            />
+          ) : (
+            canvas
+          )}
+        </div>
+        {sidePanel !== 'none' ? (
+          <aside
+            data-testid="editor-workspace-side-panel"
+            data-panel={sidePanel}
+            style={sidePanelStyle}
+          >
+            {sidePanel === 'outline' ? (
+              <DocumentOutline
+                blocks={blocks}
+                selectedClientId={selectedClientId}
+                onSelect={onSelectBlock}
+              />
+            ) : (
+              <SidePanelListView
+                blocks={blocks}
+                selectedClientId={selectedClientId}
+                onSelectBlock={onSelectBlock}
+              />
+            )}
+          </aside>
+        ) : null}
+      </div>
+    </SelectionProvider>
+  );
+}
+
+/**
+ * Internal wrapper that wires the list view's `onHover` to the
+ * canvas's hover-highlight state. Kept local so the outer
+ * `<EditorWorkspace>` doesn't have to thread `hoverId` through
+ * its prop sheet.
+ */
+function SidePanelListView({
+  blocks,
+  selectedClientId,
+  onSelectBlock,
+}: {
+  blocks: BlockTree;
+  selectedClientId?: string;
+  onSelectBlock: (id: string) => void;
+}) {
+  const [hoverId, setHoverId] = useState<string | null>(null);
+  const hoverRef = useRef<string | null>(null);
+  // Surface the hover via a data-attribute on the body of the
+  // workspace; canvas styling can react to it via CSS. We don't
+  // mutate the DOM directly from a ref because that fights React;
+  // instead we put the attribute on the wrapping aside via effect.
+  useEffect(() => {
+    hoverRef.current = hoverId;
+    const root = document.querySelector(
+      '[data-testid="editor-workspace-canvas"]',
+    );
+    if (root === null) return;
+    if (hoverId !== null) {
+      root.setAttribute('data-hover-block', hoverId);
+    } else {
+      root.removeAttribute('data-hover-block');
+    }
+  }, [hoverId]);
+
+  return (
+    <ListView
+      blocks={blocks}
+      selectedClientId={selectedClientId}
+      onSelect={onSelectBlock}
+      onHover={setHoverId}
     />
   );
 }

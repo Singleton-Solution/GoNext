@@ -77,10 +77,46 @@ export {
   EditorTitle,
   EditorTopBar,
   EditorViewSwitcher,
+  EditorWorkspace,
   InspectorTabs,
+  OutlineToggle,
   UncontrolledInspectorTabs,
   type EditorTitleProps,
   type EditorTopBarProps,
   type EditorViewSwitcherProps,
+  type EditorWorkspaceProps,
+  type EditorWorkspaceSidePanel,
   type InspectorTabsProps,
+  type OutlineToggleProps,
 } from './editor-chrome.tsx';
+
+export {
+  buildOutline,
+  DocumentOutline,
+  flattenBlocks,
+  ListView,
+  type DocumentOutlineProps,
+  type ListViewProps,
+  type OutlineNode,
+} from './outline/index.ts';
+
+export {
+  convertPaste,
+  detectPasteSource,
+  markdownToBlocks,
+  onPaste,
+  type DetectedPaste,
+  type PasteSource,
+} from './paste-handler.ts';
+
+export {
+  handleSelectionClick,
+  SelectionProvider,
+  SortableBlockList,
+  useSelection,
+  type SelectionActions,
+  type SelectionContextValue,
+  type SelectionProviderProps,
+  type SelectionState,
+  type SortableBlockListProps,
+} from './dnd/index.ts';

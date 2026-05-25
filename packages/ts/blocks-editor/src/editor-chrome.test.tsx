@@ -19,12 +19,15 @@
  *      inspector tabs.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import type { BlockTree } from '@gonext/blocks-sdk';
 import {
   EditorTitle,
   EditorTopBar,
   EditorViewSwitcher,
+  EditorWorkspace,
   InspectorTabs,
+  OutlineToggle,
   UncontrolledInspectorTabs,
 } from './editor-chrome.tsx';
 
@@ -199,5 +202,159 @@ describe('<UncontrolledInspectorTabs>', () => {
     expect(
       screen.getByTestId('inspector-tab-document').getAttribute('data-active'),
     ).toBe('true');
+  });
+});
+
+describe('<OutlineToggle>', () => {
+  it('renders an aria-pressed button reflecting the open state', () => {
+    render(<OutlineToggle open={false} onToggle={() => undefined} />);
+    const btn = screen.getByTestId('outline-toggle');
+    expect(btn.getAttribute('aria-pressed')).toBe('false');
+    expect(btn.getAttribute('data-active')).toBe('false');
+    expect(btn).toHaveAccessibleName(/Open outline/);
+  });
+
+  it('emits onToggle with the inverted state when clicked', () => {
+    const onToggle = vi.fn();
+    render(<OutlineToggle open={false} onToggle={onToggle} />);
+    fireEvent.click(screen.getByTestId('outline-toggle'));
+    expect(onToggle).toHaveBeenCalledWith(true);
+  });
+
+  it('uses the active style + label when open', () => {
+    render(<OutlineToggle open={true} onToggle={() => undefined} />);
+    const btn = screen.getByTestId('outline-toggle');
+    expect(btn.getAttribute('aria-pressed')).toBe('true');
+    expect(btn.getAttribute('data-active')).toBe('true');
+    expect(btn).toHaveAccessibleName(/Close outline/);
+    expect(btn.getAttribute('style')).toMatch(/--emerald/);
+  });
+});
+
+describe('<EditorWorkspace>', () => {
+  const blocks: BlockTree = [
+    {
+      type: 'core/heading',
+      attributes: { level: 1, text: 'Title' },
+      clientId: 'h-1',
+    },
+    {
+      type: 'core/paragraph',
+      attributes: { text: 'Body.' },
+      clientId: 'p-1',
+    },
+  ];
+
+  it('renders the canvas slot by default with no side panel', () => {
+    render(
+      <EditorWorkspace
+        blocks={blocks}
+        onReorder={() => undefined}
+        onPaste={() => undefined}
+        onSelectBlock={() => undefined}
+        canvas={<div data-testid="canvas-slot">canvas</div>}
+      />,
+    );
+    expect(screen.getByTestId('editor-workspace')).toBeInTheDocument();
+    expect(screen.getByTestId('canvas-slot')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('editor-workspace-side-panel'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders the outline panel when sidePanel="outline"', () => {
+    render(
+      <EditorWorkspace
+        blocks={blocks}
+        onReorder={() => undefined}
+        onPaste={() => undefined}
+        onSelectBlock={() => undefined}
+        canvas={<div data-testid="canvas-slot" />}
+        sidePanel="outline"
+      />,
+    );
+    const panel = screen.getByTestId('editor-workspace-side-panel');
+    expect(panel.getAttribute('data-panel')).toBe('outline');
+    expect(screen.getByTestId('document-outline')).toBeInTheDocument();
+    expect(screen.getByTestId('document-outline-row-h-1')).toBeInTheDocument();
+  });
+
+  it('renders the list-view panel when sidePanel="list"', () => {
+    render(
+      <EditorWorkspace
+        blocks={blocks}
+        onReorder={() => undefined}
+        onPaste={() => undefined}
+        onSelectBlock={() => undefined}
+        canvas={<div data-testid="canvas-slot" />}
+        sidePanel="list"
+      />,
+    );
+    expect(screen.getByTestId('list-view')).toBeInTheDocument();
+    expect(screen.getByTestId('list-view-row-h-1')).toBeInTheDocument();
+    expect(screen.getByTestId('list-view-row-p-1')).toBeInTheDocument();
+  });
+
+  it('fires onSelectBlock when an outline row is clicked', () => {
+    const onSelectBlock = vi.fn();
+    render(
+      <EditorWorkspace
+        blocks={blocks}
+        onReorder={() => undefined}
+        onPaste={() => undefined}
+        onSelectBlock={onSelectBlock}
+        canvas={<div data-testid="canvas-slot" />}
+        sidePanel="outline"
+      />,
+    );
+    act(() => {
+      screen.getByTestId('document-outline-row-h-1').click();
+    });
+    expect(onSelectBlock).toHaveBeenCalledWith('h-1');
+  });
+
+  it('mounts the sortable list when renderSortableRow is supplied', () => {
+    render(
+      <EditorWorkspace
+        blocks={blocks}
+        onReorder={() => undefined}
+        onPaste={() => undefined}
+        onSelectBlock={() => undefined}
+        canvas={<div data-testid="canvas-slot">canvas</div>}
+        renderSortableRow={(id) => <span data-testid={`row-${id}`}>{id}</span>}
+      />,
+    );
+    // Canvas slot is replaced by the sortable list when row renderer is given.
+    expect(screen.queryByTestId('canvas-slot')).not.toBeInTheDocument();
+    expect(screen.getByTestId('sortable-block-list')).toBeInTheDocument();
+    expect(screen.getByTestId('row-h-1')).toBeInTheDocument();
+  });
+
+  it('routes paste events through the paste-handler and prevents default', () => {
+    const onPaste = vi.fn();
+    render(
+      <EditorWorkspace
+        blocks={blocks}
+        onReorder={() => undefined}
+        onPaste={onPaste}
+        onSelectBlock={() => undefined}
+        canvas={<div data-testid="canvas-slot" />}
+      />,
+    );
+    const canvasWrap = screen.getByTestId('editor-workspace-canvas');
+    // Hand-roll a synthetic-ish paste event so we don't fight jsdom's
+    // partial ClipboardEvent. The runPasteHandler reads
+    // event.clipboardData.getData; React forwards a `nativeEvent`
+    // shaped like a real ClipboardEvent.
+    const clipboardData = {
+      getData: (type: string) =>
+        type === 'text/html'
+          ? '<b id="docs-internal-guid-1"><h2>Pasted</h2></b>'
+          : '',
+    };
+    fireEvent.paste(canvasWrap, { clipboardData });
+    expect(onPaste).toHaveBeenCalled();
+    const [tree] = onPaste.mock.calls[0] ?? [];
+    expect(tree?.[0]?.type).toBe('core/heading');
   });
 });
