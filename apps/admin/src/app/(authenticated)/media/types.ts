@@ -88,6 +88,32 @@ export interface BulkResult {
   op: string;
   succeeded: number;
   failed?: Record<string, string>;
+
+  /**
+   * HLS playlist URL for video assets — populated by the
+   * media.video.transcode worker (#52). The video player picks HLS
+   * over the raw mp4 source when this is set.
+   */
+  hls_url?: string;
+
+  /**
+   * True when the media_text row exists for this asset. The detail
+   * page surfaces a "View extracted text" link based on this flag.
+   * Issue #60.
+   */
+  has_extracted_text?: boolean;
+
+  /**
+   * True for assets registered in proxy mode by the migration
+   * importer (#187). The grid shows a "proxied" badge so operators
+   * can tell at a glance which assets live remotely.
+   */
+  is_proxied?: boolean;
+
+  /**
+   * Origin URL for proxied assets. Empty for locally-stored assets.
+   */
+  source_url?: string;
 }
 
 /**
