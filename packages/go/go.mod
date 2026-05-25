@@ -7,6 +7,7 @@ require (
 	github.com/Kagami/go-avif v0.1.0
 	github.com/alicebob/miniredis/v2 v2.38.0
 	github.com/coreos/go-oidc/v3 v3.18.0
+	github.com/davidbyttow/govips/v2 v2.18.0
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/golang-migrate/migrate/v4 v4.19.1
