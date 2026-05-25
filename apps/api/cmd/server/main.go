@@ -40,7 +40,9 @@ import (
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/healthz"
 	restcomments "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/comments"
 	restposts "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/posts"
+	restrender "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/render"
 	restsearch "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/search"
+	blockrender "github.com/Singleton-Solution/GoNext/packages/go/blocks/render"
 	openapidocs "github.com/Singleton-Solution/GoNext/apps/api/internal/openapi"
 	plugindev "github.com/Singleton-Solution/GoNext/apps/api/internal/plugins/dev"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/setup"
@@ -837,6 +839,29 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 			logger.Info("rest/search: routes mounted",
 				slog.String("base", "/api/v1/search"))
 		}
+	}
+
+	// Block render preview (POST /api/v1/render/preview). Drives the
+	// editor's preview pane: take a block tree + optional context
+	// map, return rendered HTML plus the per-block error list the
+	// walker collected. Stateless — no DB round-trip, no auth at
+	// this layer (admin middleware mounted upstream gates access).
+	//
+	// The registry is seeded with the sixteen core block renderers
+	// at boot; plugin renderers register on top via the same
+	// Registry handle once plugin activation lands the wiring.
+	renderRegistry := blockrender.NewRegistry()
+	blockrender.MustRegisterCoreBlocks(renderRegistry)
+	if err := restrender.Mount(mux, "/api/v1", restrender.Deps{
+		Registry: renderRegistry,
+		Logger:   logger,
+	}); err != nil {
+		logger.Warn("rest/render: failed to mount", slog.Any("err", err))
+	} else {
+		logger.Info("rest/render: routes mounted",
+			slog.String("preview", "/api/v1/render/preview"),
+			slog.Int("blocks", renderRegistry.Len()),
+		)
 	}
 
 	if cfg.Plugins.DevMode {

@@ -66,6 +66,10 @@ func TestBuildRouter_DocumentedRoutesAreMounted(t *testing.T) {
 		{"auth.sessions.list", http.MethodGet, "/api/v1/auth/sessions"},
 		{"auth.sessions.delete_one", http.MethodDelete, "/api/v1/auth/sessions/abc"},
 		{"auth.sessions.delete_all", http.MethodDelete, "/api/v1/auth/sessions"},
+
+		// rest/render — block preview endpoint backing the editor's
+		// preview pane. Stateless, mounts unconditionally.
+		{"render.preview", http.MethodPost, "/api/v1/render/preview"},
 	}
 
 	// Pass a non-nil session manager so the login + sessions blocks
