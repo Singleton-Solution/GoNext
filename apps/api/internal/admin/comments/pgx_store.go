@@ -317,33 +317,40 @@ func (s *PgxStore) Get(ctx context.Context, id string) (Comment, error) {
 	return c, nil
 }
 
-// updateStatusSQL transitions a row's status and bumps updated_at via
-// the comments_touch trigger. We RETURN the full admin-shape row so
-// the caller doesn't pay for a follow-up SELECT.
-const updateStatusSQL = `
-WITH updated AS (
-    UPDATE comments
-    SET status = $2
-    WHERE id = $1
-    RETURNING id
-)
-` + selectAdminColumns + ` WHERE c.id IN (SELECT id FROM updated)`
-
 // UpdateStatus transitions the comment's status. Returns ErrNotFound
 // when the row is absent. The comments_touch trigger from migration
 // 000006 stamps updated_at; we don't write it explicitly.
+//
+// Implementation note: we deliberately run the UPDATE and the
+// admin-shape SELECT as two statements rather than chaining them in a
+// single CTE. Postgres evaluates every sub-query in a statement against
+// the same snapshot, so a CTE that UPDATEs then SELECTs would see the
+// pre-update row in the SELECT branch — surfacing as a "status didn't
+// change" bug in callers. Splitting the work keeps the read path
+// reading what was just written.
 func (s *PgxStore) UpdateStatus(ctx context.Context, id string, status Status) (Comment, error) {
 	uid, err := uuid.Parse(id)
 	if err != nil {
 		return Comment{}, ErrNotFound
 	}
-	row := s.db.QueryRow(ctx, updateStatusSQL, uid, string(status))
-	c, err := scanAdminComment(row)
+	var updatedID uuid.UUID
+	err = s.db.QueryRow(ctx,
+		`UPDATE comments SET status = $2 WHERE id = $1 RETURNING id`,
+		uid, string(status),
+	).Scan(&updatedID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Comment{}, ErrNotFound
 		}
 		return Comment{}, fmt.Errorf("admin/comments: update status: %w", err)
+	}
+	row := s.db.QueryRow(ctx, selectAdminColumns+" WHERE c.id = $1", updatedID)
+	c, err := scanAdminComment(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Comment{}, ErrNotFound
+		}
+		return Comment{}, fmt.Errorf("admin/comments: update status readback: %w", err)
 	}
 	return c, nil
 }
