@@ -1115,3 +1115,44 @@ h2 {
   margin: 0;
   word-break: break-word;
 }
+
+/* ---------------------------------------------------------------------------
+ * Brand-state keyframes — shared by <LoadingState>, <SkeletonRow>,
+ * <SkeletonText>, <SkeletonCard>. These live here (not in Tailwind's
+ * `extend.animation`) because the gradient + background-position
+ * choreography in `gn-shimmer` can't be expressed in arbitrary utility
+ * syntax without losing the tokenized cream-paper colour stops.
+ *
+ * `gn-shimmer` runs the paper-3 → paper-4 → paper-3 gradient from
+ * 200% to -200% on a 1.6s linear loop — the exact recipe from
+ * docs/design/ui_kits/states/index.html.
+ *
+ * `gn-spin` is the emerald spinner's 0.8s linear rotation, used by the
+ * 14×14 ring in <LoadingState variant="spinner">.
+ * ------------------------------------------------------------------------- */
+@keyframes gn-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes gn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The shimmer and spinner are decorative — calmness over motion
+   * when the user has opted out. We hold the bar mid-shimmer so the
+   * static state still reads as a placeholder, not a frozen frame.
+   */
+  [data-testid='skeleton-row'],
+  [data-testid='skeleton-card-tile'],
+  [data-testid='loading-spinner'] {
+    animation: none !important;
+  }
+}

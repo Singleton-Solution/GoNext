@@ -70,13 +70,19 @@ describe('PostListClient', () => {
     vi.useRealTimers();
   });
 
-  it('renders the empty state when posts is empty', () => {
+  it('renders the brand <EmptyState> when posts is empty (first run)', () => {
     render(<PostListClient initialData={makeInitialData([])} />);
 
-    expect(
-      screen.getByRole('heading', { name: /no posts yet/i }),
-    ).toBeInTheDocument();
-    const cta = screen.getByRole('link', { name: /create your first/i });
+    // The brand state surface — see `src/components/states/`. We
+    // pin the testid because the visible copy now uses the italic-
+    // accent ("Write your *first* post.") which is matched on
+    // text content elsewhere in the test below.
+    const empty = screen.getByTestId('empty-state');
+    expect(empty).toBeInTheDocument();
+    expect(empty.textContent).toContain('first');
+
+    // CTA is rendered through Button asChild → Link.
+    const cta = screen.getByRole('link', { name: /new post/i });
     expect(cta).toBeInTheDocument();
     expect(cta).toHaveAttribute('href', '/posts/new');
   });

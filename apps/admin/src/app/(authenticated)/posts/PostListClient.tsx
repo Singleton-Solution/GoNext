@@ -30,6 +30,7 @@
  * shows an inline "Couldn't load more" message rather than crashing.
  */
 import Link from 'next/link';
+import { FileText } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   useCallback,
@@ -42,6 +43,8 @@ import {
   type ReactElement,
 } from 'react';
 import { api, ApiError } from '@/lib/api-client';
+import { Button } from '@/components/ui/button';
+import { EmptyState, LoadingState } from '@/components/states';
 import {
   POST_COLUMNS,
   STATUS_FILTERS,
@@ -264,10 +267,10 @@ export function PostListClient({
     [posts.length, selected.size],
   );
 
-  // Empty state — server returned no posts and the user has no active
-  // filter narrowing things. We render the "no posts yet" CTA so first
-  // run feels considered. If the user *does* have a filter, we show a
-  // friendlier "no matches" instead.
+  // Empty state — brand-tokenized via the shared <EmptyState>. We
+  // switch the variant (and copy) on whether the user has a filter
+  // active so the moment is right: "first run, write your first post"
+  // vs. "nothing matched your filter".
   if (posts.length === 0) {
     const hasFilter = currentQuery !== '' || currentStatus !== 'any';
     return (
@@ -283,28 +286,44 @@ export function PostListClient({
           selectedCount={0}
           isPending={isPending}
         />
-        <div className={styles.empty} role="status">
-          {hasFilter ? (
-            <>
-              <h2>No posts match those filters</h2>
-              <p>Try a different search term or clear the status filter.</p>
-            </>
-          ) : (
-            <>
-              <h2>No posts yet</h2>
-              <p>Start by creating your first post.</p>
-              <Link
-                href={{ pathname: '/posts/new' }}
-                className={styles.primaryAction}
-              >
-                Create your first
-              </Link>
-            </>
-          )}
-        </div>
+        {hasFilter ? (
+          <EmptyState
+            variant="search"
+            icon={FileText}
+            title={
+              <>
+                Nothing matched <em>those filters</em>.
+              </>
+            }
+            body="Try a shorter search term, clear the status filter, or check back after you've drafted a few posts."
+          />
+        ) : (
+          <EmptyState
+            icon={FileText}
+            title={
+              <>
+                Write your <em>first</em> post.
+              </>
+            }
+            body="An empty page is the best one. Start with a thought, an outline, or a single sentence — the rest comes from there."
+            action={
+              <Button asChild variant="primary">
+                <Link href={{ pathname: '/posts/new' }}>New post</Link>
+              </Button>
+            }
+          />
+        )}
       </div>
     );
   }
+
+  // While a `useTransition` is in flight (filter / sort / search
+  // navigation), surface the loading moment with the brand spinner
+  // and a paragraph-shape skeleton overlaying the table area. Less
+  // distracting than swapping the whole table for skeletons every
+  // keystroke; the existing rows stay visible underneath via
+  // aria-busy on the toolbar.
+  const showInlineLoad = isPending || isLoadingMore;
 
   return (
     <div>
@@ -392,6 +411,16 @@ export function PostListClient({
         <p className="muted" role="alert" style={{ marginTop: 12 }}>
           {loadMoreError}
         </p>
+      )}
+
+      {/* Inline loading indicator surfaces the in-flight 'load more'
+          and URL-transition states. We render the brand spinner so
+          the pending moment carries the voice; the table above stays
+          interactive. */}
+      {showInlineLoad && (
+        <LoadingState
+          label={isLoadingMore ? 'Loading more posts…' : 'Updating…'}
+        />
       )}
 
       {cursor && (
