@@ -1,0 +1,96 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Post detail page > matches the page-head snapshot 1`] = `
+<div
+  class="flex flex-col gap-3"
+>
+  <a
+    class="inline-flex w-fit items-center gap-1 text-xs font-medium text-fg-subtle hover:text-emerald-deep"
+    href="/posts"
+  >
+    <svg
+      aria-hidden="true"
+      class="lucide lucide-chevron-left"
+      fill="none"
+      height="13"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="13"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="m15 18-6-6 6-6"
+      />
+    </svg>
+    Back to posts
+  </a>
+  <div
+    class="flex flex-wrap items-end justify-between gap-6 border-b border-border pb-6"
+  >
+    <div>
+      <h1
+        class="font-display font-extrabold tracking-tight m-0 text-ink [&_em]:font-serif [&_em]:italic [&_em]:font-normal [&_em]:text-[1.05em] [&_em]:tracking-[-0.01em] [&_em]:text-emerald-deep data-[surface=forest]:text-fg-on-forest [[data-surface=forest]_&]:text-fg-on-forest data-[surface=forest]:[&_em]:text-emerald-bright [[data-surface=forest]_&]:[&_em]:text-emerald-bright text-[clamp(32px,4vw,44px)]"
+      >
+        Edit 
+        <em>
+          post
+        </em>
+        .
+      </h1>
+      <p
+        class="mt-[10px] text-sm text-fg-muted"
+      >
+        Update the metadata, slug, and publish state.
+         
+        <span
+          class="font-mono text-xs"
+        >
+          #
+          p1
+        </span>
+      </p>
+    </div>
+    <div
+      class="flex gap-2"
+    >
+      <a
+        class="inline-flex items-center justify-center gap-[6px] whitespace-nowrap rounded-md font-display font-bold transition-shadow duration-[160ms] ease-brand focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 bg-paper-2 text-ink border border-border shadow-xs hover:bg-paper-3 hover:border-border-strong px-4 py-[9px] text-sm"
+        href="/posts"
+      >
+        Cancel
+      </a>
+      <button
+        class="inline-flex items-center justify-center gap-[6px] whitespace-nowrap rounded-md font-display font-bold transition-shadow duration-[160ms] ease-brand focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 bg-emerald text-emerald-ink border border-emerald shadow-xs hover:bg-emerald-deep hover:text-paper hover:border-emerald-deep px-4 py-[9px] text-sm"
+      >
+        <svg
+          aria-hidden="true"
+          class="lucide lucide-save"
+          fill="none"
+          height="14"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="14"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"
+          />
+          <path
+            d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"
+          />
+          <path
+            d="M7 3v4a1 1 0 0 0 1 1h7"
+          />
+        </svg>
+        Save changes
+      </button>
+    </div>
+  </div>
+</div>
+`;
