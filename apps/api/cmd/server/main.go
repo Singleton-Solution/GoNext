@@ -49,6 +49,8 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/db"
 	"github.com/Singleton-Solution/GoNext/packages/go/email"
 	"github.com/Singleton-Solution/GoNext/packages/go/httpx"
+	"github.com/Singleton-Solution/GoNext/packages/go/jobs/cron"
+	"github.com/Singleton-Solution/GoNext/packages/go/jobs/taskspec"
 	"github.com/Singleton-Solution/GoNext/packages/go/log"
 	gonextmetrics "github.com/Singleton-Solution/GoNext/packages/go/metrics"
 	authmw "github.com/Singleton-Solution/GoNext/packages/go/middleware/auth"
@@ -639,9 +641,11 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 	// intentional here — the PgStore lands with the shared DAO follow-
 	// up; the in-memory implementation keeps the K4 e2e able to drive
 	// the admin end-to-end against a stubbed corpus.
+	postsStore := restposts.NewMemoryStore()
+	postsPolicy := policy.NewBasicPolicy(policy.DefaultRoleCapabilities())
 	if err := restposts.Mount(mux, "/api/v1/posts", restposts.Deps{
-		Store:    restposts.NewMemoryStore(),
-		Policy:   policy.NewBasicPolicy(policy.DefaultRoleCapabilities()),
+		Store:    postsStore,
+		Policy:   postsPolicy,
 		Audit:    audit.NewEmitter(audit.NewMemoryStore()),
 		Logger:   logger,
 		PostType: restposts.PostTypePost,
@@ -649,6 +653,67 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 		logger.Warn("rest/posts: failed to mount", slog.Any("err", err))
 	} else {
 		logger.Info("rest/posts: routes mounted", slog.String("base", "/api/v1/posts"))
+	}
+
+	// Autosave routes (POST/GET /api/v1/posts/{id}/autosave). The
+	// production store is Postgres-backed (migration 000016); the
+	// MemoryAutosaveStore stays available for tests under
+	// rest/posts/. The store is borrowed from `pool`; the cron sweep
+	// registered below uses the same handle.
+	//
+	// When pool is nil (a misconfigured boot — the readyz check would
+	// be unhappy too) we skip the mount rather than panic: a missing
+	// autosave endpoint is the right failure mode, the renderer
+	// surface keeps serving public content.
+	var autosaveStore *restposts.PgxAutosaveStore
+	if pool == nil {
+		logger.Warn("rest/posts/autosave: skipping mount; pool is nil")
+	} else {
+		autosaveStore = restposts.NewPgxAutosaveStore(pool)
+		if err := restposts.MountAutosave(mux, "/api/v1/posts", restposts.AutosaveDeps{
+			PostStore:     postsStore,
+			AutosaveStore: autosaveStore,
+			Policy:        postsPolicy,
+			PostType:      restposts.PostTypePost,
+		}); err != nil {
+			logger.Warn("rest/posts/autosave: failed to mount", slog.Any("err", err))
+		} else {
+			logger.Info("rest/posts/autosave: routes mounted",
+				slog.String("base", "/api/v1/posts"),
+			)
+		}
+	}
+
+	// Daily TTL sweep for post_autosaves (migration 000016 spec'd a
+	// 7-day TTL). The cron registry is wired here so a future worker
+	// boot can pick it up; the matching taskspec.Default
+	// registration sets up the worker-side dispatch handler that
+	// invokes Sweep. See packages/go/jobs/cron for the scheduler
+	// lifecycle.
+	//
+	// We use a binary-owned cron.Registry rather than a package
+	// singleton because cron schedules are owned by the binary's
+	// wiring (one registry per worker process) — same convention as
+	// the rest of jobs/cron.
+	//
+	// Registration only happens when the autosave store wired up
+	// (i.e. pool != nil); a nil store has nothing to sweep.
+	if autosaveStore != nil {
+		cronReg := cron.NewRegistry()
+		if err := restposts.RegisterAutosaveSweep(
+			autosaveStore,
+			taskspec.Default(),
+			cronReg,
+			logger,
+		); err != nil {
+			logger.Warn("rest/posts/autosave: failed to register sweep cron",
+				slog.Any("err", err))
+		} else {
+			logger.Info("rest/posts/autosave: sweep cron registered",
+				slog.String("schedule", restposts.AutosaveSweepSchedule),
+				slog.String("task", restposts.AutosaveSweepTaskName),
+			)
+		}
 	}
 
 	// Public search (GET /api/v1/search). Backed by the FTS Store
