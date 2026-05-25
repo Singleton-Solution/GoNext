@@ -1,7 +1,7 @@
 /**
  * @gonext/blocks-core — public entry point.
  *
- * Ships the eighteen **core** blocks every GoNext install relies on:
+ * Ships the nineteen **core** blocks every GoNext install relies on:
  *
  *  - `core/paragraph`  — plain narrative text
  *  - `core/heading`    — h1..h6 with optional anchor
@@ -21,6 +21,7 @@
  *  - `core/embed`      — provider-aware oEmbed wrapper
  *  - `core/media-text` — two-column image + text with position toggle
  *  - `core/navigation` — `<nav>` menu with optional mobile hamburger
+ *  - `core/query`      — dynamic post loop driven by attribute filters
  *
  * Every block exposes:
  *  - **`definition`** — `BlockTypeDefinition` for the registry
@@ -55,6 +56,7 @@ import { file } from './file/index.ts';
 import { embed } from './embed/index.ts';
 import { mediaText } from './media-text/index.ts';
 import { navigation } from './navigation/index.ts';
+import { query } from './query/index.ts';
 
 // Per-block re-exports so consumers can `import { paragraph } from
 // '@gonext/blocks-core'` and reach into `paragraph.definition`,
@@ -77,6 +79,7 @@ export { file } from './file/index.ts';
 export { embed } from './embed/index.ts';
 export { mediaText } from './media-text/index.ts';
 export { navigation } from './navigation/index.ts';
+export { query } from './query/index.ts';
 
 // Edit components are re-exported so app code that wants to mount a single
 // block in isolation (e.g. a focused review surface) can do so without
@@ -99,6 +102,7 @@ export { FileEdit } from './file/index.ts';
 export { EmbedEdit } from './embed/index.ts';
 export { MediaTextEdit } from './media-text/index.ts';
 export { NavigationEdit } from './navigation/index.ts';
+export { QueryEdit } from './query/index.ts';
 
 // Per-block attribute types.
 export type { ParagraphAttributes } from './paragraph/index.ts';
@@ -122,6 +126,11 @@ export type {
   NavigationAttributes,
   NavigationItem,
 } from './navigation/index.ts';
+export type {
+  QueryAttributes,
+  QueryOrder,
+  QueryOrderBy,
+} from './query/index.ts';
 
 // Embed provider detection — exposed so the editor's URL-paste handler
 // can compute the slug before persisting it on the block.
@@ -133,6 +142,7 @@ export { detectProvider, EMBED_PROVIDERS } from './embed/index.ts';
 export { COLUMNS_INNER_SENTINEL } from './columns/index.ts';
 export { GROUP_INNER_SENTINEL } from './group/index.ts';
 export { MEDIA_TEXT_INNER_SENTINEL } from './media-text/index.ts';
+export { QUERY_INNER_SENTINEL } from './query/index.ts';
 
 /**
  * The complete ordered list of every core block, in the order they appear
@@ -158,6 +168,7 @@ export const CORE_BLOCKS = [
   embed,
   mediaText,
   navigation,
+  query,
 ] as const;
 
 /**
