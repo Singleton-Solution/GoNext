@@ -1,20 +1,34 @@
 /*
- * gn-hello — minimal classic blog styles.
+ * gn-hello — the reference blog theme rebuilt around the
+ * Living-Systems brand. Every visual choice consumes a token emitted
+ * by theme.json via theme.EmitCSSCustomProperties(); nothing here
+ * hard-codes a color or size. That is what makes gn-hello a faithful
+ * brand reference — edit theme.json, see the site change.
  *
- * Every visual choice consumes a token emitted by theme.json via
- * theme.EmitCSSCustomProperties(); nothing in this file hard-codes
- * a color or size. That's what makes it a faithful reference: edit
- * theme.json, see the site change.
+ * The brand contract:
+ *  - cream paper background (--wp-preset--color--paper = #F5F2EA),
+ *    forest ink (--wp-preset--color--ink = #0E1A14), emerald-deep
+ *    accent (--wp-preset--color--accent = #047857) for links and
+ *    interactive emphasis.
+ *  - Archivo grotesque for display type (h1, h2) via
+ *    --wp-preset--font-family--display, Geist for body via
+ *    --wp-preset--font-family--sans, Instrument Serif for the italic
+ *    accent rule (any <em> inside a heading), and Geist Mono for
+ *    code / IDs.
+ *  - The italic-accent rule swaps any <em> inside h1 / h2 to
+ *    Instrument Serif italic at 1.05em, coloured by the accent token.
  */
 
 :root {
-  --gn-color-ink:    var(--wp-preset--color--ink, #0f172a);
-  --gn-color-paper:  var(--wp-preset--color--paper, #ffffff);
-  --gn-color-muted:  var(--wp-preset--color--muted, #64748b);
-  --gn-color-accent: var(--wp-preset--color--accent, #2563eb);
+  --gn-color-ink:    var(--wp-preset--color--ink, #0E1A14);
+  --gn-color-paper:  var(--wp-preset--color--paper, #F5F2EA);
+  --gn-color-muted:  var(--wp-preset--color--muted, #4A5C52);
+  --gn-color-accent: var(--wp-preset--color--accent, #047857);
 
-  --gn-font-sans:  var(--wp-preset--font-family--sans, system-ui, sans-serif);
-  --gn-font-serif: var(--wp-preset--font-family--serif, Georgia, serif);
+  --gn-font-sans:    var(--wp-preset--font-family--sans, Geist, system-ui, sans-serif);
+  --gn-font-display: var(--wp-preset--font-family--display, Archivo, system-ui, sans-serif);
+  --gn-font-serif:   var(--wp-preset--font-family--serif, Instrument Serif, Georgia, serif);
+  --gn-font-mono:    var(--wp-preset--font-family--mono, Geist Mono, ui-monospace, monospace);
 
   --gn-size-sm: var(--wp-preset--font-size--sm, 0.875rem);
   --gn-size-md: var(--wp-preset--font-size--md, 1rem);
@@ -33,22 +47,57 @@ body {
   margin: 0;
   background: var(--gn-color-paper);
   color: var(--gn-color-ink);
-  font-family: var(--gn-font-serif);
+  font-family: var(--gn-font-sans);
   font-size: var(--gn-size-md);
-  line-height: 1.6;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-a { color: var(--gn-color-accent); }
-a:hover { text-decoration: underline; }
+a {
+  color: var(--gn-color-accent);
+  text-decoration: none;
+  text-underline-offset: 0.15em;
+}
+a:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
 
-h1, h2, h3, h4, h5, h6 {
+/* ---------------------------------------------------------------------------
+ * Headings — Archivo grotesque + italic-accent rule.
+ * The italic-accent fires on <em> inside h1/h2 (the "signature move"
+ * from docs/design/HANDOFF.md) so post titles can carry one emphasized
+ * editorial word.
+ * ------------------------------------------------------------------------- */
+h1, h2 {
+  font-family: var(--gn-font-display);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  margin: 1.5em 0 0.5em;
+  color: var(--gn-color-ink);
+}
+h3, h4, h5, h6 {
   font-family: var(--gn-font-sans);
+  font-weight: 600;
+  letter-spacing: -0.005em;
   line-height: 1.25;
   margin: 1.5em 0 0.5em;
+  color: var(--gn-color-ink);
 }
 h1 { font-size: var(--gn-size-xl); }
 h2 { font-size: var(--gn-size-lg); }
 h3 { font-size: var(--gn-size-md); }
+
+h1 em, h2 em {
+  font-family: var(--gn-font-serif);
+  font-weight: 400;
+  font-style: italic;
+  font-size: 1.05em;
+  letter-spacing: -0.01em;
+  color: var(--gn-color-accent);
+}
 
 .gn-main,
 .gn-site-header,
@@ -70,10 +119,13 @@ h3 { font-size: var(--gn-size-md); }
   font-size: var(--gn-size-sm);
 }
 
+/* Post meta — Geist Mono in the eyebrow scale. */
 .gn-post-meta {
   color: var(--gn-color-muted);
-  font-family: var(--gn-font-sans);
+  font-family: var(--gn-font-mono);
   font-size: var(--gn-size-sm);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   margin: 0 0 1.5rem;
   gap: 0.75rem;
 }
@@ -86,4 +138,18 @@ h3 { font-size: var(--gn-size-md); }
   font-size: var(--gn-size-sm);
 }
 
+/* Inline code uses Geist Mono so prose lines stay coherent with
+   sidebar IDs and analytics callouts. */
+code, kbd, samp {
+  font-family: var(--gn-font-mono);
+  font-size: 0.92em;
+}
+
+/* 404 keeps the italic-accent rule. */
 .gn-404 { text-align: center; }
+.gn-404 h1 em {
+  font-family: var(--gn-font-serif);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--gn-color-accent);
+}

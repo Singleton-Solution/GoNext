@@ -47,8 +47,14 @@ export function defaultActiveTheme(): ActiveTheme {
       '  --wp-preset--layout--wide: 1180px;',
       '}',
     ].join('\n'),
-    headerHtml: '',
-    footerHtml: '',
+    // Minimal theme-level header / footer for the fallback path. The
+    // brand chrome in `PublicShell` paints the marketing nav + footer
+    // around these, so the theme parts here can be tiny — they act as
+    // a thin "section header" / "site colophon" within the chrome.
+    headerHtml:
+      '<header class="gn-site-header"><span class="wordmark"><span class="wm-go">Go</span><span class="wm-next">Next</span></span></header>',
+    footerHtml:
+      '<footer class="gn-site-footer"><p>Built with <a href="https://github.com/Singleton-Solution/GoNext">GoNext</a>.</p></footer>',
   };
 }
 

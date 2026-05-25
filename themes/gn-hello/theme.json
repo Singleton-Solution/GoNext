@@ -6,27 +6,41 @@
     "appearanceTools": true,
     "color": {
       "palette": [
-        { "slug": "ink",       "name": "Ink",       "color": "#0f172a" },
-        { "slug": "paper",     "name": "Paper",     "color": "#ffffff" },
-        { "slug": "muted",     "name": "Muted",     "color": "#64748b" },
-        { "slug": "accent",    "name": "Accent",    "color": "#2563eb" }
+        { "slug": "ink",    "name": "Ink",    "color": "#0E1A14" },
+        { "slug": "paper",  "name": "Paper",  "color": "#F5F2EA" },
+        { "slug": "muted",  "name": "Muted",  "color": "#4A5C52" },
+        { "slug": "accent", "name": "Accent", "color": "#047857" }
       ],
       "custom": true
     },
     "typography": {
       "fontFamilies": [
-        { "slug": "sans",
+        {
+          "slug": "sans",
           "name": "Sans",
-          "fontFamily": "system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" },
-        { "slug": "serif",
+          "fontFamily": "Geist, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+        },
+        {
+          "slug": "display",
+          "name": "Display",
+          "fontFamily": "Archivo, Geist, system-ui, sans-serif"
+        },
+        {
+          "slug": "serif",
           "name": "Serif",
-          "fontFamily": "Iowan Old Style, Apple Garamond, Baskerville, Georgia, serif" }
+          "fontFamily": "Instrument Serif, Iowan Old Style, Apple Garamond, Georgia, serif"
+        },
+        {
+          "slug": "mono",
+          "name": "Mono",
+          "fontFamily": "Geist Mono, ui-monospace, SFMono-Regular, Menlo, monospace"
+        }
       ],
       "fontSizes": [
-        { "slug": "sm",  "name": "Small",  "size": "0.875rem" },
-        { "slug": "md",  "name": "Medium", "size": "1rem"     },
-        { "slug": "lg",  "name": "Large",  "size": "1.25rem"  },
-        { "slug": "xl",  "name": "X-Large","size": "1.75rem"  }
+        { "slug": "sm", "name": "Small",   "size": "0.875rem" },
+        { "slug": "md", "name": "Medium",  "size": "1rem"     },
+        { "slug": "lg", "name": "Large",   "size": "1.25rem"  },
+        { "slug": "xl", "name": "X-Large", "size": "1.75rem"  }
       ],
       "lineHeight": true
     },
@@ -36,15 +50,32 @@
     }
   },
   "styles": {
-    "color":      { "background": "var(--wp-preset--color--paper)",
-                    "text":       "var(--wp-preset--color--ink)" },
-    "typography": { "fontFamily": "var(--wp-preset--font-family--serif)",
-                    "fontSize":   "var(--wp-preset--font-size--md)",
-                    "lineHeight": "1.6" },
+    "color": {
+      "background": "var(--wp-preset--color--paper)",
+      "text":       "var(--wp-preset--color--ink)"
+    },
+    "typography": {
+      "fontFamily": "var(--wp-preset--font-family--sans)",
+      "fontSize":   "var(--wp-preset--font-size--md)",
+      "lineHeight": "1.65"
+    },
     "elements": {
-      "h1":   { "typography": { "fontSize": "var(--wp-preset--font-size--xl)", "lineHeight": "1.2" } },
-      "h2":   { "typography": { "fontSize": "var(--wp-preset--font-size--lg)" } },
-      "link": { "color":      { "text": "var(--wp-preset--color--accent)" } }
+      "h1": {
+        "typography": {
+          "fontFamily": "var(--wp-preset--font-family--display)",
+          "fontSize":   "var(--wp-preset--font-size--xl)",
+          "lineHeight": "1.05"
+        }
+      },
+      "h2": {
+        "typography": {
+          "fontFamily": "var(--wp-preset--font-family--display)",
+          "fontSize":   "var(--wp-preset--font-size--lg)"
+        }
+      },
+      "link": {
+        "color": { "text": "var(--wp-preset--color--accent)" }
+      }
     }
   },
   "supports": {
