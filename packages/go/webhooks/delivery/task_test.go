@@ -369,8 +369,13 @@ func TestDeliver_TimeoutRetried(t *testing.T) {
 	defer close(hold)
 
 	// A custom client with a tiny timeout — same hardened defaults
-	// otherwise.
-	c := newHTTPClient(ClientConfig{RequestTimeout: 50 * time.Millisecond, ConnectTimeout: 50 * time.Millisecond})
+	// otherwise. SSRF guard disabled because httptest binds to
+	// loopback; production wiring leaves it enabled.
+	c := newHTTPClient(ClientConfig{
+		RequestTimeout:   50 * time.Millisecond,
+		ConnectTimeout:   50 * time.Millisecond,
+		DisableSSRFGuard: true,
+	})
 	d := New(
 		WithHTTPClient(c),
 		WithSecretResolver(secret("k")),
@@ -407,7 +412,11 @@ func TestDeliver_NetworkErrorRetried(t *testing.T) {
 		WithScheduler(NewSchedule(nil).WithoutJitter()),
 		WithClock(fixedTime(time.Unix(1, 0))),
 		WithDeliveryIDFactory(func() string { return "dlv-x" }),
-		WithClientConfig(ClientConfig{ConnectTimeout: 200 * time.Millisecond, RequestTimeout: 500 * time.Millisecond}),
+		WithClientConfig(ClientConfig{
+			ConnectTimeout:   200 * time.Millisecond,
+			RequestTimeout:   500 * time.Millisecond,
+			DisableSSRFGuard: true,
+		}),
 		WithAllowedSchemes("http", "https"),
 	)
 	res := d.Deliver(context.Background(), Payload{
@@ -712,5 +721,36 @@ func TestNew_DefaultUsesProductionSchedule(t *testing.T) {
 		if v != DefaultRetrySchedule[i] {
 			t.Fatalf("slot %d: %v != %v", i, v, DefaultRetrySchedule[i])
 		}
+	}
+}
+
+// TestDeliver_SSRFBlockedDeadletter verifies that a subscriber URL
+// whose host resolves to a private IP is rejected by the new SSRF
+// guard and lands on the dead-letter queue.
+//
+// We can't easily mock DNS at the net package level here, so we use
+// an IP-literal URL — that bypasses DNS but still goes through
+// AssertHostPublic, which treats RFC1918 / loopback literals as
+// non-public.
+func TestDeliver_SSRFBlockedDeadletter(t *testing.T) {
+	// Default Deliverer (SSRF guard enabled) talking to 169.254.169.254
+	// (AWS cloud-metadata, link-local).
+	d := New(
+		WithSecretResolver(secret("k")),
+		WithScheduler(NewSchedule(nil).WithoutJitter()),
+		WithClock(fixedTime(time.Unix(1, 0))),
+		WithDeliveryIDFactory(func() string { return "dlv-x" }),
+		WithClientConfig(ClientConfig{ConnectTimeout: 500 * time.Millisecond, RequestTimeout: 1 * time.Second}),
+		WithAllowedSchemes("http", "https"),
+	)
+	res := d.Deliver(context.Background(), Payload{
+		SubscriptionID: "s", EventID: "e_ssrf", Body: []byte("{}"), Attempt: 1,
+	}, Subscription{ID: "s", URL: "http://169.254.169.254/latest/meta-data/", SecretID: "ref"})
+
+	if res.Status != StatusDeadletter {
+		t.Fatalf("Status = %v, want Deadletter; err=%v", res.Status, res.Err)
+	}
+	if !errors.Is(res.Err, ErrPermanent) {
+		t.Fatalf("Err = %v, want ErrPermanent", res.Err)
 	}
 }

@@ -3,11 +3,9 @@ package runtime
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
@@ -18,6 +16,7 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/audit"
 	"github.com/Singleton-Solution/GoNext/packages/go/plugins/capabilities"
 	"github.com/Singleton-Solution/GoNext/packages/go/ratelimit"
+	"github.com/Singleton-Solution/GoNext/packages/go/safehttp"
 	"github.com/tetratelabs/wazero/api"
 )
 
@@ -587,6 +586,15 @@ func flattenHeaders(h http.Header) map[string]string {
 // fetches. The transport itself is package-default but the redirect
 // guard is per-call so it carries the calling NetworkContext into the
 // CheckRedirect closure for re-validation.
+//
+// Implementation note: this builds an *http.Client directly rather
+// than going through packages/go/safehttp because the manifest's
+// AllowHosts is per-plugin and per-call (a safehttp.Client is
+// configured at construction), and the plugin runtime needs to keep
+// the existing audit-row contract that maps redirects back to
+// NetStatusBlocked. The allowlist + SSRF check semantics are identical
+// to safehttp.Client's preflight; we delegate to safehttp.AssertHostPublic
+// to share the IP-classification code.
 func defaultFetchClient(nc *NetworkContext) *http.Client {
 	return &http.Client{
 		Timeout: MaxHTTPFetchTimeout,
@@ -597,7 +605,7 @@ func defaultFetchClient(nc *NetworkContext) *http.Client {
 			if !nc.allowsHost(redirected.URL.Hostname()) {
 				return fmt.Errorf("redirect host %q not in allowlist", redirected.URL.Hostname())
 			}
-			if err := assertPublicHost(redirected.Context(), redirected.URL.Hostname()); err != nil {
+			if err := safehttp.AssertHostPublic(redirected.Context(), redirected.URL.Hostname()); err != nil {
 				return fmt.Errorf("redirect blocked: %w", err)
 			}
 			return nil
@@ -606,76 +614,19 @@ func defaultFetchClient(nc *NetworkContext) *http.Client {
 }
 
 // assertPublicHost resolves host and returns an error if any resolved
-// address falls into the SSRF denylist:
-//
-//   - RFC1918 private space (10/8, 172.16/12, 192.168/16)
-//   - 127/8 loopback
-//   - 169.254/16 link-local (covers cloud-metadata 169.254.169.254)
-//   - ::1 IPv6 loopback
-//   - fe80::/10 IPv6 link-local
-//   - any multicast or unspecified address
-//
-// We resolve the host server-side rather than trusting the URL string —
-// a malicious plugin can use a DNS name that resolves to a private
-// IP at request time even though it points elsewhere at install time
-// (DNS rebinding). Re-resolution happens at every redirect via the
-// CheckRedirect hook.
+// address falls into the SSRF denylist. Now a thin shim over
+// packages/go/safehttp.AssertHostPublic so the IP-classification
+// implementation lives in one place; kept here as the existing test
+// surface (host_network_test.go) calls it by name.
 func assertPublicHost(ctx context.Context, host string) error {
-	// Strip [v6] brackets if any — the resolver wants the bare host.
-	host = strings.Trim(host, "[]")
-	if host == "" {
-		return errors.New("empty host")
-	}
-	// If the host parses directly as an IP literal, skip DNS.
-	if ip, err := netip.ParseAddr(host); err == nil {
-		if !isPublicAddr(ip) {
-			return fmt.Errorf("host %s resolves to non-public address %s", host, ip)
-		}
-		return nil
-	}
-	resolver := net.DefaultResolver
-	addrs, err := resolver.LookupNetIP(ctx, "ip", host)
-	if err != nil {
-		return fmt.Errorf("resolve %s: %w", host, err)
-	}
-	if len(addrs) == 0 {
-		return fmt.Errorf("resolve %s: no addresses", host)
-	}
-	for _, a := range addrs {
-		if !isPublicAddr(a) {
-			return fmt.Errorf("host %s resolves to non-public address %s", host, a)
-		}
-	}
-	return nil
+	return safehttp.AssertHostPublic(ctx, host)
 }
 
-// isPublicAddr reports whether the resolved IP is safe to talk to as a
-// plugin upstream. "Public" here is a loose definition — we want
-// "addresses that are not on the host's private fabric". Anything
-// loopback, private, link-local, multicast, broadcast, or unspecified
-// is rejected.
+// isPublicAddr is kept for backward source-level compatibility with
+// older callers in this package. New code should call
+// safehttp.IsPublicAddr directly.
 func isPublicAddr(ip netip.Addr) bool {
-	if !ip.IsValid() {
-		return false
-	}
-	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
-		ip.IsLinkLocalMulticast() || ip.IsInterfaceLocalMulticast() ||
-		ip.IsMulticast() || ip.IsUnspecified() {
-		return false
-	}
-	// Explicit 169.254.169.254 (cloud metadata) — IsLinkLocalUnicast
-	// already covers 169.254/16, but spell it out for documentation.
-	if ip.Is4() {
-		b := ip.As4()
-		if b[0] == 169 && b[1] == 254 {
-			return false
-		}
-		// CGNAT (100.64/10) — used inside cloud-provider networks.
-		if b[0] == 100 && (b[1]&0xc0) == 64 {
-			return false
-		}
-	}
-	return true
+	return safehttp.IsPublicAddr(ip)
 }
 
 // writeFetchResponse marshals the response envelope and copies it into

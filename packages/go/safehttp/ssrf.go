@@ -38,6 +38,23 @@ func (n *netResolver) LookupNetIP(ctx context.Context, network, host string) ([]
 // without ceremony.
 var defaultResolver Resolver = &netResolver{r: net.DefaultResolver}
 
+// AssertHostPublic is the exported entry point to the SSRF check.
+// Resolves host through net.DefaultResolver and reports an error if
+// any resolved address is in the SSRF denylist. Use this from callers
+// that aren't going through a full safehttp.Client (e.g. the plugin
+// runtime, where the per-plugin allowlist lives elsewhere but the
+// IP-classification logic should be shared).
+//
+// Returns a wrapped ErrBlocked on any failure.
+func AssertHostPublic(ctx context.Context, host string) error {
+	return assertHostPublic(ctx, defaultResolver, host)
+}
+
+// IsPublicAddr is the exported version of the IP classifier. Callers
+// that have already resolved a host (or are inspecting a literal IP)
+// can call this directly.
+func IsPublicAddr(ip netip.Addr) bool { return isPublicAddr(ip) }
+
 // assertHostPublic verifies that host (a URL hostname, possibly with
 // brackets for IPv6) resolves only to public IP addresses. Returns a
 // wrapped ErrBlocked on any failure.
