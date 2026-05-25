@@ -27,9 +27,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
 	goredis "github.com/redis/go-redis/v9"
 
+	accountdata "github.com/Singleton-Solution/GoNext/apps/api/internal/account/data"
 	admincomments "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/comments"
 	adminmedia "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/media"
 	adminthemes "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/themes"
@@ -900,6 +902,54 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 			logger.Info("auth/magic-link: routes mounted",
 				slog.String("request", "/api/v1/auth/magic-link/request"),
 				slog.String("verify", "/api/v1/auth/magic-link"))
+	// GDPR account-data routes (issue #216):
+	//   GET  /api/v1/account/data/export — async export
+	//   POST /api/v1/account/data/delete — anonymise + schedule purge
+	//
+	// Wired only when the pool, redis, and sessions are all healthy:
+	// the export handler enqueues to the worker via Asynq (needs
+	// Redis), the delete handler runs a multi-row UPDATE under a
+	// transaction (needs the pool), and both endpoints sit behind
+	// RequireSession.
+	if pool == nil || rdb == nil || sessions == nil {
+		logger.Warn("account/data: skipping mount; pool, redis, or sessions is nil")
+	} else {
+		// Build the Asynq client from the same Redis URL the worker
+		// consumes. We never share a *redis.Client with Asynq because
+		// the client manages its own pool and connection lifecycle —
+		// passing rdb directly would interleave Asynq's BRPOP traffic
+		// with the rest of the app's redis usage.
+		var asynqClient *asynq.Client
+		if cfg.Redis.URL != "" {
+			if redisOpt, err := asynq.ParseRedisURI(cfg.Redis.URL); err != nil {
+				logger.Warn("account/data: failed to parse redis URL for asynq",
+					slog.Any("err", err))
+			} else {
+				asynqClient = asynq.NewClient(redisOpt)
+				// Note: this asynq.Client owns its own pool of Redis
+				// connections, separate from the rdb client. The
+				// process exit closes it implicitly; we don't register
+				// it with the shutdown orchestrator because that
+				// instance lives in main() not buildRouter.
+			}
+		}
+		if asynqClient == nil {
+			logger.Warn("account/data: skipping mount; asynq client not available")
+		} else {
+			dataHandlers := accountdata.NewHandlers(accountdata.Deps{
+				Verifier:   accountdata.NewPgxPasswordVerifier(pool, []byte(cfg.Auth.Pepper)),
+				Anonymizer: accountdata.NewPgxAnonymizer(pool),
+				Enqueuer:   accountdata.NewAsynqEnqueuer(asynqClient, "default"),
+				Audit:      auditEmitter,
+				Log:        logger,
+				PollURLBase: strings.TrimRight(cfg.Email.SiteURL, "/"),
+			})
+			guarded := authmw.RequireSession(sessions)(dataHandlers.Routes())
+			mux.Handle("/api/v1/account/data/export", guarded)
+			mux.Handle("/api/v1/account/data/delete", guarded)
+			logger.Info("account/data: routes mounted",
+				slog.String("export", "/api/v1/account/data/export"),
+				slog.String("delete", "/api/v1/account/data/delete"))
 		}
 	}
 
