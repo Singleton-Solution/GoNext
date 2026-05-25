@@ -16,8 +16,18 @@
  * Subsequent issues will extend this surface with real probes (DB
  * write permission, Redis ping, etc.) once the corresponding endpoints
  * land. For now the component is intentionally lean.
+ *
+ * Visual treatment follows docs/design/ui_kits/onboarding/index.html:
+ * each row is a small bordered tile on paper-2 with a Lucide
+ * check-circle (emerald-soft pill) for an ok state, and an alert-circle
+ * (danger-soft pill) for a fail. The detail text sits in fg-muted Geist,
+ * the label in ink Geist 500 — matches the .step / .extras pattern from
+ * the onboarding hero.
  */
 import type { ReactElement } from 'react';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
+
+import { cn } from '@/lib/utils';
 import type { SetupStatus } from '../types';
 
 export interface SystemCheckProps {
@@ -32,7 +42,7 @@ interface CheckRow {
 
 /**
  * Renders the readiness rows. Each row is keyed off a boolean so the
- * UI can show a colored dot per axis; nothing here makes blocking
+ * UI can show a Lucide icon badge per axis; nothing here makes blocking
  * decisions (the wizard does that).
  */
 export function SystemCheck({ status }: SystemCheckProps): ReactElement {
@@ -59,19 +69,58 @@ export function SystemCheck({ status }: SystemCheckProps): ReactElement {
     },
   ];
   return (
-    <ul className="setup-checks" aria-label="System check">
+    <ul
+      className={cn(
+        'setup-checks',
+        'mt-6 flex flex-col gap-2 list-none p-0',
+      )}
+      aria-label="System check"
+    >
       {checks.map((c) => (
         <li
           key={c.label}
-          className={c.ok ? 'setup-checks__row setup-checks__row--ok' : 'setup-checks__row'}
+          className={cn(
+            'setup-checks__row',
+            c.ok && 'setup-checks__row--ok',
+            'flex items-start gap-3 rounded-md border border-border bg-paper px-4 py-3',
+          )}
         >
           <span
-            className="setup-checks__dot"
+            className={cn(
+              'setup-checks__dot',
+              'mt-[1px] flex h-5 w-5 shrink-0 items-center justify-center rounded-pill',
+              c.ok
+                ? 'bg-emerald-soft text-emerald-deep'
+                : 'bg-danger-soft text-danger',
+            )}
             aria-hidden="true"
-            style={{ background: c.ok ? '#16a34a' : '#dc2626' }}
-          />
-          <span className="setup-checks__label">{c.label}</span>
-          {c.detail ? <span className="setup-checks__detail muted">{c.detail}</span> : null}
+          >
+            {c.ok ? (
+              <CheckCircle2 width={14} height={14} strokeWidth={2.25} />
+            ) : (
+              <AlertCircle width={14} height={14} strokeWidth={2.25} />
+            )}
+          </span>
+          <span className="flex flex-1 flex-col gap-[2px]">
+            <span
+              className={cn(
+                'setup-checks__label',
+                'font-sans text-sm font-medium text-ink',
+              )}
+            >
+              {c.label}
+            </span>
+            {c.detail ? (
+              <span
+                className={cn(
+                  'setup-checks__detail',
+                  'font-sans text-xs text-fg-muted',
+                )}
+              >
+                {c.detail}
+              </span>
+            ) : null}
+          </span>
         </li>
       ))}
     </ul>
