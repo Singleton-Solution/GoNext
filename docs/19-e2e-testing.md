@@ -111,3 +111,65 @@ red smoke does not block merges. Promotion to a required check
 happens once the journey lands three consecutive green PRs without
 manual reruns; the gate flip is a one-line workflow edit and a
 branch-protection update.
+
+## 19.6 The full blog-loop canary
+
+A second, longer-running journey lives in
+`tools/e2e/tests/full-blog-loop.spec.ts`. It is the **canary**: the
+single test that, if green, proves the publish loop works end to
+end. It is intentionally separate from `install-and-publish.spec.ts`
+so the two CI checks fail or pass independently — a regression in
+the smoke does not pull the canary off-line, and vice versa.
+
+Differences from the smoke:
+
+- The canary captures the published slug from the success
+  notification, the status banner, *or* a fallback anchor scrape,
+  rather than from a single selector. This makes it more resilient
+  to UI churn around the publish flow.
+- The canary asserts the brand's italic-accent rule on the public
+  h1: when the editor stores an emphasis, the rendered `<h1>` must
+  contain an `<em>`. The assertion is lenient (`<em>` is optional
+  if the editor didn't produce one) but strict on the public
+  render side when it is produced.
+- The canary inserts three list items rather than two, which
+  exercises the list block's Enter-driven item splitting one extra
+  time and catches off-by-one bugs in the list serializer.
+- The canary logs out via `context.clearCookies()` rather than the
+  UI logout flow, decoupling the public-render assertion from any
+  churn in the logout affordance.
+
+### Running locally
+
+```bash
+make up                 # bring the stack up
+make e2e-blog-loop      # runs the canary against it
+```
+
+The `make e2e-blog-loop` target sets `E2E_FRESH_INSTALL=1` *and*
+`E2E_ALLOW_DESTRUCTIVE=1` for you. It targets only the
+chromium project so a single local run gives a fast verdict;
+flip the `--project=` flag if you want to sweep WebKit + Firefox.
+
+### CI
+
+`.github/workflows/e2e-blog-loop.yml` runs on every PR touching
+`apps/**` or `packages/**`. Like the smoke, it is **advisory** on
+landing (`continue-on-error: true`). Promotion rules are the same:
+three consecutive greens without manual reruns and the gate flips
+to required.
+
+### Why both?
+
+Both specs exercise the same conceptual loop, but they serve
+different roles in CI:
+
+| Spec                              | Role                                      |
+| --------------------------------- | ----------------------------------------- |
+| `install-and-publish.spec.ts`     | Architectural skeleton — the scaffold that proves the harness wiring works. |
+| `full-blog-loop.spec.ts`          | Canary — the single signal we watch to know the platform works as a CMS. |
+
+If the smoke breaks but the canary stays green, the harness or
+fixtures have regressed but the product is fine. If the canary
+breaks, the product has regressed and we know exactly which step
+of the publish loop is failing.
