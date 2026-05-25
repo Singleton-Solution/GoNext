@@ -1,0 +1,42 @@
+[package]
+name = "gonext-sdk"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.74"
+license = "Apache-2.0"
+description = "Rust SDK for building GoNext plugins (wasm32-wasi). Provides safe typed wrappers over the gn_* host ABIs, a manifest builder, JSON envelope codec, and a plugin_init! macro that wires the WASM exports."
+repository = "https://github.com/Singleton-Solution/GoNext"
+homepage = "https://github.com/Singleton-Solution/GoNext"
+documentation = "https://docs.rs/gonext-sdk"
+keywords = ["gonext", "plugin", "wasm", "wasi", "sdk"]
+categories = ["wasm", "api-bindings", "development-tools"]
+readme = "README.md"
+
+# We intentionally do NOT bound the crate to `target = "wasm32-wasi"` in
+# Cargo.toml so plugin authors can run `cargo test` on the host
+# architecture for unit tests of their domain code (codec + manifest
+# builder). The `extern "C"` declarations in `host` only get linked when
+# building for wasm32-wasi.
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] }
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
+gonext-sdk-macros = { version = "0.1.0", path = "../gonext-sdk-macros", optional = true }
+
+[features]
+default = ["macros"]
+
+# macros pulls in the proc-macro crate that supplies `plugin_init!`.
+# Disable it if you want to wire `gn_handle_hook` by hand or pin a
+# different macro version.
+macros = ["dep:gonext-sdk-macros"]
+
+[dev-dependencies]
+serde = { version = "1.0", features = ["derive"] }
+
+[package.metadata.docs.rs]
+all-features = true
+targets = ["wasm32-wasi", "x86_64-unknown-linux-gnu"]

@@ -1,0 +1,16 @@
+# {{ .Name }}
+
+GoNext plugin scaffolded by `gonext plugin init --template=rust`.
+
+## Build
+
+```sh
+make build
+```
+
+## Bundle and upload to a dev host
+
+```sh
+make bundle
+gonext plugin dev --host http://localhost:8080 .
+```
