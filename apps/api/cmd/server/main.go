@@ -37,6 +37,8 @@ import (
 	adminredirects "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/redirects"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/rum"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/auth/login"
+	"github.com/Singleton-Solution/GoNext/apps/api/internal/auth/magiclink"
+	"github.com/Singleton-Solution/GoNext/apps/api/internal/auth/passwordreset"
 	authsessions "github.com/Singleton-Solution/GoNext/apps/api/internal/auth/sessions"
 	authverify "github.com/Singleton-Solution/GoNext/apps/api/internal/auth/verify"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/healthz"
@@ -768,6 +770,113 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 			logger.Info("auth/verify: routes mounted",
 				slog.String("send", "/api/v1/auth/verify/send"),
 				slog.String("verify", "/api/v1/auth/verify"))
+		}
+	}
+
+	// Password reset flow (#140). POST /password-reset/request issues a
+	// hashed token + emails the link; POST /password-reset/confirm
+	// validates the token, updates the password, and revokes all
+	// sessions for the user. Both endpoints share a per-IP token bucket
+	// (5 attempts / 15 minutes — same envelope as the magic-link flow
+	// below). The handler refuses to start if any required dep is nil,
+	// so we skip the mount entirely when the DB or session manager is
+	// unavailable rather than wiring a half-functional flow.
+	if pool == nil || sessions == nil {
+		logger.Warn("auth/password-reset: skipping mount; pool or session manager is nil")
+	} else if prTokens, err := passwordreset.NewPgxTokenStore(pool); err != nil {
+		logger.Warn("auth/password-reset: failed to build token store", slog.Any("err", err))
+	} else if prUsers, err := passwordreset.NewPgxUserStore(pool); err != nil {
+		logger.Warn("auth/password-reset: failed to build user store", slog.Any("err", err))
+	} else if prLim, err := ratelimit.NewMemoryLimiter(ratelimit.Policy{
+		Capacity:   5,
+		RefillRate: 5.0 / (15 * 60),
+	}); err != nil {
+		logger.Warn("auth/password-reset: failed to build limiter", slog.Any("err", err))
+	} else {
+		resetBase := strings.TrimRight(cfg.Email.SiteURL, "/")
+		if resetBase == "" {
+			resetBase = "http://localhost"
+		}
+		// Sender: LogSender in dev so the reset link surfaces in the
+		// server log (useful for local development without an SMTP
+		// relay); production wiring will swap this for SMTPSender once
+		// cfg.Email.SMTPHost is plumbed end-to-end. The noop sender is
+		// reserved for tests so the wire contract stays observable.
+		var prSender email.Sender = email.NewLogSender(logger)
+		if cfg.Env == "production" {
+			prSender = email.NewNoopSender()
+		}
+		prHandler, err := passwordreset.New(passwordreset.Options{
+			Tokens:   prTokens,
+			Users:    prUsers,
+			Sessions: sessions,
+			Sender:   prSender,
+			Limiter:  prLim,
+			Audit:    auditEmitter,
+			ResetURL: resetBase + "/reset-password",
+			Pepper:   []byte(cfg.Auth.Pepper),
+			Log:      logger,
+		})
+		if err != nil {
+			logger.Warn("auth/password-reset: failed to build handler", slog.Any("err", err))
+		} else {
+			prHandler.Routes(mux)
+			logger.Info("auth/password-reset: routes mounted",
+				slog.String("request", "/api/v1/auth/password-reset/request"),
+				slog.String("confirm", "/api/v1/auth/password-reset/confirm"))
+		}
+	}
+
+	// Magic-link sign-in flow (#203). POST /magic-link/request issues a
+	// hashed token + emails a link; GET /magic-link?token=... consumes
+	// it and mints a fresh session via the same manager used by the
+	// password login. Per-IP rate-limit at 5 attempts / 15 minutes —
+	// matches the password-reset envelope. The handler is anonymous on
+	// both ends (token possession IS the credential on verify), so no
+	// RequireSession wrapper is needed.
+	if pool == nil || sessions == nil {
+		logger.Warn("auth/magic-link: skipping mount; pool or session manager is nil")
+	} else if mlTokens, err := magiclink.NewPgxTokenStore(pool); err != nil {
+		logger.Warn("auth/magic-link: failed to build token store", slog.Any("err", err))
+	} else if mlUsers, err := magiclink.NewPgxUserStore(pool); err != nil {
+		logger.Warn("auth/magic-link: failed to build user store", slog.Any("err", err))
+	} else if mlLim, err := ratelimit.NewMemoryLimiter(ratelimit.Policy{
+		Capacity:   5,
+		RefillRate: 5.0 / (15 * 60),
+	}); err != nil {
+		logger.Warn("auth/magic-link: failed to build limiter", slog.Any("err", err))
+	} else {
+		linkBase := strings.TrimRight(cfg.Email.SiteURL, "/")
+		if linkBase == "" {
+			linkBase = "http://localhost"
+		}
+		// Same dev/prod posture as the password-reset sender — log the
+		// link in dev, noop in production until SMTP wiring lands.
+		var mlSender email.Sender = email.NewLogSender(logger)
+		if cfg.Env == "production" {
+			mlSender = email.NewNoopSender()
+		}
+		mlHandler, err := magiclink.New(magiclink.Options{
+			Tokens:             mlTokens,
+			Users:              mlUsers,
+			Sessions:           sessions,
+			Sender:             mlSender,
+			Limiter:            mlLim,
+			Audit:              auditEmitter,
+			LinkURL:            linkBase + "/api/v1/auth/magic-link",
+			SuccessRedirect:    "/",
+			SessionAbsoluteTTL: cfg.Auth.SessionTTL,
+			SessionIdleTTL:     cfg.Auth.SessionIdleTTL,
+			Insecure:           cfg.Env != "production",
+			Log:                logger,
+		})
+		if err != nil {
+			logger.Warn("auth/magic-link: failed to build handler", slog.Any("err", err))
+		} else {
+			mlHandler.Routes(mux)
+			logger.Info("auth/magic-link: routes mounted",
+				slog.String("request", "/api/v1/auth/magic-link/request"),
+				slog.String("verify", "/api/v1/auth/magic-link"))
 		}
 	}
 
