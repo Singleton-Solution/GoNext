@@ -1,0 +1,188 @@
+# Plugin publishing pipeline (#274).
+#
+# Trigger: a tag push of the form `plugin/<slug>/vX.Y.Z`. The workflow:
+#   1. Builds the plugin bundle (delegates to `gonext plugin dev build`).
+#   2. Scans the bundle for known vulnerabilities (`trivy fs`).
+#   3. Computes the capability-diff against the previous tag for the
+#      same slug, surfacing what surface the new version is asking for.
+#   4. Signs the bundle (cosign keyless via GitHub OIDC).
+#   5. Publishes the signed bundle as an OCI artefact to ghcr.io under
+#      ghcr.io/<owner>/plugins/<slug>:<version>.
+#
+# # OCI artefact contract
+#
+# The published artefact is a single-layer image:
+#   - layer mediaType:  application/vnd.gonext.plugin.bundle.v1+zip
+#   - config mediaType: application/vnd.gonext.plugin.config.v1+json
+#   - config body:      { "slug": "...", "version": "...", "publisher": "..." }
+#
+# Operators pull with `gonext plugin install ghcr.io/<owner>/plugins/<slug>`
+# (CLI surface added in a follow-up issue). The bundle's cosign signature
+# is verified by the host's plugins/sign verifier on install.
+
+name: plugin-publish
+
+on:
+  push:
+    tags:
+      - 'plugin/*/v*'
+
+# Required for cosign keyless (Fulcio OIDC token) and for pushing to ghcr.io.
+permissions:
+  contents: read
+  id-token: write
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # capability-diff needs the previous tag
+
+      # The tag is plugin/<slug>/vX.Y.Z; pluck the slug + version.
+      - name: Parse tag
+        id: tag
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          slug="$(echo "$tag" | cut -d'/' -f2)"
+          version="$(echo "$tag" | cut -d'/' -f3)"
+          version="${version#v}"
+          echo "slug=$slug"     >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag"       >> "$GITHUB_OUTPUT"
+          # Repository slug (lowercased) for the OCI ref.
+          owner_lc="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          echo "owner_lc=$owner_lc" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.work'
+          cache: true
+
+      - name: Build CLI
+        run: |
+          go work sync
+          go build -o ./bin/gonext ./cli/gonext
+
+      - name: Build plugin bundle
+        id: build
+        run: |
+          ./bin/gonext plugin dev build \
+            --source "plugins/${{ steps.tag.outputs.slug }}" \
+            --output "dist/${{ steps.tag.outputs.slug }}-${{ steps.tag.outputs.version }}.gnplugin"
+          echo "bundle=dist/${{ steps.tag.outputs.slug }}-${{ steps.tag.outputs.version }}.gnplugin" >> "$GITHUB_OUTPUT"
+
+      # Bundle layout + manifest schema gate. The same checks the admin
+      # installer runs at upload time, but moved earlier so a broken
+      # bundle fails the pipeline before scan/sign/publish.
+      - name: Plugin contract checks
+        run: |
+          ./bin/gonext plugin test --json "${{ steps.build.outputs.bundle }}" > test-report.json
+          cat test-report.json
+
+      # Static vulnerability scan. We use trivy because it handles
+      # zip-packaged artefacts (the bundle) without needing the wasm
+      # source tree mounted. The govulncheck path runs alongside in
+      # plugin repos that ship a Go module — that's a per-plugin
+      # workflow concern, not this pipeline's.
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '${{ steps.build.outputs.bundle }}'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+          ignore-unfixed: true
+          format: 'table'
+
+      # Capability-diff against the previous tag for the same slug. The
+      # diff is emitted into the workflow's step summary so operators
+      # see what surface the new version added before they activate it.
+      - name: Capability diff
+        id: diff
+        run: |
+          prev_tag="$(git tag -l "plugin/${{ steps.tag.outputs.slug }}/v*" --sort=-v:refname \
+            | grep -v "^${{ steps.tag.outputs.tag }}\$" \
+            | head -n1)"
+          if [ -z "$prev_tag" ]; then
+            echo "No previous tag for slug ${{ steps.tag.outputs.slug }} — skipping diff."
+            echo "## Capability diff" >> "$GITHUB_STEP_SUMMARY"
+            echo "First publication of this plugin. No baseline to diff against." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git worktree add ../prev "$prev_tag"
+          ../prev/bin/gonext plugin dev build \
+            --source "../prev/plugins/${{ steps.tag.outputs.slug }}" \
+            --output  "dist/prev.gnplugin" \
+            || ./bin/gonext plugin dev build \
+                 --source "../prev/plugins/${{ steps.tag.outputs.slug }}" \
+                 --output  "dist/prev.gnplugin"
+          ./bin/gonext plugin diff \
+            "dist/prev.gnplugin" \
+            "${{ steps.build.outputs.bundle }}" \
+            > diff.txt
+          echo "## Capability diff" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat diff.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      # Cosign keyless sign. The OIDC token comes from id-token:write
+      # above; cosign binds the Fulcio cert to the workflow's identity
+      # (e.g. github.com/Singleton-Solution/GoNext/.github/workflows/...).
+      # The signed bundle has signatures/{cosign.sig,cosign.bundle,publisher.json}
+      # appended.
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3.6.0
+
+      - name: Sign bundle
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          ./bin/gonext plugin sign \
+            --identity "github.com/${{ steps.tag.outputs.owner_lc }}" \
+            --display-name "${{ github.repository_owner }}" \
+            "${{ steps.build.outputs.bundle }}"
+
+      # Push to ghcr.io as an OCI artefact. We use `oras` because cosign's
+      # own attach surface is signature-only — we want the bundle itself
+      # to be the registry artefact, with the signature attached separately
+      # via `cosign attach signature`.
+      - name: Set up oras
+        uses: oras-project/setup-oras@v1
+
+      - name: Push OCI artefact
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GHCR_TOKEN" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+          target="ghcr.io/${{ steps.tag.outputs.owner_lc }}/plugins/${{ steps.tag.outputs.slug }}:${{ steps.tag.outputs.version }}"
+          oras push "$target" \
+            --artifact-type application/vnd.gonext.plugin.bundle.v1+zip \
+            --config <(printf '{"slug":"%s","version":"%s","publisher":"github.com/%s"}' \
+              "${{ steps.tag.outputs.slug }}" \
+              "${{ steps.tag.outputs.version }}" \
+              "${{ steps.tag.outputs.owner_lc }}"):application/vnd.gonext.plugin.config.v1+json \
+            "${{ steps.build.outputs.bundle }}:application/vnd.gonext.plugin.bundle.v1+zip"
+
+      # Cosign-attach the signature to the published OCI ref so the
+      # operator-side install can `cosign verify` against the registry
+      # ref directly without unzipping the bundle.
+      - name: Attach signature to OCI ref
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          target="ghcr.io/${{ steps.tag.outputs.owner_lc }}/plugins/${{ steps.tag.outputs.slug }}:${{ steps.tag.outputs.version }}"
+          cosign sign --yes "$target"
+
+      - name: Summary
+        run: |
+          echo "## Published" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **slug**: ${{ steps.tag.outputs.slug }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **version**: ${{ steps.tag.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **OCI ref**: ghcr.io/${{ steps.tag.outputs.owner_lc }}/plugins/${{ steps.tag.outputs.slug }}:${{ steps.tag.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
