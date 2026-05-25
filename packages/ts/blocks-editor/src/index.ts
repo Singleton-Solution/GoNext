@@ -56,10 +56,12 @@ export {
 } from './default-core-blocks.ts';
 
 export {
+  AutosaveIndicator,
   LockBanner,
   RecoveryDialog,
   useAutosave,
   usePostLock,
+  type AutosaveIndicatorProps,
   type AutosavePayload,
   type AutosaveResponse,
   type AutosaveState,
@@ -70,3 +72,15 @@ export {
   type RecoveryDialogProps,
   type UseAutosaveOptions,
 } from './autosave/index.ts';
+
+export {
+  EditorTitle,
+  EditorTopBar,
+  EditorViewSwitcher,
+  InspectorTabs,
+  UncontrolledInspectorTabs,
+  type EditorTitleProps,
+  type EditorTopBarProps,
+  type EditorViewSwitcherProps,
+  type InspectorTabsProps,
+} from './editor-chrome.tsx';
