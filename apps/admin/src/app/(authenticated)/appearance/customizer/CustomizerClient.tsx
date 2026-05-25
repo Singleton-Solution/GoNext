@@ -200,7 +200,9 @@ export function CustomizerClient({
     <div className="customizer" data-testid="customizer-root">
       <aside className="customizer__sidebar">
         <header className="customizer__header">
-          <h1>Customize</h1>
+          <h1>
+            Customize your <em>site</em>.
+          </h1>
           <p className="muted">
             Active theme: <strong>{activeResponse.themeSlug}</strong>
           </p>
