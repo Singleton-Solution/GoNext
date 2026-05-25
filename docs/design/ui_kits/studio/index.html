@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>GoNext — Studio · Brick &amp; Mortar Coffee</title>
+<link rel="stylesheet" href="../../colors_and_type.css">
+<link rel="icon" href="../../assets/favicon.svg">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  body { background: var(--forest); height: 100vh; overflow: hidden; display: flex; flex-direction: column; color: var(--fg-on-forest); }
+
+  /* ─── TOPBAR ─── */
+  .topbar { display: flex; align-items: center; justify-content: space-between; height: 54px; padding: 0 16px 0 20px; border-bottom: 1px solid var(--forest-border); flex-shrink: 0; }
+  .topbar .left { display: flex; align-items: center; gap: 16px; }
+  .topbar .brand-mini { width: 26px; height: 26px; }
+  .topbar .crumbs { display: flex; align-items: center; gap: 8px; font-size: var(--t-sm); color: var(--fg-on-forest-muted); }
+  .topbar .crumbs .sep { width: 13px; height: 13px; opacity: 0.5; }
+  .topbar .crumbs .here { color: var(--fg-on-forest); font-weight: 500; }
+  .topbar .crumbs .here em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-bright); font-size: 1.05em; }
+
+  /* viewport switcher */
+  .viewport-switch { display: inline-flex; gap: 2px; padding: 3px; background: var(--forest-2); border-radius: var(--r-md); }
+  .viewport-switch button { padding: 5px 10px; background: transparent; color: var(--fg-on-forest-muted); border: none; cursor: pointer; border-radius: var(--r-sm); display: flex; align-items: center; gap: 5px; font-size: var(--t-xs); font-weight: 500; }
+  .viewport-switch button:hover { color: var(--fg-on-forest); }
+  .viewport-switch button.on { background: var(--forest-3); color: var(--fg-on-forest); }
+  .viewport-switch button i { width: 13px; height: 13px; }
+
+  .topbar .right { display: flex; align-items: center; gap: 8px; }
+  .save-state { display: flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: var(--t-xs); background: var(--forest-2); border-radius: var(--r-pill); color: var(--fg-on-forest-muted); }
+  .save-state .d { width: 6px; height: 6px; border-radius: 999px; background: var(--emerald-bright); animation: pulse 2s var(--ease) infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .topbar .btn-dark { background: var(--forest-3); color: var(--fg-on-forest); border-color: var(--forest-border); box-shadow: none; }
+  .topbar .btn-dark:hover { background: var(--forest-border); }
+  .topbar .btn-em { background: var(--emerald); color: var(--emerald-ink); border-color: var(--emerald); }
+  .topbar .btn-em:hover { background: var(--emerald-bright); }
+
+  .undo-redo { display: inline-flex; gap: 4px; }
+  .undo-redo button { width: 30px; height: 30px; padding: 0; background: var(--forest-2); border: 1px solid var(--forest-border); color: var(--fg-on-forest-muted); border-radius: var(--r-sm); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .undo-redo button:hover { background: var(--forest-3); color: var(--fg-on-forest); }
+  .undo-redo button i { width: 14px; height: 14px; }
+
+  /* ─── STUDIO LAYOUT ─── */
+  .studio { flex: 1; display: grid; grid-template-columns: 64px 340px 1fr; min-height: 0; }
+
+  /* left rail */
+  .rail { background: var(--forest); border-right: 1px solid var(--forest-border); display: flex; flex-direction: column; align-items: center; padding: 14px 0; gap: 4px; }
+  .rail button { width: 44px; height: 44px; background: transparent; border: 1px solid transparent; border-radius: var(--r-md); color: var(--fg-on-forest-muted); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+  .rail button:hover { background: var(--forest-2); color: var(--fg-on-forest); }
+  .rail button.on { background: var(--forest-2); color: var(--emerald-bright); box-shadow: inset 0 0 0 1px var(--forest-border); }
+  .rail button i { width: 17px; height: 17px; }
+  .rail button .lbl { font-size: 9px; letter-spacing: 0.04em; }
+  .rail .sep { width: 24px; height: 1px; background: var(--forest-border); margin: 6px 0; }
+
+  /* inspector */
+  .inspector { background: var(--forest-2); border-right: 1px solid var(--forest-border); overflow: auto; display: flex; flex-direction: column; }
+  .inspector .insp-head { padding: 18px 20px 14px; border-bottom: 1px solid var(--forest-border); }
+  .inspector .insp-head .eyebrow { color: var(--emerald-bright); display: block; margin-bottom: 6px; }
+  .inspector .insp-head h2 { font-family: var(--font-display); font-weight: 800; font-size: 26px; letter-spacing: -0.025em; line-height: 1; color: var(--fg-on-forest); }
+  .inspector .insp-head h2 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-bright); }
+  .inspector .insp-head p { font-size: var(--t-xs); color: var(--fg-on-forest-muted); margin-top: 6px; line-height: 1.5; }
+
+  .insp-body { padding: 20px; display: flex; flex-direction: column; gap: 28px; flex: 1; }
+  .insp-section .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .insp-section .head h3 { font-size: var(--t-sm); font-weight: 600; color: var(--fg-on-forest); }
+  .insp-section .head .reset { font-family: var(--font-mono); font-size: 10px; color: var(--fg-on-forest-muted); cursor: pointer; }
+  .insp-section .head .reset:hover { color: var(--fg-on-forest); }
+
+  /* Color swatches */
+  .swatch-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  .sw {
+    aspect-ratio: 1;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--forest-border);
+    cursor: pointer;
+    position: relative;
+    transition: transform var(--dur-fast) var(--ease);
+  }
+  .sw:hover { transform: scale(1.08); }
+  .sw.on { box-shadow: 0 0 0 2px var(--emerald-bright), 0 0 0 4px var(--forest-2); border-color: transparent; }
+  .sw-list { display: grid; gap: 8px; }
+  .palette-row { display: flex; gap: 6px; padding: 8px; border: 1px solid var(--forest-border); border-radius: var(--r-md); cursor: pointer; align-items: center; transition: border-color var(--dur-fast) var(--ease); }
+  .palette-row:hover { border-color: var(--forest-3); background: var(--forest-3); }
+  .palette-row.on { border-color: var(--emerald-bright); background: rgba(52, 211, 153, 0.06); }
+  .palette-row .strip { display: flex; flex: 1; height: 22px; border-radius: var(--r-xs); overflow: hidden; }
+  .palette-row .strip span { flex: 1; }
+  .palette-row .nm { font-size: var(--t-xs); font-weight: 500; color: var(--fg-on-forest); width: 90px; }
+  .palette-row .ck { width: 14px; height: 14px; border-radius: 999px; background: var(--forest-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .palette-row.on .ck { background: var(--emerald-bright); }
+  .palette-row.on .ck i { width: 10px; height: 10px; color: var(--emerald-ink); }
+  .palette-row:not(.on) .ck i { display: none; }
+
+  /* Font picker */
+  .font-list { display: grid; gap: 6px; }
+  .font-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--forest-border); border-radius: var(--r-md); cursor: pointer; }
+  .font-row:hover { background: var(--forest-3); }
+  .font-row.on { border-color: var(--emerald-bright); background: rgba(52, 211, 153, 0.06); }
+  .font-row .sample { flex: 1; font-size: var(--t-md); font-weight: 600; color: var(--fg-on-forest); letter-spacing: -0.02em; }
+  .font-row .sample.serif { font-family: var(--font-serif); font-style: italic; font-weight: 400; }
+  .font-row .name { font-size: var(--t-xs); color: var(--fg-on-forest-muted); }
+  .font-row .ck { width: 14px; height: 14px; border-radius: 999px; background: var(--forest-border); display: flex; align-items: center; justify-content: center; }
+  .font-row.on .ck { background: var(--emerald-bright); }
+  .font-row.on .ck i { width: 10px; height: 10px; color: var(--emerald-ink); }
+  .font-row:not(.on) .ck i { display: none; }
+
+  /* Slider */
+  .slider-row { display: flex; flex-direction: column; gap: 8px; }
+  .slider-row .label-row { display: flex; justify-content: space-between; align-items: baseline; }
+  .slider-row .l { font-size: var(--t-xs); color: var(--fg-on-forest-muted); }
+  .slider-row .v { font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-on-forest); font-weight: 500; }
+  .slider {
+    height: 4px; background: var(--forest-border); border-radius: 999px; position: relative; cursor: pointer;
+  }
+  .slider .fill { height: 100%; background: var(--emerald-bright); border-radius: 999px; }
+  .slider .thumb { position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 999px; background: var(--paper); border: 2px solid var(--emerald-bright); transform: translate(-50%, -50%); box-shadow: var(--sh-sm); }
+
+  /* Toggle */
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; font-size: var(--t-sm); color: var(--fg-on-forest); }
+  .toggle-row .desc { font-size: var(--t-xs); color: var(--fg-on-forest-muted); margin-top: 2px; }
+  .toggle-row .t { width: 32px; height: 18px; background: var(--emerald); border-radius: 999px; position: relative; cursor: pointer; flex-shrink: 0; }
+  .toggle-row .t::after { content: ''; position: absolute; top: 2px; left: 16px; width: 14px; height: 14px; background: var(--paper); border-radius: 999px; }
+  .toggle-row .t.off { background: var(--forest-border); }
+  .toggle-row .t.off::after { left: 2px; background: var(--fg-on-forest-muted); }
+
+  /* ─── PREVIEW ─── */
+  .preview-wrap { background: var(--forest); padding: 24px; overflow: auto; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .preview-meta { display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 1180px; padding: 0 4px; }
+  .preview-meta .url { font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-on-forest-muted); display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--forest-2); border-radius: var(--r-pill); border: 1px solid var(--forest-border); }
+  .preview-meta .url i { width: 12px; height: 12px; }
+  .preview-meta .zoom-row { display: flex; align-items: center; gap: 8px; font-size: var(--t-xs); color: var(--fg-on-forest-muted); }
+  .preview-meta .zoom-row .pct { font-family: var(--font-mono); }
+
+  .preview-frame {
+    width: 100%; max-width: 1180px;
+    background: var(--paper);
+    border-radius: var(--r-lg);
+    box-shadow: var(--sh-lg);
+    overflow: hidden;
+    border: 1px solid var(--forest-border);
+  }
+
+  /* In-preview site (this is the rendered "Brick & Mortar" site) */
+  .site-nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 32px; border-bottom: 1px solid var(--border); }
+  .site-nav .br { display: flex; align-items: baseline; gap: 1px; }
+  .site-nav .br .wm-go { font-family: var(--font-display); font-weight: 800; font-size: 18px; letter-spacing: -0.03em; color: var(--ink); }
+  .site-nav .br .wm-next { font-family: var(--font-serif); font-weight: 400; font-style: italic; font-size: 20px; color: var(--ink); }
+  .site-nav .br.brand-name { font-family: var(--font-display); font-weight: 800; font-size: 19px; letter-spacing: -0.03em; color: var(--ink); }
+  .site-nav .br.brand-name em { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--emerald-deep); margin-left: 1px; }
+  .site-nav .links { display: flex; gap: 24px; font-size: var(--t-sm); color: var(--fg-muted); }
+  .site-nav .ord-cta { background: var(--ink); color: var(--paper); padding: 8px 16px; border-radius: var(--r-md); font-size: var(--t-sm); font-weight: 500; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+
+  .site-hero { padding: 64px 32px 48px; display: grid; grid-template-columns: 1.3fr 1fr; gap: 48px; align-items: end; }
+  .site-hero .eyebrow { color: var(--emerald-deep); }
+  .site-hero h1 { font-family: var(--font-display); font-weight: 800; font-size: 72px; letter-spacing: -0.035em; line-height: 0.92; color: var(--ink); margin-top: 14px; }
+  .site-hero h1 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-deep); }
+  .site-hero .img {
+    aspect-ratio: 4/5; border-radius: var(--r-lg);
+    background: var(--forest); position: relative; overflow: hidden;
+  }
+  .site-hero .img::after { content: ''; position: absolute; inset: 0; background-image: radial-gradient(circle at 30% 40%, rgba(52, 211, 153, 0.4) 0%, transparent 50%), radial-gradient(circle at 70% 70%, rgba(167, 139, 250, 0.3) 0%, transparent 50%); }
+
+  .site-products { padding: 0 32px 56px; }
+  .site-products .head { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 16px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+  .site-products .head h2 { font-family: var(--font-display); font-weight: 800; font-size: 32px; letter-spacing: -0.025em; color: var(--ink); }
+  .site-products .head h2 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-deep); }
+  .site-products .head a { font-size: var(--t-sm); color: var(--fg-muted); text-decoration: none; }
+
+  .prod-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .prod {
+    background: var(--paper-2); border: 1px solid var(--border); border-radius: var(--r-md);
+    padding: 14px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .prod .img {
+    aspect-ratio: 1; border-radius: var(--r-sm);
+    background: var(--forest); position: relative; overflow: hidden;
+  }
+  .prod .img::after { content: ''; position: absolute; inset: 0; background-image: radial-gradient(circle at 60% 50%, rgba(52, 211, 153, 0.4) 0%, transparent 60%); }
+  .prod.lv .img::after { background-image: radial-gradient(circle at 60% 50%, rgba(167, 139, 250, 0.5) 0%, transparent 60%); }
+  .prod .name { font-size: var(--t-md); font-weight: 600; color: var(--ink); }
+  .prod .price { font-family: var(--font-mono); font-size: var(--t-sm); color: var(--fg-muted); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="left">
+    <img class="brand-mini" src="../../assets/logo-mark.svg" alt="">
+    <div class="crumbs">
+      <span>Brick &amp; Mortar</span>
+      <i data-lucide="chevron-right" class="sep"></i>
+      <span class="here">Studio · <em>theme</em></span>
+    </div>
+    <div class="undo-redo">
+      <button><i data-lucide="undo-2"></i></button>
+      <button><i data-lucide="redo-2"></i></button>
+    </div>
+  </div>
+
+  <div class="viewport-switch">
+    <button class="on"><i data-lucide="monitor"></i>Desktop</button>
+    <button><i data-lucide="tablet"></i>Tablet</button>
+    <button><i data-lucide="smartphone"></i>Mobile</button>
+  </div>
+
+  <div class="right">
+    <span class="save-state"><span class="d"></span>Editing draft · last save 8s ago</span>
+    <button class="btn btn--sm btn-dark">Discard</button>
+    <button class="btn btn--sm btn-em">Publish<i data-lucide="arrow-right" style="width: 12px; height: 12px;"></i></button>
+  </div>
+</div>
+
+<div class="studio">
+
+  <div class="rail">
+    <button title="Brand"><i data-lucide="sparkles"></i><span class="lbl">Brand</span></button>
+    <button class="on" title="Theme"><i data-lucide="palette"></i><span class="lbl">Theme</span></button>
+    <button title="Typography"><i data-lucide="type"></i><span class="lbl">Type</span></button>
+    <button title="Layout"><i data-lucide="layout-grid"></i><span class="lbl">Layout</span></button>
+    <button title="Components"><i data-lucide="component"></i><span class="lbl">Parts</span></button>
+    <div class="sep"></div>
+    <button title="Pages"><i data-lucide="files"></i><span class="lbl">Pages</span></button>
+    <button title="Nav &amp; footer"><i data-lucide="menu"></i><span class="lbl">Nav</span></button>
+    <button title="Code"><i data-lucide="code-2"></i><span class="lbl">Code</span></button>
+    <div style="flex: 1;"></div>
+    <button title="Reset"><i data-lucide="rotate-ccw"></i><span class="lbl">Reset</span></button>
+  </div>
+
+  <aside class="inspector">
+
+    <div class="insp-head">
+      <span class="eyebrow">Studio — theme</span>
+      <h2>Make it <em>yours</em>.</h2>
+      <p>Every change previews to the right, live. Nothing publishes until you say so.</p>
+    </div>
+
+    <div class="insp-body">
+
+      <div class="insp-section">
+        <div class="head"><h3>Palette</h3><span class="reset">Reset</span></div>
+        <div class="sw-list">
+          <div class="palette-row on">
+            <div class="strip"><span style="background: #F5F2EA;"></span><span style="background: #0E1A14;"></span><span style="background: #10B981;"></span><span style="background: #A78BFA;"></span></div>
+            <span class="nm">Vital</span>
+            <div class="ck"><i data-lucide="check"></i></div>
+          </div>
+          <div class="palette-row">
+            <div class="strip"><span style="background: #FFFFFF;"></span><span style="background: #0A0A0A;"></span><span style="background: #4F46E5;"></span><span style="background: #E5E7EB;"></span></div>
+            <span class="nm">Studio</span>
+            <div class="ck"><i data-lucide="check"></i></div>
+          </div>
+          <div class="palette-row">
+            <div class="strip"><span style="background: #FEF7E6;"></span><span style="background: #1A1A1A;"></span><span style="background: #DC2626;"></span><span style="background: #F59E0B;"></span></div>
+            <span class="nm">Ember</span>
+            <div class="ck"><i data-lucide="check"></i></div>
+          </div>
+          <div class="palette-row">
+            <div class="strip"><span style="background: #F0F0F0;"></span><span style="background: #1E3A8A;"></span><span style="background: #06B6D4;"></span><span style="background: #FBBF24;"></span></div>
+            <span class="nm">Atlas</span>
+            <div class="ck"><i data-lucide="check"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="insp-section">
+        <div class="head"><h3>Accent</h3></div>
+        <div class="swatch-grid">
+          <div class="sw on" style="background: #10B981;"></div>
+          <div class="sw" style="background: #A78BFA;"></div>
+          <div class="sw" style="background: #F59E0B;"></div>
+          <div class="sw" style="background: #DC2626;"></div>
+          <div class="sw" style="background: #06B6D4;"></div>
+          <div class="sw" style="background: #EC4899;"></div>
+        </div>
+      </div>
+
+      <div class="insp-section">
+        <div class="head"><h3>Display font</h3></div>
+        <div class="font-list">
+          <div class="font-row on">
+            <span class="sample">Archivo Black</span>
+            <span class="name">800</span>
+            <div class="ck"><i data-lucide="check"></i></div>
+          </div>
+          <div class="font-row">
+            <span class="sample" style="font-family: 'Geist'; font-weight: 700;">Geist Bold</span>
+            <span class="name">700</span>
+            <div class="ck"><i data-lucide="check"></i></div>
+          </div>
+          <div class="font-row">
+            <span class="sample serif">Instrument Serif</span>
+            <span class="name">italic</span>
+            <div class="ck"><i data-lucide="check"></i></div>
+          </div>
+          <div class="font-row">
+            <span class="sample" style="font-family: 'Geist Mono'; font-weight: 500;">Geist Mono</span>
+            <span class="name">mono</span>
+            <div class="ck"><i data-lucide="check"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="insp-section">
+        <div class="head"><h3>Scale</h3></div>
+        <div class="slider-row">
+          <div class="label-row"><span class="l">Heading size</span><span class="v">72px</span></div>
+          <div class="slider"><div class="fill" style="width: 72%;"></div><div class="thumb" style="left: 72%;"></div></div>
+        </div>
+        <div class="slider-row" style="margin-top: 16px;">
+          <div class="label-row"><span class="l">Corner radius</span><span class="v">12px</span></div>
+          <div class="slider"><div class="fill" style="width: 30%;"></div><div class="thumb" style="left: 30%;"></div></div>
+        </div>
+        <div class="slider-row" style="margin-top: 16px;">
+          <div class="label-row"><span class="l">Section spacing</span><span class="v">96px</span></div>
+          <div class="slider"><div class="fill" style="width: 60%;"></div><div class="thumb" style="left: 60%;"></div></div>
+        </div>
+      </div>
+
+      <div class="insp-section">
+        <div class="head"><h3>Effects</h3></div>
+        <div class="toggle-row"><span>Organic gradients</span><span class="t"></span></div>
+        <div class="toggle-row"><span>Italic serif accents</span><span class="t"></span></div>
+        <div class="toggle-row"><span>Hover lift on cards</span><span class="t"></span></div>
+        <div class="toggle-row"><span>Cursor glow on hero</span><span class="t off"></span></div>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- ─── PREVIEW ─── -->
+  <div class="preview-wrap">
+
+    <div class="preview-meta">
+      <div class="url"><i data-lucide="globe"></i>brickmortar.co</div>
+      <div class="zoom-row">
+        <button class="icon-btn-top" style="background: var(--forest-2); border: 1px solid var(--forest-border); border-radius: var(--r-sm); width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--fg-on-forest-muted);"><i data-lucide="minus" style="width: 13px; height: 13px;"></i></button>
+        <span class="pct">100%</span>
+        <button class="icon-btn-top" style="background: var(--forest-2); border: 1px solid var(--forest-border); border-radius: var(--r-sm); width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--fg-on-forest-muted);"><i data-lucide="plus" style="width: 13px; height: 13px;"></i></button>
+        <button style="background: var(--forest-2); border: 1px solid var(--forest-border); border-radius: var(--r-sm); padding: 4px 10px; cursor: pointer; color: var(--fg-on-forest-muted); font-size: var(--t-xs); display: inline-flex; align-items: center; gap: 4px;"><i data-lucide="external-link" style="width: 12px; height: 12px;"></i>Open in new tab</button>
+      </div>
+    </div>
+
+    <div class="preview-frame">
+
+      <div class="site-nav">
+        <div class="br brand-name">Brick &amp; <em>Mortar</em></div>
+        <div class="links">
+          <span>Shop</span>
+          <span>Subscribe</span>
+          <span>Journal</span>
+          <span>Visit</span>
+        </div>
+        <a class="ord-cta">Order online<i data-lucide="arrow-right" style="width: 12px; height: 12px;"></i></a>
+      </div>
+
+      <div class="site-hero">
+        <div>
+          <span class="eyebrow">Roastery · est. 2019</span>
+          <h1>Beans we'd<br>actually <em>drink</em>.</h1>
+        </div>
+        <div class="img"></div>
+      </div>
+
+      <div class="site-products">
+        <div class="head">
+          <h2>This week's <em>roast</em>.</h2>
+          <a href="#">All beans →</a>
+        </div>
+        <div class="prod-grid">
+          <div class="prod">
+            <div class="img"></div>
+            <div>
+              <div class="name">La Esperanza · 250g</div>
+              <div class="price">$22.00</div>
+            </div>
+          </div>
+          <div class="prod lv">
+            <div class="img"></div>
+            <div>
+              <div class="name">Sidamo Hambela · 250g</div>
+              <div class="price">$24.00</div>
+            </div>
+          </div>
+          <div class="prod">
+            <div class="img"></div>
+            <div>
+              <div class="name">Weekly subscription</div>
+              <div class="price">$18.00 · per month</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

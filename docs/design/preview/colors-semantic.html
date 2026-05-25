@@ -1,0 +1,42 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>Accents &amp; semantic</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<link rel="stylesheet" href="_card.css">
+<style>
+  body { padding: 24px; }
+  .row { gap: 10px; }
+  .sw { flex: 1; height: 110px; border-radius: var(--r-md); padding: 12px; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid transparent; }
+  .sw .lbl { font-family: var(--font-mono); font-size: 10px; opacity: 0.85; }
+  .sw .name { font-family: var(--font-display); font-weight: 700; font-size: 18px; letter-spacing: -0.02em; line-height: 1; }
+  .sw .hex  { font-family: var(--font-mono); font-size: 10px; opacity: 0.7; }
+</style></head><body>
+  <span class="eyebrow" style="display: block; margin-bottom: 14px;">Accents — Emerald primary, Lavender secondary</span>
+  <div class="row" style="margin-bottom: 10px;">
+    <div class="sw" style="background: var(--emerald); color: var(--emerald-ink);">
+      <div class="lbl">--emerald · primary actions</div>
+      <div><div class="name">Emerald</div><div class="hex">#10B981</div></div>
+    </div>
+    <div class="sw" style="background: var(--emerald-bright); color: var(--emerald-ink);">
+      <div class="lbl">--emerald-bright · on-dark</div>
+      <div><div class="name">Bright</div><div class="hex">#34D399</div></div>
+    </div>
+    <div class="sw" style="background: var(--emerald-soft); color: var(--emerald-deep);">
+      <div class="lbl">--emerald-soft · tints</div>
+      <div><div class="name">Soft</div><div class="hex">#D1FAE5</div></div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="sw" style="background: var(--lavender); color: var(--ink);">
+      <div class="lbl">--lavender · data viz, tags</div>
+      <div><div class="name">Lavender</div><div class="hex">#A78BFA</div></div>
+    </div>
+    <div class="sw" style="background: var(--lavender-soft); color: var(--lavender-deep);">
+      <div class="lbl">--lavender-soft</div>
+      <div><div class="name">Soft</div><div class="hex">#EDE9FE</div></div>
+    </div>
+    <div class="sw" style="background: var(--danger-soft); color: var(--danger);">
+      <div class="lbl">--danger · destructive</div>
+      <div><div class="name">Flag</div><div class="hex">#DC2626</div></div>
+    </div>
+  </div>
+</body></html>

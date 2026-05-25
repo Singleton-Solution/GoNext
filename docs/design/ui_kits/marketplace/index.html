@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>GoNext — Marketplace</title>
+<link rel="stylesheet" href="../../colors_and_type.css">
+<link rel="icon" href="../../assets/favicon.svg">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  body { background: var(--paper); }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 0 32px; }
+
+  /* nav */
+  nav.top { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; border-bottom: 1px solid var(--border); }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+  .brand img { width: 28px; height: 28px; }
+  .brand .wm-go { font-family: var(--font-display); font-weight: 800; font-size: 19px; letter-spacing: -0.03em; color: var(--ink); }
+  .brand .wm-next { font-family: var(--font-serif); font-weight: 400; font-style: italic; font-size: 21px; color: var(--ink); margin-left: 1px; }
+  .breadcrumb { font-size: var(--t-sm); color: var(--fg-subtle); margin-left: 24px; }
+  .breadcrumb .here { color: var(--ink); font-weight: 500; }
+  .nav-cta { display: flex; gap: 10px; }
+
+  /* hero */
+  .hero { padding: 64px 0 48px; }
+  .hero-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 60px; }
+  .hero h1 {
+    font-family: var(--font-display); font-weight: 800;
+    font-size: clamp(56px, 7vw, 80px);
+    line-height: 0.92; letter-spacing: -0.03em;
+    color: var(--ink); margin-top: 16px;
+  }
+  .hero h1 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-deep); }
+  .hero .right { display: flex; flex-direction: column; align-items: flex-end; gap: 14px; }
+  .search-big {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px;
+    background: var(--paper-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    width: 380px;
+    transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+  }
+  .search-big:focus-within { background: var(--paper); border-color: var(--emerald); box-shadow: var(--sh-focus); }
+  .search-big input { flex: 1; border: none; outline: none; background: transparent; font: inherit; font-size: var(--t-sm); }
+  .search-big i { width: 16px; height: 16px; color: var(--fg-subtle); }
+  .hero .note { font-size: var(--t-xs); color: var(--fg-subtle); }
+  .hero .note em { font-family: var(--font-serif); font-style: italic; color: var(--emerald-deep); }
+
+  /* filter bar */
+  .filterbar { padding: 18px 0; border-bottom: 1px solid var(--border); }
+  .filterbar-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pill { padding: 6px 14px; background: var(--paper-2); border: 1px solid var(--border); border-radius: var(--r-pill); font-size: var(--t-xs); font-weight: 500; color: var(--fg-muted); cursor: pointer; transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+  .pill:hover { background: var(--paper-3); color: var(--ink); }
+  .pill.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .sort { display: flex; align-items: center; gap: 8px; font-size: var(--t-xs); color: var(--fg-subtle); }
+  .sort select { font: inherit; font-size: var(--t-xs); background: var(--paper-2); border: 1px solid var(--border); padding: 6px 10px; border-radius: var(--r-md); color: var(--ink); }
+
+  /* body grid */
+  .body { display: grid; grid-template-columns: 220px 1fr; gap: 40px; padding: 36px 0 96px; }
+
+  /* sidebar */
+  .side .group { margin-bottom: 28px; }
+  .side h5 { font-size: var(--t-xs); font-weight: 600; color: var(--ink); margin: 0 0 10px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .side a { display: flex; justify-content: space-between; padding: 5px 0; font-size: var(--t-sm); color: var(--fg-muted); text-decoration: none; }
+  .side a:hover { color: var(--ink); }
+  .side a .n { font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-faint); }
+  .side a.on { color: var(--ink); font-weight: 500; }
+  .side a.on::before { content: '› '; color: var(--emerald-deep); }
+
+  /* grid */
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+
+  .card-ext {
+    background: var(--paper-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    display: flex; flex-direction: column;
+    text-decoration: none; color: var(--ink);
+    transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+    overflow: hidden;
+  }
+  .card-ext:hover { transform: translateY(-2px); border-color: var(--border-strong); box-shadow: var(--sh-md); }
+  .card-ext .thumb { aspect-ratio: 16/9; border-bottom: 1px solid var(--border); position: relative; overflow: hidden; }
+  .card-ext .thumb .badge { position: absolute; top: 10px; right: 10px; z-index: 1; }
+  .card-ext .body { padding: 16px 18px 18px; flex: 1; display: flex; flex-direction: column; gap: 10px; }
+  .card-ext .head-row { display: flex; align-items: center; gap: 12px; }
+  .card-ext .icon { width: 36px; height: 36px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--paper); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .card-ext h3 { font-family: var(--font-sans); font-weight: 600; font-size: var(--t-lg); letter-spacing: -0.005em; line-height: 1.2; }
+  .card-ext .by { font-size: var(--t-xs); color: var(--fg-subtle); margin-top: 2px; }
+  .card-ext .desc { font-size: var(--t-sm); line-height: 1.5; color: var(--fg-muted); flex: 1; }
+  .card-ext .foot { display: flex; justify-content: space-between; align-items: center; padding-top: 12px; border-top: 1px solid var(--border); }
+  .card-ext .price { font-family: var(--font-display); font-weight: 700; font-size: var(--t-md); letter-spacing: -0.02em; color: var(--ink); }
+  .card-ext .free { color: var(--emerald-deep); }
+  .card-ext .stars { font-size: var(--t-xs); color: var(--fg-subtle); display: flex; align-items: center; gap: 4px; }
+  .card-ext .stars i { width: 11px; height: 11px; color: var(--warning); fill: var(--warning); }
+
+  /* thumb styles */
+  .thumb-forest { background: var(--forest); position: relative; overflow: hidden; }
+  .thumb-forest::after { content: ''; position: absolute; inset: 0; background-image: radial-gradient(circle at 30% 40%, rgba(52, 211, 153, 0.35) 0%, transparent 50%), radial-gradient(circle at 80% 70%, rgba(167, 139, 250, 0.25) 0%, transparent 50%); }
+  .thumb-forest .glyph { position: absolute; bottom: 14px; left: 16px; font-family: var(--font-display); font-weight: 800; font-size: 36px; color: var(--fg-on-forest); letter-spacing: -0.025em; line-height: 1; z-index: 1; }
+  .thumb-forest .glyph em { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--emerald-bright); }
+
+  .thumb-paper { background: var(--paper-3); display: flex; align-items: center; justify-content: center; position: relative; }
+  .thumb-paper .preview-card { background: var(--paper); border: 1px solid var(--border); padding: 8px 16px; font-family: var(--font-display); font-weight: 800; font-size: 22px; letter-spacing: -0.025em; transform: rotate(-2deg); box-shadow: var(--sh-md); border-radius: var(--r-sm); }
+  .thumb-paper .preview-card em { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--emerald-deep); }
+
+  .thumb-emerald { background: var(--emerald-soft); display: flex; align-items: center; justify-content: center; }
+  .thumb-emerald .glyph { font-family: var(--font-display); font-weight: 800; font-size: 80px; color: var(--emerald-deep); letter-spacing: -0.04em; line-height: 1; }
+
+  .thumb-lavender { background: var(--lavender-soft); display: flex; align-items: center; justify-content: center; }
+  .thumb-lavender .glyph { font-family: var(--font-display); font-weight: 800; font-size: 64px; color: var(--lavender-deep); letter-spacing: -0.04em; line-height: 1; }
+  .thumb-lavender .glyph em { font-family: var(--font-serif); font-style: italic; font-weight: 400; }
+
+  .thumb-mono { background: var(--ink); color: var(--emerald-bright); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 13px; padding: 18px; line-height: 1.6; text-align: left; }
+  .thumb-mono .c { color: var(--fg-faint); }
+
+  .thumb-grid { background: var(--paper-2); background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <nav class="top">
+    <div style="display: flex; align-items: center;">
+      <a class="brand" href="../marketing/index.html">
+        <img src="../../assets/logo-mark.svg" alt="">
+        <span class="wm-go">Go</span><span class="wm-next">Next</span>
+      </a>
+      <div class="breadcrumb"><span>GoNext</span> &nbsp;/&nbsp; <span class="here">Marketplace</span></div>
+    </div>
+    <div class="nav-cta">
+      <a class="btn btn--ghost btn--sm" href="#">Submit an extension</a>
+      <a class="btn btn--sm" href="#">My library</a>
+    </div>
+  </nav>
+</div>
+
+<div class="hero">
+  <div class="wrap hero-row">
+    <div>
+      <span class="eyebrow">Marketplace — themes &amp; extensions</span>
+      <h1>Built by people<br>who <em>ship</em>.</h1>
+    </div>
+    <div class="right">
+      <div class="search-big">
+        <i data-lucide="search"></i>
+        <input placeholder="Search 1,240+ themes &amp; extensions">
+        <span class="kbd">⌘K</span>
+      </div>
+      <span class="note">All extensions are sandboxed · <em>no PHP, ever</em></span>
+    </div>
+  </div>
+</div>
+
+<div class="filterbar">
+  <div class="wrap filterbar-row">
+    <div class="pills">
+      <span class="pill on">All · 1,240</span>
+      <span class="pill">Themes · 312</span>
+      <span class="pill">SEO</span>
+      <span class="pill">Commerce</span>
+      <span class="pill">Analytics</span>
+      <span class="pill">Integrations</span>
+      <span class="pill">Forms</span>
+      <span class="pill">Performance</span>
+    </div>
+    <div class="sort">
+      <span>Sort by</span>
+      <select><option>Most installed</option><option>Newest</option><option>Top rated</option></select>
+    </div>
+  </div>
+</div>
+
+<div class="wrap body">
+
+  <aside class="side">
+    <div class="group">
+      <h5>Type</h5>
+      <a class="on" href="#">All<span class="n">1,240</span></a>
+      <a href="#">Themes<span class="n">312</span></a>
+      <a href="#">Extensions<span class="n">928</span></a>
+    </div>
+    <div class="group">
+      <h5>Price</h5>
+      <a href="#">Free<span class="n">468</span></a>
+      <a href="#">Paid<span class="n">772</span></a>
+      <a href="#">Subscription<span class="n">204</span></a>
+    </div>
+    <div class="group">
+      <h5>Compatibility</h5>
+      <a href="#">v1.0+<span class="n">1,240</span></a>
+      <a href="#">Commerce<span class="n">412</span></a>
+      <a href="#">Multilingual<span class="n">88</span></a>
+    </div>
+    <div class="group">
+      <h5>Author</h5>
+      <a href="#">By GoNext<span class="n">42</span></a>
+      <a href="#">Verified<span class="n">214</span></a>
+      <a href="#">Community<span class="n">984</span></a>
+    </div>
+  </aside>
+
+  <section>
+    <div class="grid">
+
+      <a class="card-ext" href="#">
+        <div class="thumb thumb-forest">
+          <span class="tag tag--emerald badge">Featured</span>
+          <div class="glyph">Single-<em>origin</em>.</div>
+        </div>
+        <div class="body">
+          <div class="head-row">
+            <div class="icon"><i data-lucide="newspaper" style="width: 18px; height: 18px; color: var(--fg-muted);"></i></div>
+            <div><h3>Broadsheet</h3><div class="by">By GoNext · Theme</div></div>
+          </div>
+          <p class="desc">An editorial-first theme for long-form publishers. Magazine grids, photo essays, paywall-ready.</p>
+          <div class="foot"><span class="price free">Free</span><span class="stars"><i data-lucide="star"></i>4.9 · 12k installs</span></div>
+        </div>
+      </a>
+
+      <a class="card-ext" href="#">
+        <div class="thumb thumb-paper">
+          <div class="preview-card">Brick &amp; <em>Mortar</em>.</div>
+        </div>
+        <div class="body">
+          <div class="head-row">
+            <div class="icon"><i data-lucide="coffee" style="width: 18px; height: 18px; color: var(--fg-muted);"></i></div>
+            <div><h3>Brick &amp; Mortar</h3><div class="by">By Ortho Type · Theme</div></div>
+          </div>
+          <p class="desc">Local-business theme. Hours, map, menu, online ordering — works out of the box.</p>
+          <div class="foot"><span class="price">$29</span><span class="stars"><i data-lucide="star"></i>4.7 · 940</span></div>
+        </div>
+      </a>
+
+      <a class="card-ext" href="#">
+        <div class="thumb thumb-emerald">
+          <span class="tag tag--ink badge">Verified</span>
+          <div class="glyph">›</div>
+        </div>
+        <div class="body">
+          <div class="head-row">
+            <div class="icon"><i data-lucide="zap" style="width: 18px; height: 18px; color: var(--fg-muted);"></i></div>
+            <div><h3>Edge Cache+</h3><div class="by">By GoNext · Performance</div></div>
+          </div>
+          <p class="desc">Aggressive edge caching with per-route invalidation. Sub-20ms TTFB on 24 regions.</p>
+          <div class="foot"><span class="price free">Free</span><span class="stars"><i data-lucide="star"></i>4.9 · 28k</span></div>
+        </div>
+      </a>
+
+      <a class="card-ext" href="#">
+        <div class="thumb thumb-mono">
+          <div><span class="c">$</span> gonext seo audit<br><span style="color: var(--emerald-bright);">✓</span> 142 pages indexed<br><span style="color: var(--warning);">⚠</span> 3 missing meta</div>
+        </div>
+        <div class="body">
+          <div class="head-row">
+            <div class="icon"><i data-lucide="search-check" style="width: 18px; height: 18px; color: var(--fg-muted);"></i></div>
+            <div><h3>SEO Inspector</h3><div class="by">By Cobalt Labs · SEO</div></div>
+          </div>
+          <p class="desc">CLI + dashboard SEO auditing. Flags missing meta, broken canonicals, slow LCP routes.</p>
+          <div class="foot"><span class="price">$12<span style="font-family: var(--font-sans); font-size: 11px; color: var(--fg-subtle); font-weight: 400;">/mo</span></span><span class="stars"><i data-lucide="star"></i>4.6 · 1.8k</span></div>
+        </div>
+      </a>
+
+      <a class="card-ext" href="#">
+        <div class="thumb thumb-lavender">
+          <div class="glyph"><em>Forms</em></div>
+        </div>
+        <div class="body">
+          <div class="head-row">
+            <div class="icon"><i data-lucide="text-cursor-input" style="width: 18px; height: 18px; color: var(--fg-muted);"></i></div>
+            <div><h3>Forms.next</h3><div class="by">By GoNext · Forms</div></div>
+          </div>
+          <p class="desc">Drag-to-build forms with spam protection, Stripe, and webhook delivery. Type-safe submissions.</p>
+          <div class="foot"><span class="price free">Free</span><span class="stars"><i data-lucide="star"></i>4.8 · 18k</span></div>
+        </div>
+      </a>
+
+      <a class="card-ext" href="#">
+        <div class="thumb thumb-forest">
+          <div class="glyph">$$$</div>
+        </div>
+        <div class="body">
+          <div class="head-row">
+            <div class="icon"><i data-lucide="credit-card" style="width: 18px; height: 18px; color: var(--fg-muted);"></i></div>
+            <div><h3>Stripe Checkout Pro</h3><div class="by">By Stripe · Commerce</div></div>
+          </div>
+          <p class="desc">Hosted checkout with subscriptions, taxes, and Apple Pay. Replaces the default flow.</p>
+          <div class="foot"><span class="price free">Free</span><span class="stars"><i data-lucide="star"></i>4.9 · 9.4k</span></div>
+        </div>
+      </a>
+
+      <a class="card-ext" href="#">
+        <div class="thumb thumb-emerald">
+          <div class="glyph">42</div>
+        </div>
+        <div class="body">
+          <div class="head-row">
+            <div class="icon"><i data-lucide="bar-chart-3" style="width: 18px; height: 18px; color: var(--fg-muted);"></i></div>
+            <div><h3>Plain Analytics</h3><div class="by">By Quiet Co. · Analytics</div></div>
+          </div>
+          <p class="desc">Cookieless analytics, 1KB script, real-time dashboard. Works without a banner.</p>
+          <div class="foot"><span class="price">$8<span style="font-family: var(--font-sans); font-size: 11px; color: var(--fg-subtle); font-weight: 400;">/mo</span></span><span class="stars"><i data-lucide="star"></i>4.8 · 2.4k</span></div>
+        </div>
+      </a>
+
+      <a class="card-ext" href="#">
+        <div class="thumb thumb-grid"></div>
+        <div class="body">
+          <div class="head-row">
+            <div class="icon"><i data-lucide="languages" style="width: 18px; height: 18px; color: var(--fg-muted);"></i></div>
+            <div><h3>Polyglot</h3><div class="by">By Riemann Type · Integrations</div></div>
+          </div>
+          <p class="desc">Translate posts, pages, and products across 40 locales. Editor-side, no API key.</p>
+          <div class="foot"><span class="price">$19<span style="font-family: var(--font-sans); font-size: 11px; color: var(--fg-subtle); font-weight: 400;">/mo</span></span><span class="stars"><i data-lucide="star"></i>4.5 · 612</span></div>
+        </div>
+      </a>
+
+      <a class="card-ext" href="#">
+        <div class="thumb thumb-lavender">
+          <div class="glyph">A/<em>B</em></div>
+        </div>
+        <div class="body">
+          <div class="head-row">
+            <div class="icon"><i data-lucide="split" style="width: 18px; height: 18px; color: var(--fg-muted);"></i></div>
+            <div><h3>Split Lab</h3><div class="by">By Quiet Co. · Analytics</div></div>
+          </div>
+          <p class="desc">A/B test posts, headlines, and product layouts. Statistical confidence baked in.</p>
+          <div class="foot"><span class="price">$24<span style="font-family: var(--font-sans); font-size: 11px; color: var(--fg-subtle); font-weight: 400;">/mo</span></span><span class="stars"><i data-lucide="star"></i>4.7 · 480</span></div>
+        </div>
+      </a>
+
+    </div>
+  </section>
+</div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

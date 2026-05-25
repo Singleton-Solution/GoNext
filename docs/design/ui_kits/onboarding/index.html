@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>GoNext — Welcome</title>
+<link rel="stylesheet" href="../../colors_and_type.css">
+<link rel="icon" href="../../assets/favicon.svg">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  body { background: var(--paper); min-height: 100vh; display: flex; flex-direction: column; position: relative; overflow-x: hidden; }
+  body::before { content: ''; position: fixed; top: -30%; right: -10%; width: 800px; height: 800px; background: radial-gradient(circle, rgba(16, 185, 129, 0.10) 0%, transparent 60%); pointer-events: none; z-index: 0; }
+  body::after { content: ''; position: fixed; bottom: -30%; left: -10%; width: 700px; height: 700px; background: radial-gradient(circle, rgba(167, 139, 250, 0.08) 0%, transparent 60%); pointer-events: none; z-index: 0; }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 32px; width: 100%; position: relative; z-index: 1; }
+
+  /* ─── TOP STRIP ─── */
+  .topstrip { padding: 22px 0; border-bottom: 1px solid var(--border); }
+  .topstrip-row { display: flex; align-items: center; justify-content: space-between; gap: 32px; }
+  .brand-row { display: flex; align-items: center; gap: 9px; }
+  .brand-row img { width: 28px; height: 28px; }
+  .brand-row .wm-go { font-family: var(--font-display); font-weight: 800; font-size: 19px; letter-spacing: -0.03em; color: var(--ink); }
+  .brand-row .wm-next { font-family: var(--font-serif); font-weight: 400; font-style: italic; font-size: 21px; color: var(--ink); margin-left: 1px; }
+
+  .steps { display: flex; align-items: center; gap: 0; flex: 1; max-width: 560px; }
+  .step { display: flex; align-items: center; gap: 8px; font-size: var(--t-sm); flex: 1; position: relative; }
+  .step + .step::before { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .step .num { width: 22px; height: 22px; border-radius: 999px; background: var(--paper-3); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 10px; font-weight: 500; color: var(--fg-muted); flex-shrink: 0; }
+  .step .lbl { color: var(--fg-muted); font-weight: 500; }
+  .step.done .num { background: var(--emerald); color: var(--emerald-ink); border-color: var(--emerald); }
+  .step.done .num::after { content: ''; }
+  .step.done .lbl { color: var(--fg-muted); }
+  .step.done .num i { width: 11px; height: 11px; }
+  .step.active .num { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .step.active .lbl { color: var(--ink); }
+  .step:first-child::before { display: none; }
+  .step .container { display: flex; align-items: center; gap: 8px; padding: 0 8px; }
+
+  .skip { font-size: var(--t-sm); color: var(--fg-subtle); text-decoration: none; }
+  .skip:hover { color: var(--ink); }
+
+  /* ─── CONTENT ─── */
+  .content { flex: 1; padding: 56px 0 64px; }
+
+  .head { text-align: center; margin-bottom: 48px; }
+  .head .eyebrow { display: block; margin-bottom: 14px; }
+  .head h1 {
+    font-family: var(--font-display); font-weight: 800;
+    font-size: clamp(48px, 6vw, 80px);
+    line-height: 0.95; letter-spacing: var(--track-tight);
+    color: var(--ink);
+  }
+  .head h1 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-deep); font-size: 1.05em; }
+  .head p { font-size: var(--t-lg); color: var(--fg-muted); margin-top: 20px; max-width: 560px; margin-left: auto; margin-right: auto; line-height: 1.5; }
+
+  /* ─── PICKER CARDS ─── */
+  .picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 48px; }
+  .pick {
+    background: var(--paper-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 22px;
+    cursor: pointer;
+    display: flex; flex-direction: column; gap: 12px;
+    transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease);
+    position: relative;
+    text-decoration: none; color: var(--ink);
+  }
+  .pick:hover { border-color: var(--border-strong); transform: translateY(-2px); box-shadow: var(--sh-md); }
+  .pick.selected { border-color: var(--ink); background: var(--paper-2); box-shadow: 0 0 0 1px var(--ink), var(--sh-md); }
+  .pick.selected::after {
+    content: ''; position: absolute; top: 14px; right: 14px;
+    width: 22px; height: 22px; border-radius: 999px;
+    background: var(--emerald);
+    background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5 13l4 4L19 7' stroke='%23022C22' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-position: center; background-repeat: no-repeat;
+  }
+  .pick .visual {
+    aspect-ratio: 16/10;
+    border-radius: var(--r-md);
+    position: relative; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  /* visual variants */
+  .v-editorial { background: var(--paper); padding: 14px; display: flex; flex-direction: column; gap: 4px; }
+  .v-editorial .eb { font-size: 8px; color: var(--emerald-deep); font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; }
+  .v-editorial .hd { font-family: var(--font-display); font-weight: 800; font-size: 18px; line-height: 0.95; letter-spacing: -0.025em; color: var(--ink); }
+  .v-editorial .hd em { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--emerald-deep); }
+  .v-editorial .line { height: 4px; background: var(--paper-3); border-radius: 1px; margin-top: 6px; }
+  .v-editorial .line.s { width: 60%; }
+
+  .v-shop { background: var(--paper); display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 10px; }
+  .v-shop .prod { background: var(--paper-2); border: 1px solid var(--border); border-radius: 3px; padding: 5px; display: flex; flex-direction: column; gap: 2px; }
+  .v-shop .prod .img { background: var(--forest); height: 28px; border-radius: 2px; position: relative; overflow: hidden; }
+  .v-shop .prod .img::after { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 60% 50%, rgba(52, 211, 153, 0.4) 0%, transparent 60%); }
+  .v-shop .prod.lv .img::after { background: radial-gradient(circle at 60% 50%, rgba(167, 139, 250, 0.5) 0%, transparent 60%); }
+  .v-shop .prod .n { font-size: 7px; font-weight: 600; }
+  .v-shop .prod .p { font-family: var(--font-mono); font-size: 6px; color: var(--fg-muted); }
+
+  .v-portfolio { background: var(--emerald-soft); padding: 14px; }
+  .v-portfolio .name { font-family: var(--font-display); font-weight: 800; font-size: 18px; letter-spacing: -0.025em; color: var(--forest); line-height: 1; }
+  .v-portfolio .name em { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--emerald-deep); }
+  .v-portfolio .role { font-size: 7px; color: var(--emerald-deep); letter-spacing: 0.14em; text-transform: uppercase; margin-top: 6px; font-weight: 500; }
+  .v-portfolio .list { margin-top: 8px; font-size: 7px; line-height: 1.6; color: var(--forest); }
+
+  .v-landing { background: var(--forest); padding: 14px; position: relative; overflow: hidden; }
+  .v-landing::after { content: ''; position: absolute; top: -50%; right: -20%; width: 200px; height: 200px; background: radial-gradient(circle, rgba(16, 185, 129, 0.30) 0%, transparent 60%); }
+  .v-landing .hd { position: relative; font-family: var(--font-display); font-weight: 800; font-size: 18px; line-height: 1; letter-spacing: -0.025em; color: var(--fg-on-forest); }
+  .v-landing .hd em { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--emerald-bright); }
+  .v-landing .sub { position: relative; font-size: 7px; color: var(--fg-on-forest-muted); margin: 5px 0; }
+  .v-landing .cta { position: relative; background: var(--emerald); color: var(--emerald-ink); padding: 3px 8px; border-radius: 3px; font-size: 7px; display: inline-block; margin-top: 4px; }
+
+  .v-docs { background: var(--paper); display: grid; grid-template-columns: 60px 1fr; height: 100%; }
+  .v-docs .nav { background: var(--paper-2); border-right: 1px solid var(--border); padding: 8px 6px; display: flex; flex-direction: column; gap: 3px; }
+  .v-docs .nav .it { padding: 3px 4px; font-size: 6px; color: var(--fg-muted); border-radius: 2px; }
+  .v-docs .nav .it.on { background: var(--ink); color: var(--paper); }
+  .v-docs .doc { padding: 8px 10px; }
+  .v-docs .h { font-family: var(--font-display); font-weight: 800; font-size: 14px; letter-spacing: -0.025em; }
+  .v-docs .h em { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--emerald-deep); }
+  .v-docs p { font-size: 6px; color: var(--fg-muted); margin-top: 4px; line-height: 1.5; }
+
+  .v-restaurant { background: var(--paper); padding: 10px; }
+  .v-restaurant .top { display: flex; justify-content: space-between; font-size: 6px; color: var(--fg-subtle); letter-spacing: 0.1em; text-transform: uppercase; }
+  .v-restaurant .hd { font-family: var(--font-display); font-weight: 800; font-size: 15px; letter-spacing: -0.025em; margin-top: 4px; }
+  .v-restaurant .hd em { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--emerald-deep); }
+  .v-restaurant .it { display: flex; justify-content: space-between; font-size: 7px; margin-top: 4px; padding-bottom: 2px; border-bottom: 1px dotted var(--border); }
+
+  .pick .meta { display: flex; align-items: center; gap: 10px; }
+  .pick .ico { width: 32px; height: 32px; border-radius: var(--r-sm); background: var(--paper-3); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .pick .ico i { width: 15px; height: 15px; color: var(--fg-muted); }
+  .pick.selected .ico { background: var(--emerald-soft); border-color: transparent; }
+  .pick.selected .ico i { color: var(--emerald-deep); }
+  .pick h3 { font-family: var(--font-sans); font-weight: 600; font-size: var(--t-lg); }
+  .pick h3 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-deep); }
+  .pick p { font-size: var(--t-sm); color: var(--fg-muted); line-height: 1.5; }
+  .pick .footer { display: flex; justify-content: space-between; align-items: center; padding-top: 12px; border-top: 1px solid var(--border); margin-top: auto; }
+  .pick .footer .tags { display: flex; gap: 4px; }
+  .pick .footer .count { font-family: var(--font-mono); font-size: var(--t-2xs); color: var(--fg-subtle); }
+
+  /* ─── DETAIL CARD (selected) ─── */
+  .detail {
+    background: var(--paper-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 28px;
+    margin-bottom: 32px;
+    display: grid; grid-template-columns: 1fr 1.2fr; gap: 32px; align-items: center;
+  }
+  .detail .text .eyebrow { display: block; margin-bottom: 10px; }
+  .detail .text h2 { font-family: var(--font-display); font-weight: 800; font-size: 36px; letter-spacing: -0.025em; line-height: 1; }
+  .detail .text h2 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-deep); }
+  .detail .text p { font-size: var(--t-md); color: var(--fg-muted); line-height: 1.55; margin-top: 14px; }
+  .detail .text .extras { display: flex; gap: 18px; margin-top: 20px; }
+  .detail .text .extras .x { display: flex; align-items: center; gap: 8px; font-size: var(--t-sm); color: var(--ink); }
+  .detail .text .extras .x i { width: 15px; height: 15px; color: var(--emerald-deep); }
+
+  .detail .name-card {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 20px;
+  }
+  .detail .name-card .label { display: block; font-size: var(--t-xs); font-weight: 500; color: var(--ink); margin-bottom: 8px; }
+  .detail .name-card .url-input {
+    display: flex; align-items: center; padding: 0;
+    background: var(--paper); border: 1px solid var(--border); border-radius: var(--r-md);
+    overflow: hidden;
+  }
+  .detail .name-card .url-input:focus-within { border-color: var(--emerald); box-shadow: var(--sh-focus); }
+  .detail .name-card .url-input input { flex: 1; border: none; outline: none; padding: 10px 12px; font: inherit; font-size: var(--t-md); font-weight: 500; }
+  .detail .name-card .url-input .suffix { font-family: var(--font-mono); font-size: var(--t-sm); color: var(--fg-subtle); padding: 10px 12px; background: var(--paper-3); border-left: 1px solid var(--border); }
+  .detail .name-card .hint { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: var(--t-xs); color: var(--emerald-deep); }
+  .detail .name-card .hint i { width: 13px; height: 13px; }
+  .detail .name-card .domain { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border); font-size: var(--t-xs); color: var(--fg-subtle); }
+  .detail .name-card .domain a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; font-weight: 500; }
+
+  /* ─── ACTION BAR ─── */
+  .action-bar {
+    position: sticky; bottom: 0;
+    margin: 32px -32px -64px;
+    padding: 18px 32px;
+    background: rgba(245, 242, 234, 0.92); backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .action-bar .left { display: flex; align-items: center; gap: 8px; font-size: var(--t-sm); color: var(--fg-muted); }
+  .action-bar .left .check { width: 18px; height: 18px; border-radius: 999px; background: var(--emerald); display: flex; align-items: center; justify-content: center; color: var(--emerald-ink); }
+  .action-bar .left .check i { width: 11px; height: 11px; }
+  .action-bar .left em { font-family: var(--font-serif); font-style: italic; color: var(--emerald-deep); font-size: 1.05em; }
+  .action-bar .actions { display: flex; gap: 10px; }
+</style>
+</head>
+<body>
+
+<div class="wrap topstrip">
+  <div class="topstrip-row">
+    <div class="brand-row">
+      <img src="../../assets/logo-mark.svg" alt="">
+      <span class="wm-go">Go</span><span class="wm-next">Next</span>
+    </div>
+    <div class="steps">
+      <div class="step done">
+        <div class="container">
+          <span class="num"><i data-lucide="check"></i></span>
+          <span class="lbl">Account</span>
+        </div>
+      </div>
+      <div class="step active">
+        <div class="container">
+          <span class="num">02</span>
+          <span class="lbl">Set up your site</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="container">
+          <span class="num">03</span>
+          <span class="lbl">Customize</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="container">
+          <span class="num">04</span>
+          <span class="lbl">Publish</span>
+        </div>
+      </div>
+    </div>
+    <a class="skip" href="#">Skip for now →</a>
+  </div>
+</div>
+
+<div class="wrap content">
+
+  <div class="head">
+    <span class="eyebrow">Welcome, Mara — let's begin</span>
+    <h1>What are we<br>building <em>together</em>?</h1>
+    <p>Pick the shape of your site. We'll suggest a template, set up commerce if you need it, and have you writing in under two minutes.</p>
+  </div>
+
+  <div class="picker">
+
+    <a class="pick" href="#">
+      <div class="visual"><div class="v-editorial">
+        <span class="eb">// 02 — Sourcing</span>
+        <span class="hd">Single-<em>origin</em>.</span>
+        <span class="line"></span>
+        <span class="line s"></span>
+      </div></div>
+      <div class="meta">
+        <div class="ico"><i data-lucide="newspaper"></i></div>
+        <div><h3>Blog or <em>magazine</em></h3></div>
+      </div>
+      <p>Long-form writing, photo essays, paywalls. Built for publishers who treat their archive as a living thing.</p>
+      <div class="footer">
+        <div class="tags"><span class="tag">Editor</span><span class="tag">RSS</span></div>
+        <span class="count">42 templates</span>
+      </div>
+    </a>
+
+    <a class="pick selected" href="#">
+      <div class="visual"><div class="v-shop">
+        <div class="prod"><div class="img"></div><span class="n">Roaster v2</span><span class="p">$420</span></div>
+        <div class="prod lv"><div class="img"></div><span class="n">Grinder</span><span class="p">$180</span></div>
+        <div class="prod"><div class="img"></div><span class="n">Bag · 250g</span><span class="p">$22</span></div>
+        <div class="prod"><div class="img"></div><span class="n">Sub</span><span class="p">$18/mo</span></div>
+      </div></div>
+      <div class="meta">
+        <div class="ico"><i data-lucide="shopping-bag"></i></div>
+        <div><h3>Shop &amp; <em>storefront</em></h3></div>
+      </div>
+      <p>Sell products, subscriptions, or services. Stripe-powered checkout, inventory, taxes — built in, not a plugin.</p>
+      <div class="footer">
+        <div class="tags"><span class="tag tag--emerald">Commerce</span><span class="tag">Stripe</span></div>
+        <span class="count">38 templates</span>
+      </div>
+    </a>
+
+    <a class="pick" href="#">
+      <div class="visual"><div class="v-portfolio">
+        <div class="name">Jules<em>.</em></div>
+        <div class="role">Head Roaster · Bogotá</div>
+        <div class="list">01 — Field notes<br>02 — Cupping protocol<br>03 — Roast curves<br>04 — Contact</div>
+      </div></div>
+      <div class="meta">
+        <div class="ico"><i data-lucide="user-square"></i></div>
+        <div><h3>Personal <em>portfolio</em></h3></div>
+      </div>
+      <p>One-page or list-driven site. Type-led, work-first, perfect for writers, designers, and operators.</p>
+      <div class="footer">
+        <div class="tags"><span class="tag">Solo</span><span class="tag">Resume</span></div>
+        <span class="count">24 templates</span>
+      </div>
+    </a>
+
+    <a class="pick" href="#">
+      <div class="visual"><div class="v-landing">
+        <div class="hd">Ship <em>fast</em>.</div>
+        <div class="sub">All-in-one platform.</div>
+        <span class="cta">Start →</span>
+      </div></div>
+      <div class="meta">
+        <div class="ico"><i data-lucide="rocket"></i></div>
+        <div><h3>Product <em>launch</em></h3></div>
+      </div>
+      <p>SaaS, app, or campaign landing. Hero, pricing, FAQ, signup forms, A/B variants out of the box.</p>
+      <div class="footer">
+        <div class="tags"><span class="tag">SaaS</span><span class="tag">Forms</span></div>
+        <span class="count">31 templates</span>
+      </div>
+    </a>
+
+    <a class="pick" href="#">
+      <div class="visual"><div class="v-docs">
+        <div class="nav"><span class="it">Quickstart</span><span class="it on">Install</span><span class="it">CLI</span><span class="it">API</span></div>
+        <div class="doc"><div class="h">Install<em>.</em></div><p>Three ways to get up and running…</p></div>
+      </div></div>
+      <div class="meta">
+        <div class="ico"><i data-lucide="book-open"></i></div>
+        <div><h3>Docs &amp; <em>manual</em></h3></div>
+      </div>
+      <p>Technical documentation with sidebar nav, search, code blocks, and versioning. Markdown or MDX.</p>
+      <div class="footer">
+        <div class="tags"><span class="tag">MDX</span><span class="tag">Search</span></div>
+        <span class="count">18 templates</span>
+      </div>
+    </a>
+
+    <a class="pick" href="#">
+      <div class="visual"><div class="v-restaurant">
+        <div class="top"><span>Menu · Week 21</span><span>Open 8–4</span></div>
+        <div class="hd">Brick &amp; <em>Mortar</em>.</div>
+        <div class="it"><span>Flat white</span><span>$5</span></div>
+        <div class="it"><span>Cold brew</span><span>$6</span></div>
+      </div></div>
+      <div class="meta">
+        <div class="ico"><i data-lucide="map-pin"></i></div>
+        <div><h3>Local <em>business</em></h3></div>
+      </div>
+      <p>Café, studio, shop, gallery. Hours, location, menu, online ordering, weekly updates and events.</p>
+      <div class="footer">
+        <div class="tags"><span class="tag">Map</span><span class="tag">Menu</span></div>
+        <span class="count">12 templates</span>
+      </div>
+    </a>
+
+  </div>
+
+  <div class="detail">
+    <div class="text">
+      <span class="eyebrow">You picked Shop &amp; storefront</span>
+      <h2>Let's give your <em>shop</em> a name.</h2>
+      <p>This is what readers and customers see at the top of every page. You can change it any time.</p>
+      <div class="extras">
+        <span class="x"><i data-lucide="check-circle-2"></i>Free .gonext.app subdomain</span>
+        <span class="x"><i data-lucide="check-circle-2"></i>Custom domain in 90s</span>
+      </div>
+    </div>
+
+    <div class="name-card">
+      <span class="label">Site name</span>
+      <div class="url-input">
+        <input value="Brick &amp; Mortar Coffee" />
+        <span class="suffix">.gonext.app</span>
+      </div>
+      <div class="hint"><i data-lucide="check"></i>brick-and-mortar-coffee.gonext.app · available</div>
+      <div class="domain">
+        <i data-lucide="globe" style="width: 13px; height: 13px;"></i>
+        Have a domain already? <a href="#">Connect brickmortar.co →</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="action-bar">
+    <div class="left">
+      <span class="check"><i data-lucide="check"></i></span>
+      <span>Saved. We're spinning up <em>Counter</em> as a starting template — you can change it next.</span>
+    </div>
+    <div class="actions">
+      <button class="btn">← Back</button>
+      <button class="btn btn--primary btn--lg">Continue<i data-lucide="arrow-right" style="width: 14px; height: 14px;"></i></button>
+    </div>
+  </div>
+
+</div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

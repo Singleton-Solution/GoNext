@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>GoNext — Pulse · Brick &amp; Mortar Coffee</title>
+<link rel="stylesheet" href="../../colors_and_type.css">
+<link rel="icon" href="../../assets/favicon.svg">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  body {
+    background: var(--forest); color: var(--fg-on-forest);
+    display: flex; height: 100vh; overflow: hidden;
+    position: relative;
+  }
+  body::before {
+    content: ''; position: fixed; top: -20%; right: -10%;
+    width: 900px; height: 900px;
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.10) 0%, transparent 55%);
+    pointer-events: none; z-index: 0;
+  }
+  body::after {
+    content: ''; position: fixed; bottom: -30%; left: -10%;
+    width: 800px; height: 800px;
+    background: radial-gradient(circle, rgba(167, 139, 250, 0.08) 0%, transparent 55%);
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ───────────── SIDEBAR ───────────── */
+  aside.sidebar {
+    width: 240px; flex-shrink: 0; z-index: 1;
+    background: rgba(14, 26, 20, 0.6); backdrop-filter: blur(20px);
+    border-right: 1px solid var(--forest-border);
+    display: flex; flex-direction: column;
+  }
+  .org-switch { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--forest-border); cursor: pointer; }
+  .org-switch:hover { background: var(--forest-2); }
+  .org-switch .mark { width: 28px; height: 28px; border-radius: var(--r-sm); }
+  .org-switch .info { flex: 1; min-width: 0; }
+  .org-switch .org { font-size: var(--t-sm); font-weight: 600; color: var(--fg-on-forest); line-height: 1.3; }
+  .org-switch .plan { font-size: var(--t-2xs); color: var(--fg-on-forest-muted); display: flex; align-items: center; gap: 4px; margin-top: 1px; }
+  .org-switch .plan::before { content: ''; width: 5px; height: 5px; border-radius: 999px; background: var(--emerald-bright); }
+  .org-switch i { color: var(--fg-on-forest-muted); width: 14px; height: 14px; }
+
+  nav.side { padding: 12px 8px; flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 1px; }
+  nav.side .head { padding: 16px 10px 6px; font-size: var(--t-2xs); font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--fg-on-forest-muted); opacity: 0.6; }
+  nav.side a { display: flex; align-items: center; gap: 10px; padding: 7px 10px; font-size: var(--t-sm); color: var(--fg-on-forest-muted); text-decoration: none; border-radius: var(--r-sm); transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+  nav.side a:hover { background: var(--forest-2); color: var(--fg-on-forest); }
+  nav.side a.active { background: var(--forest-2); color: var(--fg-on-forest); font-weight: 500; box-shadow: inset 2px 0 0 var(--emerald-bright); }
+  nav.side a.active i { color: var(--emerald-bright); }
+  nav.side a i { width: 15px; height: 15px; opacity: 0.85; flex-shrink: 0; }
+  nav.side a .count { margin-left: auto; font-size: var(--t-2xs); opacity: 0.6; }
+  nav.side a .pulse-dot { margin-left: auto; width: 6px; height: 6px; border-radius: 999px; background: var(--emerald-bright); animation: pulse 2s var(--ease) infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .side-foot { padding: 10px 12px; border-top: 1px solid var(--forest-border); display: flex; align-items: center; gap: 10px; }
+  .avatar { width: 28px; height: 28px; border-radius: 999px; background: var(--emerald); color: var(--emerald-ink); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 11px; font-weight: 700; letter-spacing: -0.02em; }
+  .side-foot .who { flex: 1; min-width: 0; }
+  .side-foot .name { font-size: var(--t-sm); font-weight: 500; color: var(--fg-on-forest); }
+  .side-foot .email { font-size: var(--t-2xs); color: var(--fg-on-forest-muted); }
+  .side-foot button { background: transparent; border: none; padding: 6px; color: var(--fg-on-forest-muted); cursor: pointer; border-radius: var(--r-sm); }
+  .side-foot button:hover { background: var(--forest-2); color: var(--fg-on-forest); }
+  .side-foot button i { width: 14px; height: 14px; }
+
+  /* ───────────── MAIN ───────────── */
+  main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; position: relative; z-index: 1; }
+
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 28px; border-bottom: 1px solid var(--forest-border); height: 54px; }
+  .crumbs { display: flex; align-items: center; gap: 8px; font-size: var(--t-sm); color: var(--fg-on-forest-muted); }
+  .crumbs .sep { width: 13px; height: 13px; }
+  .crumbs .here { color: var(--fg-on-forest); font-weight: 500; }
+  .crumbs .here em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-bright); font-size: 1.05em; }
+
+  .top-actions { display: flex; align-items: center; gap: 8px; }
+  .range-picker { display: flex; align-items: center; gap: 2px; padding: 2px; background: var(--forest-2); border-radius: var(--r-md); }
+  .range-picker button { padding: 5px 12px; font: inherit; font-size: var(--t-xs); font-weight: 500; color: var(--fg-on-forest-muted); background: transparent; border: none; border-radius: var(--r-sm); cursor: pointer; }
+  .range-picker button:hover { color: var(--fg-on-forest); }
+  .range-picker button.on { background: var(--forest-3); color: var(--fg-on-forest); }
+  .icon-btn-top { background: transparent; border: 1px solid transparent; padding: 6px; border-radius: var(--r-sm); cursor: pointer; color: var(--fg-on-forest-muted); }
+  .icon-btn-top:hover { background: var(--forest-2); color: var(--fg-on-forest); }
+  .icon-btn-top i { width: 16px; height: 16px; }
+
+  /* content */
+  .content { padding: 32px 36px 64px; flex: 1; overflow: auto; }
+
+  .page-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px; gap: 24px; padding-bottom: 24px; border-bottom: 1px solid var(--forest-border); }
+  .page-head h1 { font-family: var(--font-display); font-weight: 800; font-size: 52px; letter-spacing: -0.03em; line-height: 0.95; color: var(--fg-on-forest); }
+  .page-head h1 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-bright); }
+  .page-head .sub { font-size: var(--t-sm); color: var(--fg-on-forest-muted); margin-top: 10px; max-width: 540px; line-height: 1.5; }
+  .page-head .sub em { font-family: var(--font-serif); font-style: italic; color: var(--emerald-bright); }
+  .page-head .live { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(52, 211, 153, 0.12); border: 1px solid rgba(52, 211, 153, 0.35); border-radius: var(--r-pill); font-size: var(--t-xs); color: var(--emerald-bright); font-weight: 500; }
+  .page-head .live .d { width: 6px; height: 6px; border-radius: 999px; background: var(--emerald-bright); animation: pulse 2s var(--ease) infinite; }
+
+  /* ─── HERO STATS — big-number row ─── */
+  .hero-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px; }
+  .hero-stat {
+    padding: 22px 24px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--forest-border);
+    border-radius: var(--r-lg);
+    position: relative; overflow: hidden;
+  }
+  .hero-stat .k { font-size: var(--t-xs); color: var(--fg-on-forest-muted); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; }
+  .hero-stat .v {
+    font-family: var(--font-display); font-weight: 800;
+    font-size: 56px; letter-spacing: var(--track-tight); line-height: 1;
+    color: var(--fg-on-forest); margin-top: 12px;
+  }
+  .hero-stat .v em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-bright); font-size: 0.55em; margin-left: 2px; letter-spacing: 0; }
+  .hero-stat .v .unit { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--fg-on-forest-muted); font-size: 0.5em; margin-left: 2px; }
+  .hero-stat .trend { display: flex; align-items: center; gap: 6px; margin-top: 12px; font-size: var(--t-xs); }
+  .hero-stat .delta { display: inline-flex; align-items: center; gap: 2px; font-weight: 600; padding: 2px 6px; border-radius: var(--r-xs); }
+  .hero-stat .delta.up { background: rgba(52, 211, 153, 0.15); color: var(--emerald-bright); }
+  .hero-stat .delta.down { background: rgba(220, 38, 38, 0.15); color: #FCA5A5; }
+  .hero-stat .delta i { width: 11px; height: 11px; }
+  .hero-stat .vs { color: var(--fg-on-forest-muted); }
+
+  /* ─── BIG CHART ─── */
+  .big-chart {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--forest-border);
+    border-radius: var(--r-lg);
+    padding: 24px 24px 18px;
+    margin-bottom: 16px;
+  }
+  .big-chart .top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+  .big-chart .top .left { display: flex; flex-direction: column; gap: 4px; }
+  .big-chart .top .k { font-size: var(--t-xs); color: var(--fg-on-forest-muted); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; }
+  .big-chart .top h3 { font-family: var(--font-display); font-weight: 700; font-size: 26px; letter-spacing: -0.025em; color: var(--fg-on-forest); }
+  .big-chart .top h3 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-bright); }
+  .big-chart .legend { display: flex; gap: 14px; }
+  .big-chart .legend .item { display: flex; align-items: center; gap: 6px; font-size: var(--t-xs); color: var(--fg-on-forest-muted); }
+  .big-chart .legend .item .sw { width: 8px; height: 8px; border-radius: 2px; }
+  .big-chart .legend .item .sw.em { background: var(--emerald-bright); }
+  .big-chart .legend .item .sw.lv { background: var(--lavender); }
+
+  .chart-canvas { position: relative; height: 240px; }
+  .chart-canvas svg { width: 100%; height: 100%; overflow: visible; }
+  .chart-canvas .axis-y { font-family: var(--font-mono); font-size: 10px; fill: var(--fg-on-forest-muted); }
+  .chart-canvas .gridline { stroke: var(--forest-border); stroke-width: 1; stroke-dasharray: 2 4; }
+  .chart-canvas .axis-x-row { display: flex; justify-content: space-between; margin-top: 12px; padding-left: 32px; font-family: var(--font-mono); font-size: 10px; color: var(--fg-on-forest-muted); letter-spacing: 0.04em; }
+
+  /* ─── HISTOGRAM ROW (moodboard signature) ─── */
+  .charts-row { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; margin-bottom: 16px; }
+  .histo-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--forest-border);
+    border-radius: var(--r-lg);
+    padding: 24px;
+    position: relative; overflow: hidden;
+  }
+  .histo-card .top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; }
+  .histo-card .top .k { font-size: var(--t-xs); color: var(--fg-on-forest-muted); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; }
+  .histo-card h3 { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: -0.02em; color: var(--fg-on-forest); margin-top: 4px; }
+  .histo-card h3 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--lavender); }
+
+  .histo-card .axis-row { display: flex; gap: 10px; align-items: center; }
+  .histo-card .axis-row .tag-mini { font-family: var(--font-mono); font-size: 9px; padding: 2px 6px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--forest-border); border-radius: 3px; color: var(--fg-on-forest-muted); letter-spacing: 0.05em; }
+
+  .histo {
+    display: flex; align-items: flex-end; gap: 3px;
+    height: 200px; margin: 18px 0 12px;
+  }
+  .histo .bar { flex: 1; background: var(--lavender); border-radius: 2px 2px 0 0; min-width: 4px; transition: background var(--dur) var(--ease); }
+  .histo .bar:hover { background: var(--lavender-deep); }
+  .histo .bar.peak { background: var(--emerald-bright); }
+
+  .histo-card .axis-x { display: flex; justify-content: space-between; padding: 0 4px; font-family: var(--font-mono); font-size: 10px; color: var(--fg-on-forest-muted); letter-spacing: 0.04em; }
+  .histo-card .axis-x span { position: relative; }
+
+  /* annotation lines in histogram */
+  .annotation { position: absolute; top: 60px; height: 168px; border-left: 1px dashed var(--lavender); pointer-events: none; }
+  .annotation .lbl { position: absolute; top: -22px; left: -28px; font-family: var(--font-mono); font-size: 9px; padding: 2px 6px; background: var(--lavender-soft); color: var(--lavender-deep); border-radius: 3px; letter-spacing: 0.04em; white-space: nowrap; }
+
+  /* world / map card */
+  .geo-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--forest-border);
+    border-radius: var(--r-lg);
+    padding: 24px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .geo-card .top { display: flex; flex-direction: column; gap: 4px; }
+  .geo-card .k { font-size: var(--t-xs); color: var(--fg-on-forest-muted); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; }
+  .geo-card h3 { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: -0.02em; color: var(--fg-on-forest); }
+  .geo-card h3 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-bright); }
+  .geo-rows { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .geo-row { display: grid; grid-template-columns: 22px 1fr 1fr 50px; gap: 10px; align-items: center; padding: 4px 0; font-size: var(--t-sm); }
+  .geo-row .flag { font-size: 16px; line-height: 1; }
+  .geo-row .name { color: var(--fg-on-forest); font-weight: 500; }
+  .geo-row .bar-bg { height: 6px; background: var(--forest-3); border-radius: 999px; overflow: hidden; }
+  .geo-row .bar-bg .fill { height: 100%; background: var(--emerald-bright); border-radius: 999px; }
+  .geo-row .val { font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-on-forest-muted); text-align: right; }
+
+  /* ─── BOTTOM ROW — top content + recent ─── */
+  .bottom-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .panel-dark {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--forest-border);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+  }
+  .panel-dark .head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--forest-border); }
+  .panel-dark h3 { font-family: var(--font-display); font-weight: 700; font-size: var(--t-lg); letter-spacing: var(--track-tight); color: var(--fg-on-forest); }
+  .panel-dark h3 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-bright); }
+  .panel-dark .see-all { font-size: var(--t-xs); color: var(--fg-on-forest-muted); text-decoration: none; }
+  .panel-dark .see-all:hover { color: var(--fg-on-forest); }
+
+  .top-content { padding: 8px 4px; }
+  .top-row { display: grid; grid-template-columns: 22px 1fr 64px 64px; gap: 12px; padding: 10px 16px; align-items: center; }
+  .top-row:hover { background: var(--forest-2); }
+  .top-row .rank { font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-on-forest-muted); }
+  .top-row .title { font-size: var(--t-sm); color: var(--fg-on-forest); font-weight: 500; }
+  .top-row .title .slug { font-family: var(--font-mono); font-size: 10px; color: var(--fg-on-forest-muted); display: block; margin-top: 2px; }
+  .top-row .views { font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-on-forest); text-align: right; }
+  .top-row .trend { font-size: var(--t-xs); display: inline-flex; align-items: center; gap: 2px; justify-content: flex-end; }
+  .top-row .trend.up { color: var(--emerald-bright); }
+  .top-row .trend.down { color: #FCA5A5; }
+  .top-row .trend i { width: 11px; height: 11px; }
+
+  /* event feed */
+  .feed { padding: 8px 0; }
+  .feed-row { display: grid; grid-template-columns: 22px 1fr auto; gap: 12px; padding: 10px 20px; align-items: flex-start; position: relative; }
+  .feed-row:hover { background: var(--forest-2); }
+  .feed-row .ico { width: 22px; height: 22px; border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+  .feed-row .ico.em { background: rgba(52, 211, 153, 0.15); color: var(--emerald-bright); }
+  .feed-row .ico.lv { background: rgba(167, 139, 250, 0.18); color: var(--lavender); }
+  .feed-row .ico.muted { background: var(--forest-3); color: var(--fg-on-forest-muted); }
+  .feed-row .ico i { width: 12px; height: 12px; }
+  .feed-row .text { font-size: var(--t-sm); line-height: 1.5; color: var(--fg-on-forest); }
+  .feed-row .text strong { font-weight: 600; }
+  .feed-row .text em { font-family: var(--font-serif); font-style: italic; color: var(--emerald-bright); font-size: 1.05em; }
+  .feed-row .text .meta { display: block; font-family: var(--font-mono); font-size: 10px; color: var(--fg-on-forest-muted); margin-top: 2px; }
+  .feed-row .time { font-family: var(--font-mono); font-size: 10px; color: var(--fg-on-forest-muted); flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="org-switch">
+    <img class="mark" src="../../assets/logo-mark.svg" alt="">
+    <div class="info">
+      <div class="org">Brick &amp; Mortar Coffee</div>
+      <div class="plan">Studio · live</div>
+    </div>
+    <i data-lucide="chevrons-up-down"></i>
+  </div>
+
+  <nav class="side">
+    <div class="head">Workspace</div>
+    <a href="#"><i data-lucide="layout-dashboard"></i>Overview</a>
+    <a href="#" class="active"><i data-lucide="activity"></i>Pulse<span class="pulse-dot"></span></a>
+
+    <div class="head">Content</div>
+    <a href="#"><i data-lucide="file-text"></i>Posts<span class="count">142</span></a>
+    <a href="#"><i data-lucide="layout"></i>Pages<span class="count">12</span></a>
+    <a href="#"><i data-lucide="image"></i>Media<span class="count">1.2k</span></a>
+
+    <div class="head">Commerce</div>
+    <a href="#"><i data-lucide="shopping-bag"></i>Products<span class="count">38</span></a>
+    <a href="#"><i data-lucide="receipt"></i>Orders<span class="count">7</span></a>
+    <a href="#"><i data-lucide="users"></i>Customers</a>
+
+    <div class="head">Studio</div>
+    <a href="#"><i data-lucide="palette"></i>Theme</a>
+    <a href="#"><i data-lucide="globe"></i>Domains</a>
+    <a href="#"><i data-lucide="settings"></i>Settings</a>
+  </nav>
+
+  <div class="side-foot">
+    <div class="avatar">MW</div>
+    <div class="who">
+      <div class="name">Mara Wills</div>
+      <div class="email">mara@brickmortar.co</div>
+    </div>
+    <button><i data-lucide="log-out"></i></button>
+  </div>
+</aside>
+
+<main>
+
+  <div class="topbar">
+    <div class="crumbs">
+      <span>Workspace</span>
+      <i data-lucide="chevron-right" class="sep"></i>
+      <span class="here">Pulse, <em>live</em></span>
+    </div>
+    <div class="top-actions">
+      <div class="range-picker">
+        <button>1h</button>
+        <button class="on">24h</button>
+        <button>7d</button>
+        <button>30d</button>
+        <button>90d</button>
+      </div>
+      <button class="icon-btn-top"><i data-lucide="download"></i></button>
+      <button class="icon-btn-top"><i data-lucide="bell"></i></button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <div class="page-head">
+      <div>
+        <h1>Pulse, <em>live</em>.</h1>
+        <p class="sub">A real-time view of the site as a <em>living thing</em>. Updated every two seconds, never sampled, never delayed.</p>
+      </div>
+      <span class="live"><span class="d"></span>Streaming · 142 readers, now</span>
+    </div>
+
+    <!-- ─── HERO STATS ─── -->
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="k">Readers · now</div>
+        <div class="v">142</div>
+        <div class="trend"><span class="delta up"><i data-lucide="trending-up"></i>+18%</span><span class="vs">vs. avg hour</span></div>
+      </div>
+      <div class="hero-stat">
+        <div class="k">Views · 24h</div>
+        <div class="v">12,847</div>
+        <div class="trend"><span class="delta up"><i data-lucide="trending-up"></i>+12.4%</span><span class="vs">vs. yesterday</span></div>
+      </div>
+      <div class="hero-stat">
+        <div class="k">Revenue · 24h</div>
+        <div class="v">$847<em>.20</em></div>
+        <div class="trend"><span class="delta up"><i data-lucide="trending-up"></i>+$92</span><span class="vs">vs. yesterday</span></div>
+      </div>
+      <div class="hero-stat">
+        <div class="k">p50 TTFB</div>
+        <div class="v">38<span class="unit">ms</span></div>
+        <div class="trend"><span class="delta down"><i data-lucide="trending-down"></i>−4ms</span><span class="vs">faster than avg</span></div>
+      </div>
+    </div>
+
+    <!-- ─── BIG CHART ─── -->
+    <div class="big-chart">
+      <div class="top">
+        <div class="left">
+          <span class="k">Views &amp; Conversions · last 24h</span>
+          <h3>Reader <em>flow</em>, two-second resolution</h3>
+        </div>
+        <div class="legend">
+          <span class="item"><span class="sw em"></span>Views</span>
+          <span class="item"><span class="sw lv"></span>Conversions</span>
+        </div>
+      </div>
+
+      <div class="chart-canvas">
+        <svg viewBox="0 0 1200 240" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="vFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#34D399" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="#34D399" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+
+          <!-- gridlines -->
+          <line class="gridline" x1="0" y1="48" x2="1200" y2="48"/>
+          <line class="gridline" x1="0" y1="96" x2="1200" y2="96"/>
+          <line class="gridline" x1="0" y1="144" x2="1200" y2="144"/>
+          <line class="gridline" x1="0" y1="192" x2="1200" y2="192"/>
+
+          <!-- y axis labels -->
+          <text class="axis-y" x="4" y="52">800</text>
+          <text class="axis-y" x="4" y="100">600</text>
+          <text class="axis-y" x="4" y="148">400</text>
+          <text class="axis-y" x="4" y="196">200</text>
+
+          <!-- views (emerald) -->
+          <path d="M 40 180 Q 80 160, 120 165 T 200 150 T 280 140 T 360 125 T 440 130 T 520 110 T 600 100 T 680 70 T 760 80 T 840 60 T 920 65 T 1000 40 T 1080 50 T 1160 30 L 1160 240 L 40 240 Z" fill="url(#vFill)"/>
+          <path d="M 40 180 Q 80 160, 120 165 T 200 150 T 280 140 T 360 125 T 440 130 T 520 110 T 600 100 T 680 70 T 760 80 T 840 60 T 920 65 T 1000 40 T 1080 50 T 1160 30" fill="none" stroke="#34D399" stroke-width="1.75"/>
+
+          <!-- conversions (lavender) -->
+          <path d="M 40 220 Q 100 215, 160 218 T 280 210 T 400 205 T 520 195 T 640 200 T 760 188 T 880 185 T 1000 178 T 1160 175" fill="none" stroke="#A78BFA" stroke-width="1.75"/>
+
+          <!-- live point -->
+          <circle cx="1160" cy="30" r="4" fill="#34D399"/>
+          <circle cx="1160" cy="30" r="10" fill="#34D399" opacity="0.25"/>
+          <line x1="1160" y1="30" x2="1160" y2="240" stroke="#34D399" stroke-width="1" stroke-dasharray="2 3" opacity="0.4"/>
+
+          <!-- live label -->
+          <rect x="1095" y="14" width="60" height="20" rx="4" fill="#34D399"/>
+          <text x="1125" y="28" font-family="Geist Mono, monospace" font-size="11" fill="#022C22" text-anchor="middle" font-weight="500">NOW</text>
+        </svg>
+      </div>
+      <div class="axis-x-row">
+        <span>00:00</span><span>04:00</span><span>08:00</span><span>12:00</span><span>16:00</span><span>20:00</span><span>now</span>
+      </div>
+    </div>
+
+    <!-- ─── HISTOGRAM + GEO ─── -->
+    <div class="charts-row">
+
+      <div class="histo-card">
+        <div class="top">
+          <div>
+            <span class="k">Reader sessions · 24h</span>
+            <h3>Where they <em>linger</em></h3>
+          </div>
+          <div class="axis-row">
+            <span class="tag-mini">COUNT</span>
+            <span class="tag-mini">log scale</span>
+            <span class="tag-mini">7,842 sessions</span>
+          </div>
+        </div>
+
+        <div style="position: relative;">
+          <div class="histo">
+            <span class="bar" style="height: 22%;"></span>
+            <span class="bar" style="height: 28%;"></span>
+            <span class="bar" style="height: 36%;"></span>
+            <span class="bar" style="height: 48%;"></span>
+            <span class="bar" style="height: 56%;"></span>
+            <span class="bar" style="height: 64%;"></span>
+            <span class="bar" style="height: 70%;"></span>
+            <span class="bar" style="height: 78%;"></span>
+            <span class="bar" style="height: 85%;"></span>
+            <span class="bar peak" style="height: 92%;"></span>
+            <span class="bar peak" style="height: 100%;"></span>
+            <span class="bar peak" style="height: 94%;"></span>
+            <span class="bar" style="height: 86%;"></span>
+            <span class="bar" style="height: 78%;"></span>
+            <span class="bar" style="height: 70%;"></span>
+            <span class="bar" style="height: 60%;"></span>
+            <span class="bar" style="height: 52%;"></span>
+            <span class="bar" style="height: 44%;"></span>
+            <span class="bar" style="height: 36%;"></span>
+            <span class="bar" style="height: 30%;"></span>
+            <span class="bar" style="height: 24%;"></span>
+            <span class="bar" style="height: 18%;"></span>
+            <span class="bar" style="height: 14%;"></span>
+            <span class="bar" style="height: 10%;"></span>
+            <span class="bar" style="height: 7%;"></span>
+            <span class="bar" style="height: 5%;"></span>
+            <span class="bar" style="height: 3%;"></span>
+          </div>
+          <div class="annotation" style="left: 38%;">
+            <span class="lbl">median · 2:47</span>
+          </div>
+          <div class="annotation" style="left: 67%; border-left-color: var(--emerald-bright);">
+            <span class="lbl" style="background: var(--emerald-soft); color: var(--emerald-deep);">long-tail readers</span>
+          </div>
+        </div>
+
+        <div class="axis-x">
+          <span>10s</span>
+          <span>30s</span>
+          <span>1m</span>
+          <span>2m</span>
+          <span>5m</span>
+          <span>10m</span>
+          <span>30m+</span>
+        </div>
+      </div>
+
+      <div class="geo-card">
+        <div class="top">
+          <span class="k">Edge regions · live</span>
+          <h3>Served from <em>24</em> regions</h3>
+        </div>
+        <div class="geo-rows">
+          <div class="geo-row"><span class="flag">🇺🇸</span><span class="name">North America</span><div class="bar-bg"><div class="fill" style="width: 92%;"></div></div><span class="val">4,218</span></div>
+          <div class="geo-row"><span class="flag">🇪🇺</span><span class="name">Europe</span><div class="bar-bg"><div class="fill" style="width: 74%;"></div></div><span class="val">3,402</span></div>
+          <div class="geo-row"><span class="flag">🇯🇵</span><span class="name">Asia · East</span><div class="bar-bg"><div class="fill" style="width: 48%;"></div></div><span class="val">2,184</span></div>
+          <div class="geo-row"><span class="flag">🇧🇷</span><span class="name">South America</span><div class="bar-bg"><div class="fill" style="width: 32%;"></div></div><span class="val">1,486</span></div>
+          <div class="geo-row"><span class="flag">🇦🇺</span><span class="name">Oceania</span><div class="bar-bg"><div class="fill" style="width: 18%;"></div></div><span class="val">840</span></div>
+          <div class="geo-row"><span class="flag">🇿🇦</span><span class="name">Africa</span><div class="bar-bg"><div class="fill" style="width: 12%;"></div></div><span class="val">517</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ─── BOTTOM — top content + live feed ─── -->
+    <div class="bottom-row">
+
+      <div class="panel-dark">
+        <div class="head">
+          <h3>Top <em>posts</em>, 24h</h3>
+          <a class="see-all" href="#">See all 142 →</a>
+        </div>
+        <div class="top-content">
+          <div class="top-row">
+            <span class="rank">01</span>
+            <span class="title">Drip vs. pour-over: a 5-year case study<span class="slug">/blog/drip-vs-pourover</span></span>
+            <span class="views">2,847</span>
+            <span class="trend up"><i data-lucide="trending-up"></i>+18%</span>
+          </div>
+          <div class="top-row">
+            <span class="rank">02</span>
+            <span class="title">How we source single-origin beans<span class="slug">/blog/single-origin-2026</span></span>
+            <span class="views">2,184</span>
+            <span class="trend up"><i data-lucide="trending-up"></i>+9%</span>
+          </div>
+          <div class="top-row">
+            <span class="rank">03</span>
+            <span class="title">Why we stopped selling oat milk for a month<span class="slug">/blog/oat-milk-pause</span></span>
+            <span class="views">1,672</span>
+            <span class="trend down"><i data-lucide="trending-down"></i>−4%</span>
+          </div>
+          <div class="top-row">
+            <span class="rank">04</span>
+            <span class="title">Meet the team: our new head roaster<span class="slug">/blog/meet-jules</span></span>
+            <span class="views">1,240</span>
+            <span class="trend up"><i data-lucide="trending-up"></i>+6%</span>
+          </div>
+          <div class="top-row">
+            <span class="rank">05</span>
+            <span class="title">A field guide to the espresso machine<span class="slug">/blog/espresso-field-guide</span></span>
+            <span class="views">980</span>
+            <span class="trend up"><i data-lucide="trending-up"></i>+2%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-dark">
+        <div class="head">
+          <h3>Live <em>feed</em></h3>
+          <a class="see-all" href="#">All events →</a>
+        </div>
+        <div class="feed">
+          <div class="feed-row">
+            <div class="ico em"><i data-lucide="shopping-bag"></i></div>
+            <div class="text">
+              <strong>Order #4218</strong> · La Esperanza × 2, Bag <em>$44.00</em>
+              <span class="meta">Reader from Berlin · arrived via /blog/single-origin-2026</span>
+            </div>
+            <span class="time">12s ago</span>
+          </div>
+          <div class="feed-row">
+            <div class="ico lv"><i data-lucide="eye"></i></div>
+            <div class="text">
+              Reader from <strong>Tokyo</strong> just opened <em>Drip vs. pour-over</em>
+              <span class="meta">Mobile Safari · returning visitor · 3rd session</span>
+            </div>
+            <span class="time">28s ago</span>
+          </div>
+          <div class="feed-row">
+            <div class="ico em"><i data-lucide="check-circle-2"></i></div>
+            <div class="text">
+              <strong>Deploy succeeded</strong> · v1.2.4 → <em>production</em>
+              <span class="meta">14 routes invalidated · TTFB unchanged</span>
+            </div>
+            <span class="time">2m ago</span>
+          </div>
+          <div class="feed-row">
+            <div class="ico lv"><i data-lucide="user-plus"></i></div>
+            <div class="text">
+              New subscriber · <strong>jules.akande@…</strong>
+              <span class="meta">Source: /blog/meet-jules · welcome email queued</span>
+            </div>
+            <span class="time">3m ago</span>
+          </div>
+          <div class="feed-row">
+            <div class="ico muted"><i data-lucide="file-text"></i></div>
+            <div class="text">
+              Mara published <strong>Holiday hours, closures, and bean clearance</strong>
+              <span class="meta">Scheduled · auto-published at 09:00</span>
+            </div>
+            <span class="time">14m ago</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</main>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

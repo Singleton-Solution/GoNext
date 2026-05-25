@@ -1,0 +1,29 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>Core colors</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<link rel="stylesheet" href="_card.css">
+<style>
+  body { padding: 24px; }
+  .row { gap: 12px; align-items: stretch; }
+  .sw { flex: 1; height: 132px; border: 1px solid var(--border); border-radius: var(--r-md); padding: 14px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; }
+  .sw .top { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 11px; }
+  .sw .name { font-family: var(--font-display); font-weight: 800; font-size: 28px; letter-spacing: -0.025em; line-height: 1; }
+  .sw .hex  { font-family: var(--font-mono); font-size: 11px; opacity: 0.7; }
+</style></head><body>
+  <span class="eyebrow" style="display: block; margin-bottom: 14px;">Core — Paper · Forest · Emerald</span>
+  <div class="row">
+    <div class="sw" style="background: var(--paper); color: var(--ink);">
+      <div class="top"><span>--paper</span><span>01</span></div>
+      <div><div class="name">Paper</div><div class="hex">#F5F2EA</div></div>
+    </div>
+    <div class="sw" style="background: var(--forest); color: var(--fg-on-forest); border-color: var(--forest); position: relative;">
+      <div style="position: absolute; inset: 0; background: radial-gradient(circle at 70% 30%, rgba(52, 211, 153, 0.18) 0%, transparent 60%); pointer-events: none;"></div>
+      <div class="top" style="position: relative;"><span>--forest</span><span>02</span></div>
+      <div style="position: relative;"><div class="name">Forest</div><div class="hex">#0E1A14</div></div>
+    </div>
+    <div class="sw" style="background: var(--emerald); color: var(--emerald-ink); border-color: transparent;">
+      <div class="top"><span>--emerald</span><span>03</span></div>
+      <div><div class="name">Emerald</div><div class="hex">#10B981</div></div>
+    </div>
+  </div>
+</body></html>

@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>Surfaces &amp; neutrals</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<link rel="stylesheet" href="_card.css">
+<style>
+  body { padding: 24px; }
+  .row { gap: 10px; }
+  .sw { flex: 1; height: 100px; border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px; display: flex; flex-direction: column; justify-content: space-between; }
+  .sw .name { font-family: var(--font-sans); font-size: 12px; font-weight: 500; color: var(--ink); }
+  .sw .hex  { font-family: var(--font-mono); font-size: 10px; color: var(--fg-muted); }
+  .sw.dark .name, .sw.dark .hex { color: var(--fg-on-forest); }
+</style></head><body>
+  <span class="eyebrow" style="display: block; margin-bottom: 14px;">Surfaces &amp; neutrals</span>
+  <div class="row" style="margin-bottom: 10px;">
+    <div class="sw" style="background: var(--paper);"><div class="name">paper</div><div class="hex">#F5F2EA</div></div>
+    <div class="sw" style="background: var(--paper-2);"><div class="name">paper-2</div><div class="hex">#EFEBE0</div></div>
+    <div class="sw" style="background: var(--paper-3);"><div class="name">paper-3</div><div class="hex">#E6E1D2</div></div>
+    <div class="sw" style="background: var(--paper-4);"><div class="name">paper-4</div><div class="hex">#DAD3BD</div></div>
+  </div>
+  <div class="row">
+    <div class="sw dark" style="background: var(--forest); border-color: var(--forest);"><div class="name">forest</div><div class="hex">#0E1A14</div></div>
+    <div class="sw dark" style="background: var(--forest-2); border-color: var(--forest-2);"><div class="name">forest-2</div><div class="hex">#18261E</div></div>
+    <div class="sw dark" style="background: var(--forest-3); border-color: var(--forest-3);"><div class="name">forest-3</div><div class="hex">#22322A</div></div>
+    <div class="sw" style="background: var(--fg-muted); color: var(--paper); border-color: transparent;"><div class="name" style="color: var(--paper);">fg-muted</div><div class="hex" style="color: var(--paper);">#4A5C52</div></div>
+  </div>
+</body></html>
