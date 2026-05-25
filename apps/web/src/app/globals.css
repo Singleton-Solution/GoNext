@@ -1,78 +1,145 @@
-/**
- * Baseline public-site stylesheet.
+/*
+ * @gonext/web — global styles.
  *
- * Intentionally tiny — the theme owns visual identity through the
- * design-token surface emitted as `--wp-preset--*` CSS custom
- * properties. This file just maps a few of those tokens onto bare
- * elements so a freshly-installed site is presentable before the
- * author touches anything.
+ * Loads the brand design tokens (cream-paper / forest-ink / emerald +
+ * lavender), Tailwind v3 directives, and a small set of baseline
+ * selectors that map the tokens onto bare elements so a freshly-
+ * installed theme is presentable before the author touches anything.
  *
- * Theme authors who want to override should ship a `style.css` in
- * their theme package; the renderer will surface it via the
- * resolver's existing path.
+ * The theme owns visual identity through the design-token surface
+ * emitted as `--wp-preset--*` CSS custom properties — that part of the
+ * cascade is unchanged. What this file adds on top is the brand
+ * surface (Living-Systems palette + Archivo / Geist / Geist Mono /
+ * Instrument Serif typography) so the public landing page, the
+ * single-post layout, and the site chrome read on-brand even before a
+ * theme is installed.
  */
 
-:root {
-  --wp-preset--color--ink: #0f172a;
-  --wp-preset--color--paper: #ffffff;
-  --wp-preset--color--muted: #64748b;
-  --wp-preset--color--accent: #2563eb;
-  --wp-preset--font-family--sans: system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif;
-  --wp-preset--font-family--serif: Iowan Old Style, Apple Garamond, Baskerville, Georgia, serif;
-  --wp-preset--font-size--md: 1rem;
-  --wp-preset--layout--content: 720px;
-}
+@import './../styles/tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 * {
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--t-base);
+  line-height: var(--lh-normal);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-body {
-  font-family: var(--wp-preset--font-family--serif);
-  font-size: var(--wp-preset--font-size--md);
-  line-height: 1.6;
-  color: var(--wp-preset--color--ink);
-  background: var(--wp-preset--color--paper);
+/* ---------------------------------------------------------------------------
+ * Legacy --wp-preset aliases for theme-unaware fallback paths.
+ *
+ * Some renderer fallback HTML (the `fallbackSingularMain`,
+ * `fallbackArchiveMain`, `fallback404Main` strings in `src/lib/render.ts`)
+ * still reaches for `--wp-preset--*` variables when a theme hasn't been
+ * resolved yet. Re-point those to the brand tokens so the unbranded
+ * cascade still looks Living-Systems.
+ * ------------------------------------------------------------------------- */
+:root {
+  --wp-preset--color--ink: var(--ink);
+  --wp-preset--color--paper: var(--paper);
+  --wp-preset--color--muted: var(--fg-muted);
+  --wp-preset--color--accent: var(--emerald-deep);
+  --wp-preset--font-family--sans: var(--font-sans);
+  --wp-preset--font-family--serif: var(--font-serif);
+  --wp-preset--font-size--md: var(--t-md);
+  --wp-preset--layout--content: 720px;
+  --wp-preset--layout--wide: 1180px;
 }
 
+/* ---------------------------------------------------------------------------
+ * Body type & links — minimal baseline for un-themed fallback HTML.
+ * The branded landing page + post layout own most of the cascade through
+ * Tailwind utilities composed in their components.
+ * ------------------------------------------------------------------------- */
 a {
-  color: var(--wp-preset--color--accent);
+  color: var(--emerald-deep);
+  text-decoration: none;
 }
 
+a:hover {
+  text-decoration: underline;
+}
+
+/* ---------------------------------------------------------------------------
+ * Brand wordmark — composite "Go" (Archivo 800) + italic "Next"
+ * (Instrument Serif italic). The italic-accent rule from the handoff
+ * lives in the React components; this is the bare-DOM helper used by
+ * the renderer's fallback header / footer.
+ * ------------------------------------------------------------------------- */
+.wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  line-height: 1;
+  letter-spacing: var(--track-tight);
+}
+.wordmark .wm-go {
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: var(--ink);
+}
+.wordmark .wm-next {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-style: italic;
+  color: var(--ink);
+}
+.wordmark.on-dark .wm-go,
+.wordmark.on-dark .wm-next {
+  color: var(--fg-on-forest);
+}
+
+/* ---------------------------------------------------------------------------
+ * Theme-shell fallback selectors.
+ *
+ * `.gn-site-main`, `.gn-site-header`, `.gn-site-footer`, `.gn-post-meta`,
+ * `.gn-archive-list`, `.gn-404` are emitted by `src/lib/render.ts`
+ * when the renderer cannot reach the Go-side template endpoint. They
+ * point back at the brand tokens so the fallback paths still feel
+ * Living-Systems instead of bare-browser.
+ * ------------------------------------------------------------------------- */
 .gn-site-main {
   max-width: var(--wp-preset--layout--content);
   margin: 0 auto;
-  padding: 2rem 1rem;
+  padding: var(--s-7) var(--s-4);
 }
 
 .gn-site-header,
 .gn-site-footer {
-  max-width: var(--wp-preset--layout--wide, 1180px);
+  max-width: var(--wp-preset--layout--wide);
   margin: 0 auto;
-  padding: 1rem;
+  padding: var(--s-4);
 }
 
 .gn-site-footer {
-  border-top: 1px solid color-mix(in srgb, var(--wp-preset--color--muted) 30%, transparent);
-  margin-top: 3rem;
-  color: var(--wp-preset--color--muted);
-  font-size: 0.875rem;
+  border-top: 1px solid var(--border);
+  margin-top: var(--s-8);
+  color: var(--fg-muted);
+  font-size: var(--t-sm);
 }
 
 .gn-post-meta {
-  color: var(--wp-preset--color--muted);
-  font-size: 0.875rem;
-  margin-bottom: 1.5rem;
+  color: var(--fg-muted);
+  font-size: var(--t-sm);
+  margin-bottom: var(--s-5);
 }
 
 .gn-post-meta > * + *::before {
   content: ' · ';
-  margin: 0 0.25rem;
+  margin: 0 var(--s-1);
 }
 
 .gn-archive-list {
@@ -81,7 +148,7 @@ a {
 }
 
 .gn-archive-item + .gn-archive-item {
-  margin-top: 2rem;
+  margin-top: var(--s-7);
 }
 
 .gn-archive-title {
@@ -90,5 +157,5 @@ a {
 
 .gn-404 {
   text-align: center;
-  padding: 4rem 0;
+  padding: var(--s-9) 0;
 }

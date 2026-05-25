@@ -1,0 +1,136 @@
+/* =============================================================
+   GoNext — Design Tokens
+   "Living systems" — biology-meets-software.
+   Cream paper · forest ink · emerald + lavender accents.
+   Heavy grotesque display + editorial italic serif accents.
+
+   This file is the public-site mirror of docs/design/colors_and_type.css
+   and the @gonext/admin tokens at apps/admin/src/styles/tokens.css.
+   The same brand contract drives admin, web, and the first-party
+   themes; the canonical source is the design handoff.
+
+   NOTE: Fonts are self-hosted via `next/font/google` in
+   `app/layout.tsx`. The CSS variables (--font-display, --font-sans,
+   --font-mono, --font-serif) are injected on the <html> element by
+   next/font; the rules below reference them so the same token names
+   from the design handoff resolve at runtime to the real font
+   families. Do not re-add the @import — it would double-fetch and
+   defeat next/font's self-hosting + preloading.
+   ============================================================= */
+
+:root {
+  /* ─── Surface — warm cream paper ────────────────────────── */
+  --paper:          #F5F2EA;   /* page background — warm cream */
+  --paper-2:        #EFEBE0;   /* card / panel surface */
+  --paper-3:        #E6E1D2;   /* sunken, hover row, inputs at rest */
+  --paper-4:        #DAD3BD;   /* inset wells */
+
+  /* ─── Surface — deep forest dark ────────────────────────── */
+  --forest:         #0E1A14;   /* primary dark surface (sidebar, dark hero) */
+  --forest-2:       #18261E;   /* lifted dark surface */
+  --forest-3:       #22322A;   /* dark hover */
+  --forest-border:  #2C3D33;   /* hairline on dark */
+
+  /* ─── Foreground ────────────────────────────────────────── */
+  --ink:            #0E1A14;   /* primary text — same as forest, "alive" black */
+  --ink-soft:       #1F2D26;   /* secondary text on cream */
+  --fg-muted:       #4A5C52;   /* tertiary text on cream */
+  --fg-subtle:      #6B7B72;   /* labels, captions */
+  --fg-faint:       #94A199;   /* placeholder, disabled */
+  --fg-on-forest:   #F0EAD8;   /* primary text on dark forest */
+  --fg-on-forest-muted: #A8B5AC;
+
+  /* ─── Border ────────────────────────────────────────────── */
+  --border:         #D9D2C0;   /* default hairline on cream */
+  --border-strong:  #B8B09A;   /* focused / emphasized on cream */
+  --border-subtle:  #E8E2D1;   /* very faint, table rows */
+
+  /* ─── Accent — vivid emerald (primary brand) ────────────── */
+  --emerald:        #10B981;   /* fresh, alive green — primary CTAs, focus */
+  --emerald-bright: #34D399;   /* lighter, used on dark surfaces */
+  --emerald-deep:   #047857;   /* hover, text-on-cream emerald */
+  --emerald-soft:   #D1FAE5;   /* tinted surface */
+  --emerald-ink:    #022C22;   /* text on emerald */
+
+  /* ─── Accent — lavender (secondary, data viz) ───────────── */
+  --lavender:       #A78BFA;   /* secondary accent — data viz, tags */
+  --lavender-deep:  #7C3AED;
+  --lavender-soft:  #EDE9FE;
+
+  /* ─── Semantic ──────────────────────────────────────────── */
+  --success:        #059669;
+  --success-soft:   #D1FAE5;
+  --warning:        #D97706;
+  --warning-soft:   #FEF3C7;
+  --danger:         #DC2626;
+  --danger-soft:    #FEE2E2;
+
+  /* ─── Typography ────────────────────────────────────────── */
+  /* These four variables are *re-declared* on <html> by next/font with the
+     real, hashed self-hosted family names. The fallback chains below only
+     apply if next/font hasn't loaded yet (FOUT window) or in environments
+     where next/font isn't running (e.g. raw vitest jsdom snapshots). */
+  --font-display:   'Archivo', system-ui, sans-serif;          /* heavy grotesque headlines */
+  --font-sans:      'Geist', -apple-system, system-ui, sans-serif;  /* body, UI */
+  --font-serif:     'Instrument Serif', Georgia, serif;        /* italic accents */
+  --font-mono:      'Geist Mono', ui-monospace, monospace;
+  /* legacy alias */
+  --font-ui:        var(--font-sans);
+
+  /* type scale */
+  --t-2xs:  11px;
+  --t-xs:   12px;
+  --t-sm:   13px;
+  --t-base: 14px;
+  --t-md:   15px;
+  --t-lg:   17px;
+  --t-xl:   20px;
+  --t-2xl:  24px;
+  --t-3xl:  32px;
+  --t-4xl:  44px;
+  --t-5xl:  64px;
+  --t-6xl:  96px;
+
+  /* line heights */
+  --lh-tight:  1.0;
+  --lh-snug:   1.15;
+  --lh-normal: 1.5;
+
+  /* tracking */
+  --track-tight:  -0.03em;
+  --track-normal: -0.005em;
+  --track-wide:    0.04em;
+
+  /* ─── Spacing (4-base) ──────────────────────────────────── */
+  --s-1:   4px;
+  --s-2:   8px;
+  --s-3:  12px;
+  --s-4:  16px;
+  --s-5:  20px;
+  --s-6:  24px;
+  --s-7:  32px;
+  --s-8:  48px;
+  --s-9:  64px;
+  --s-10: 96px;
+
+  /* ─── Radii ─────────────────────────────────────────────── */
+  --r-xs:    4px;
+  --r-sm:    6px;
+  --r-md:    8px;
+  --r-lg:   12px;
+  --r-xl:   16px;
+  --r-pill: 999px;
+
+  /* ─── Shadows (soft, organic — not hard offsets) ────────── */
+  --sh-xs:   0 1px 2px rgba(14, 26, 20, 0.04);
+  --sh-sm:   0 1px 3px rgba(14, 26, 20, 0.06), 0 1px 2px rgba(14, 26, 20, 0.04);
+  --sh-md:   0 6px 14px -4px rgba(14, 26, 20, 0.08), 0 2px 6px -2px rgba(14, 26, 20, 0.04);
+  --sh-lg:   0 16px 32px -10px rgba(14, 26, 20, 0.14), 0 4px 10px -4px rgba(14, 26, 20, 0.06);
+  --sh-focus: 0 0 0 3px rgba(16, 185, 129, 0.22);
+
+  /* ─── Motion ────────────────────────────────────────────── */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur-fast: 100ms;
+  --dur:      160ms;
+  --dur-slow: 260ms;
+}
