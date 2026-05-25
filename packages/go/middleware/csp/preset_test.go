@@ -207,6 +207,79 @@ func TestAdminPolicy_IncludeStrictDynamicTrue(t *testing.T) {
 	}
 }
 
+// TestAdminStrictPolicy_MatchesBaseline pins the admin-strict preset to
+// the canonical shape required by issue #59. The shape is:
+//
+//	default-src 'self'; script-src 'self' 'strict-dynamic' [nonce];
+//	require-trusted-types-for 'script';
+//	trusted-types gn-admin gn-editor 'allow-duplicates'; …
+//
+// All other directives mirror AdminPolicy.
+func TestAdminStrictPolicy_MatchesBaseline(t *testing.T) {
+	p := AdminStrictPolicy(PolicyOptions{
+		ReportURI: "/_/csp-report",
+	})
+	got := p.String()
+
+	for _, m := range []string{
+		"default-src 'self'",
+		"script-src 'self' 'strict-dynamic'",
+		"object-src 'none'",
+		"base-uri 'self'",
+		"frame-ancestors 'none'",
+		"require-trusted-types-for 'script'",
+		"trusted-types gn-admin gn-editor 'allow-duplicates'",
+		"report-uri /_/csp-report",
+	} {
+		if !strings.Contains(got, m) {
+			t.Errorf("output missing %q\nfull: %s", m, got)
+		}
+	}
+
+	// Admin-strict MUST NOT include unsafe-inline / unsafe-eval.
+	for _, banned := range []string{"'unsafe-inline'", "'unsafe-eval'"} {
+		if strings.Contains(got, banned) {
+			t.Errorf("admin-strict preset leaked %s: %s", banned, got)
+		}
+	}
+}
+
+// TestAdminStrictPolicy_AppliesNonceTransitively verifies WithNonce
+// folds the per-request nonce into script-src alongside 'strict-dynamic'.
+// The nonce-from-context shape is what the Next.js middleware mirrors
+// in apps/admin/middleware.ts.
+func TestAdminStrictPolicy_AppliesNonceTransitively(t *testing.T) {
+	p := AdminStrictPolicy(PolicyOptions{})
+	got := p.WithNonce("ABC123").String()
+	if !strings.Contains(got, "'nonce-ABC123'") {
+		t.Errorf("nonce missing: %s", got)
+	}
+	if !strings.Contains(got, "'strict-dynamic'") {
+		t.Errorf("strict-dynamic missing: %s", got)
+	}
+}
+
+// TestAdminStrictPolicy_HonorsCallerOverrides verifies the caller can
+// substitute their own TrustedTypePolicies (e.g. a hardened deployment
+// that disallows 'allow-duplicates') and disable strict-dynamic.
+func TestAdminStrictPolicy_HonorsCallerOverrides(t *testing.T) {
+	f := false
+	p := AdminStrictPolicy(PolicyOptions{
+		TrustedTypePolicies:  []string{"gn-admin"},
+		IncludeStrictDynamic: &f,
+	})
+	got := p.String()
+	if !strings.Contains(got, "trusted-types gn-admin") {
+		t.Errorf("override missed: %s", got)
+	}
+	if strings.Contains(got, "gn-editor") {
+		t.Errorf("caller override should have dropped gn-editor: %s", got)
+	}
+	if strings.Contains(got, "'strict-dynamic'") {
+		t.Errorf("caller suppressed strict-dynamic but it leaked: %s", got)
+	}
+}
+
 // TestHostsToSourcesSkipsEmpty verifies the helper drops empty strings
 // so callers can freely append optional lists.
 func TestHostsToSourcesSkipsEmpty(t *testing.T) {

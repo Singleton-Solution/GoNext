@@ -1,4 +1,7 @@
 {
   "extends": "next/core-web-vitals",
-  "ignorePatterns": [".next", "node_modules", "coverage", "dist"]
+  "ignorePatterns": [".next", "node_modules", "coverage", "dist"],
+  "rules": {
+    "react/no-danger": "error"
+  }
 }

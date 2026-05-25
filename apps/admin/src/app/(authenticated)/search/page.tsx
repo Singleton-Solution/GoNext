@@ -29,6 +29,7 @@ import { Search as SearchIcon, Timer } from 'lucide-react';
 import { api, ApiError } from '@/lib/api-client';
 import { Headline } from '@/components/ui/headline';
 import { Badge } from '@/components/ui/badge';
+import { SafeHTML } from '@/components/SafeHTML';
 import type { SearchHit } from '@/components/GlobalSearch';
 
 interface SearchResponse {
@@ -198,14 +199,17 @@ function SearchPageBody(): ReactElement {
                     <span className="search-page__hit-title">{hit.title}</span>
                   </Link>
                   {hit.excerpt_html && (
-                    <p
+                    // ExcerptHTML is server-sanitised by
+                    // packages/go/search/highlight.go AND then routed
+                    // through the gn-admin Trusted Types policy
+                    // (DOMPurify + 'mark'-preserving profile). The
+                    // brand's <mark> rule (globals.css → emerald-soft
+                    // on emerald-ink) repaints the highlights with no
+                    // additional code here.
+                    <SafeHTML
+                      as="p"
                       className="search-page__hit-excerpt"
-                      // ExcerptHTML is server-sanitised; see
-                      // packages/go/search/highlight.go. The brand's
-                      // <mark> rule (globals.css → emerald-soft on
-                      // emerald-ink) repaints the highlights with no
-                      // additional code here.
-                      dangerouslySetInnerHTML={{ __html: hit.excerpt_html }}
+                      html={hit.excerpt_html}
                     />
                   )}
                 </li>
