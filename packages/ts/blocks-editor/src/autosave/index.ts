@@ -19,6 +19,11 @@ export { useAutosave } from './useAutosave.ts';
 export { usePostLock } from './usePostLock.ts';
 export { RecoveryDialog, type RecoveryDialogProps } from './RecoveryDialog.tsx';
 export { LockBanner, type LockBannerProps } from './LockBanner.tsx';
+export {
+  AutosaveIndicator,
+  relativeTimestamp,
+  type AutosaveIndicatorProps,
+} from './AutosaveIndicator.tsx';
 export type {
   AutosavePayload,
   AutosaveResponse,

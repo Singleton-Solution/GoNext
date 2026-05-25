@@ -56,10 +56,13 @@ export {
 } from './default-core-blocks.ts';
 
 export {
+  AutosaveIndicator,
   LockBanner,
   RecoveryDialog,
+  relativeTimestamp,
   useAutosave,
   usePostLock,
+  type AutosaveIndicatorProps,
   type AutosavePayload,
   type AutosaveResponse,
   type AutosaveState,
@@ -70,3 +73,15 @@ export {
   type RecoveryDialogProps,
   type UseAutosaveOptions,
 } from './autosave/index.ts';
+
+export {
+  EditorRailTabs,
+  type EditorRailTab,
+  type EditorRailTabsProps,
+} from './editor-rail-tabs.tsx';
+
+export {
+  DocTitleEditor,
+  parsePlaceholder,
+  type DocTitleEditorProps,
+} from './doc-title-editor.tsx';
