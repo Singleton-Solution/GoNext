@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 64" width="260" height="64" aria-label="GoNext">
+  
+  <rect x="0" y="12" width="40" height="40" rx="9" fill="#0E1A14"></rect>
+  <path d="M 13 36 Q 18 22, 30 24 Q 25 32, 14 39 Z" fill="#10B981"></path>
+  <text x="54" y="44" class="go">Go</text>
+  <text x="106" y="44" class="next">Next</text>
+</svg>

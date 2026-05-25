@@ -1,52 +1,73 @@
 /*
  * @gonext/admin — global styles.
  *
- * Intentionally tiny: this scaffold pre-dates the design-system extraction
- * (issue #34). Real visual styling lands with the design tokens package.
- * For now we ship the shell-level styles needed for the sidebar+main layout
- * to be navigable, and nothing more.
+ * Loads the brand design tokens (cream-paper / forest-ink / emerald +
+ * lavender), Tailwind v3 directives, and the legacy shell selectors
+ * that the scaffold's existing screens (login card, setup wizard,
+ * sidebar, global search, search page) depend on for layout. The
+ * legacy selectors remain so existing snapshot / DOM tests keep
+ * passing; their color values now resolve to the new Living-Systems
+ * tokens instead of the pre-brand placeholders.
+ *
+ * New surfaces should reach for the Tailwind classes (which map to
+ * the same tokens via tailwind.config.ts) rather than adding more
+ * legacy class names here.
  */
+
+@import './../styles/tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 * {
   box-sizing: border-box;
 }
 
+/* ---------------------------------------------------------------------------
+ * Legacy color/space aliases.
+ *
+ * The pre-brand scaffold's CSS used --color-bg / --color-surface / etc.
+ * Rather than rewrite every selector below, we re-point those aliases at
+ * the new brand tokens so legacy classes (.sidebar, .login-card, .setup,
+ * .global-search, etc.) inherit the new look automatically. New code should
+ * use the Tailwind classes (bg-paper, border-border, etc.) instead.
+ * ------------------------------------------------------------------------- */
 :root {
-  --color-bg: #f6f7f9;
-  --color-surface: #ffffff;
-  --color-border: #e4e6ea;
-  --color-text: #1c2024;
-  --color-text-muted: #6b7280;
-  --color-accent: #2563eb;
-  --color-accent-hover: #1d4ed8;
-  --sidebar-width: 220px;
+  --color-bg: var(--paper);
+  --color-surface: var(--paper-2);
+  --color-border: var(--border);
+  --color-text: var(--ink);
+  --color-text-muted: var(--fg-muted);
+  --color-accent: var(--emerald);
+  --color-accent-hover: var(--emerald-deep);
+  --sidebar-width: 248px;
   --sidebar-width-collapsed: 64px;
   --header-height: 56px;
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --radius: 6px;
-  --font-sans:
-    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-    sans-serif;
+  --space-1: var(--s-1);
+  --space-2: var(--s-2);
+  --space-3: var(--s-3);
+  --space-4: var(--s-4);
+  --space-6: var(--s-6);
+  --space-8: var(--s-7);
+  --radius: var(--r-md);
 }
 
 html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--color-bg);
-  color: var(--color-text);
+  background: var(--paper);
+  color: var(--ink);
   font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: var(--t-base);
+  line-height: var(--lh-normal);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 a {
-  color: var(--color-accent);
+  color: var(--emerald-deep);
   text-decoration: none;
 }
 
@@ -74,31 +95,28 @@ h2 {
   font-size: 18px;
 }
 
+/* ---------------------------------------------------------------------------
+ * Shell — sidebar + header + content. The new chrome lives in
+ * `src/app/(authenticated)/_components/Sidebar.tsx` and the
+ * authenticated layout. The forest-on-paper repaint below uses the
+ * brand tokens directly.
+ * ------------------------------------------------------------------------- */
 .app-shell {
   display: flex;
   min-height: 100vh;
 }
 
-/*
- * Public shell — wraps unauthenticated surfaces (/login, /setup, …).
- * Full-viewport flex container that centers the page content card.
- * Intentionally has no chrome of its own; per-surface CSS (.login-card,
- * .setup) supplies the card styling.
- */
 .public-shell {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  padding: var(--space-6);
-  background: var(--color-bg);
+  padding: var(--s-6);
+  background: var(--paper);
 }
 
 .public-shell__content {
   width: 100%;
-  /* Wide enough to host the setup wizard's step indicator without
-     squeezing it; per-surface CSS (.login-card, .setup) constrains
-     itself tighter for the simpler forms. */
   max-width: 720px;
 }
 
@@ -111,26 +129,30 @@ h2 {
 
 .app-shell__header {
   height: var(--header-height);
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+  background: var(--paper);
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  padding: 0 var(--space-6);
-  font-weight: 600;
+  padding: 0 var(--s-6);
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--ink);
 }
 
 .app-shell__content {
-  padding: var(--space-6);
+  padding: var(--s-6);
   flex: 1;
 }
 
+/* Forest sidebar — matches docs/design/ui_kits/admin/index.html. */
 .sidebar {
   width: var(--sidebar-width);
-  background: var(--color-surface);
-  border-right: 1px solid var(--color-border);
+  background: var(--forest);
+  color: var(--fg-on-forest);
+  border-right: 1px solid var(--forest-border);
   display: flex;
   flex-direction: column;
-  transition: width 150ms ease;
+  transition: width 150ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 .sidebar--collapsed {
@@ -142,26 +164,34 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--space-3);
-  border-bottom: 1px solid var(--color-border);
-  font-weight: 600;
+  padding: 0 var(--s-4);
+  border-bottom: 1px solid var(--forest-border);
+  color: var(--fg-on-forest);
+  font-family: var(--font-display);
+  font-weight: 800;
 }
 
 .sidebar__toggle {
   background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border: 1px solid var(--forest-border);
+  border-radius: var(--r-sm);
   width: 28px;
   height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  color: var(--fg-on-forest-muted);
+}
+
+.sidebar__toggle:hover {
+  background: var(--forest-2);
+  color: var(--fg-on-forest);
 }
 
 .sidebar__nav {
   list-style: none;
   margin: 0;
-  padding: var(--space-2) 0;
+  padding: var(--s-2) 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -170,109 +200,149 @@ h2 {
 .sidebar__item a {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-4);
-  color: var(--color-text);
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-4);
+  color: var(--fg-on-forest-muted);
   text-decoration: none;
   border-left: 2px solid transparent;
+  font-size: var(--t-sm);
+  font-weight: 500;
+  transition: background 100ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    color 100ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 .sidebar__item a:hover {
-  background: var(--color-bg);
+  background: var(--forest-2);
+  color: var(--fg-on-forest);
   text-decoration: none;
 }
 
 .sidebar__item--active a {
-  background: var(--color-bg);
-  border-left-color: var(--color-accent);
-  color: var(--color-accent);
-  font-weight: 500;
+  background: var(--forest-2);
+  border-left-color: var(--emerald-bright);
+  color: var(--fg-on-forest);
+  font-weight: 600;
+}
+
+.sidebar__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: inherit;
 }
 
 .sidebar--collapsed .sidebar__label {
   display: none;
 }
 
+.sidebar__wordmark {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+}
+
+.sidebar__wordmark svg {
+  height: 22px;
+  width: auto;
+}
+
 .widget-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: var(--space-4);
-  margin-top: var(--space-6);
+  gap: var(--s-4);
+  margin-top: var(--s-6);
 }
 
 .widget {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: var(--space-4);
+  background: var(--paper-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--s-5);
   min-height: 120px;
+  box-shadow: var(--sh-xs);
 }
 
 .widget__title {
-  font-size: 14px;
+  font-size: var(--t-base);
   font-weight: 600;
-  margin: 0 0 var(--space-2);
-  color: var(--color-text);
+  margin: 0 0 var(--s-2);
+  color: var(--ink);
+  font-family: var(--font-sans);
 }
 
 .widget__body {
-  color: var(--color-text-muted);
-  font-size: 13px;
+  color: var(--fg-muted);
+  font-size: var(--t-sm);
 }
 
+/* ---------------------------------------------------------------------------
+ * Legacy /login surface — superseded by the brand restyle in
+ * src/app/(public)/login/page.tsx. Kept here so any older snapshot
+ * referring to .login-card still renders coherently.
+ * ------------------------------------------------------------------------- */
 .login-card {
   max-width: 360px;
-  /* margin: auto centers when the parent is a block container;
-     under .public-shell (flex) the parent handles centering, so
-     auto resolves to 0 horizontally. The vertical breathing room
-     is provided by .public-shell's padding. */
   margin: 0 auto;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: var(--space-6);
+  background: var(--paper-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--s-6);
+  box-shadow: var(--sh-sm);
 }
 
 .form-field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  margin-bottom: var(--space-4);
+  gap: var(--s-1);
+  margin-bottom: var(--s-4);
 }
 
 .form-field label {
-  font-size: 13px;
+  font-size: var(--t-sm);
   font-weight: 500;
+  color: var(--ink);
 }
 
 .form-field input {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s-2) var(--s-3);
+  background: var(--paper-3);
+  color: var(--ink);
   font: inherit;
+  transition: border-color 160ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 160ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 .form-field input:focus {
-  outline: 2px solid var(--color-accent);
-  outline-offset: -1px;
-  border-color: var(--color-accent);
+  outline: none;
+  border-color: var(--emerald);
+  box-shadow: var(--sh-focus);
 }
 
 .btn-primary {
-  background: var(--color-accent);
-  color: white;
-  border: 0;
-  border-radius: var(--radius);
-  padding: var(--space-2) var(--space-4);
-  font-weight: 500;
+  background: var(--emerald);
+  color: var(--emerald-ink);
+  border: 1px solid var(--emerald);
+  border-radius: var(--r-md);
+  padding: var(--s-2) var(--s-4);
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  transition: background 160ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    color 160ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 .btn-primary:hover {
-  background: var(--color-accent-hover);
+  background: var(--emerald-deep);
+  color: var(--paper);
 }
 
 .muted {
-  color: var(--color-text-muted);
+  color: var(--fg-muted);
 }
 
 .visually-hidden {
@@ -287,13 +357,13 @@ h2 {
   border: 0;
 }
 
-/* GlobalSearch — sidebar-mounted command input. The component must
- * remain compact in the sidebar gutter; the dropdown floats below
- * the input and is positioned absolutely so it overlays the nav
- * without re-flowing the list. */
+/* ---------------------------------------------------------------------------
+ * GlobalSearch — sidebar-mounted command input. Repainted to live on
+ * the forest sidebar surface; the dropdown floats on cream paper.
+ * ------------------------------------------------------------------------- */
 .sidebar__search {
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--color-border);
+  padding: var(--s-2) var(--s-3);
+  border-bottom: 1px solid var(--forest-border);
 }
 
 .global-search {
@@ -302,40 +372,45 @@ h2 {
 
 .global-search__input {
   width: 100%;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--forest-border);
+  border-radius: var(--r-md);
+  padding: var(--s-2) var(--s-3);
   font: inherit;
-  background: var(--color-bg);
+  background: var(--forest-2);
+  color: var(--fg-on-forest);
+}
+
+.global-search__input::placeholder {
+  color: var(--fg-on-forest-muted);
 }
 
 .global-search__input:focus {
-  outline: 2px solid var(--color-accent);
-  outline-offset: -1px;
-  border-color: var(--color-accent);
-  background: var(--color-surface);
+  outline: none;
+  border-color: var(--emerald-bright);
+  box-shadow: var(--sh-focus);
+  background: var(--forest-3);
 }
 
 .global-search__results {
   position: absolute;
-  top: calc(100% + var(--space-1));
+  top: calc(100% + var(--s-1));
   left: 0;
   right: 0;
   z-index: 50;
   list-style: none;
   margin: 0;
-  padding: var(--space-1) 0;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding: var(--s-1) 0;
+  background: var(--paper-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-md);
   max-height: 60vh;
   overflow-y: auto;
 }
 
 .global-search__empty {
-  padding: var(--space-2) var(--space-3);
-  color: var(--color-text-muted);
+  padding: var(--s-2) var(--s-3);
+  color: var(--fg-muted);
 }
 
 .global-search__hit {
@@ -346,30 +421,32 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: var(--space-2) var(--space-3);
-  color: var(--color-text);
+  padding: var(--s-2) var(--s-3);
+  color: var(--ink);
 }
 
 .global-search__hit a:hover,
 .global-search__hit--focused a {
-  background: var(--color-bg);
+  background: var(--paper-3);
   text-decoration: none;
 }
 
 .global-search__hit-type {
-  font-size: 11px;
+  font-size: var(--t-2xs);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-text-muted);
+  letter-spacing: 0.12em;
+  color: var(--emerald-deep);
+  font-weight: 500;
 }
 
 .global-search__hit-title {
   font-weight: 500;
+  color: var(--ink);
 }
 
 .global-search__hit-excerpt {
-  font-size: 12px;
-  color: var(--color-text-muted);
+  font-size: var(--t-xs);
+  color: var(--fg-muted);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -377,8 +454,8 @@ h2 {
 }
 
 .global-search__hit-excerpt mark {
-  background: rgba(37, 99, 235, 0.18);
-  color: var(--color-text);
+  background: var(--emerald-soft);
+  color: var(--emerald-deep);
   padding: 0 2px;
   border-radius: 2px;
 }
@@ -386,89 +463,86 @@ h2 {
 /* /search full page */
 .search-page__list {
   list-style: none;
-  margin: var(--space-4) 0 0;
+  margin: var(--s-4) 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--s-3);
 }
 
 .search-page__hit {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: var(--space-4);
+  background: var(--paper-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--s-5);
+  box-shadow: var(--sh-xs);
 }
 
 .search-page__hit a {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  color: var(--color-text);
+  color: var(--ink);
 }
 
 .search-page__hit-type {
-  font-size: 11px;
+  font-size: var(--t-2xs);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-text-muted);
+  letter-spacing: 0.12em;
+  color: var(--emerald-deep);
+  font-weight: 500;
 }
 
 .search-page__hit-title {
-  font-size: 16px;
+  font-size: var(--t-lg);
   font-weight: 500;
 }
 
 .search-page__hit-excerpt {
-  margin: var(--space-2) 0 0;
-  color: var(--color-text-muted);
+  margin: var(--s-2) 0 0;
+  color: var(--fg-muted);
 }
 
 .search-page__hit-excerpt mark {
-  background: rgba(37, 99, 235, 0.18);
-  color: var(--color-text);
+  background: var(--emerald-soft);
+  color: var(--emerald-deep);
   padding: 0 2px;
   border-radius: 2px;
 }
 
 /* ---------------------------------------------------------------------------
- * Setup wizard — the in-browser first-run install surface. Lives at /setup.
- * The shell mimics the login-card pattern but is roomier because the wizard
- * has its own multi-step flow + step indicator.
+ * Setup wizard — the in-browser first-run install surface.
  * ------------------------------------------------------------------------- */
 .setup {
   max-width: 640px;
-  /* Under .public-shell (flex), horizontal centering is parent-driven
-     and the vertical breathing room comes from .public-shell's padding.
-     Keep the inner side padding so narrow viewports don't pin content
-     to the edge. */
   margin: 0 auto;
-  padding: 0 var(--space-4);
+  padding: 0 var(--s-4);
 }
 
 .setup__header {
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--s-6);
   text-align: center;
 }
 
 .setup__header h1 {
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--s-2);
 }
 
 .setup__step {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: var(--space-6);
+  background: var(--paper-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--s-6);
+  box-shadow: var(--sh-sm);
 }
 
 .setup-steps {
   list-style: none;
-  margin: var(--space-6) 0 0;
+  margin: var(--s-6) 0 0;
   padding: 0;
   display: flex;
   justify-content: space-between;
-  gap: var(--space-2);
+  gap: var(--s-2);
 }
 
 .setup-steps__item {
@@ -476,17 +550,17 @@ h2 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-1);
-  color: var(--color-text-muted);
-  font-size: 12px;
-  border-top: 2px solid var(--color-border);
-  padding-top: var(--space-2);
+  gap: var(--s-1);
+  color: var(--fg-muted);
+  font-size: var(--t-xs);
+  border-top: 2px solid var(--border);
+  padding-top: var(--s-2);
 }
 
 .setup-steps__item--current,
 .setup-steps__item--done {
-  color: var(--color-accent);
-  border-top-color: var(--color-accent);
+  color: var(--emerald-deep);
+  border-top-color: var(--emerald);
 }
 
 .setup-steps__num {
@@ -496,57 +570,59 @@ h2 {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  background: var(--paper-3);
+  border: 1px solid var(--border);
   font-weight: 600;
-  font-size: 11px;
+  font-size: var(--t-2xs);
+  font-family: var(--font-mono);
 }
 
 .setup-steps__item--current .setup-steps__num,
 .setup-steps__item--done .setup-steps__num {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: white;
+  background: var(--emerald);
+  border-color: var(--emerald);
+  color: var(--emerald-ink);
 }
 
 .setup-step h2 {
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--s-2);
 }
 
 .setup-step__actions {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-3);
-  margin-top: var(--space-6);
+  gap: var(--s-3);
+  margin-top: var(--s-6);
 }
 
 .setup-step__error {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #991b1b;
-  border-radius: var(--radius);
-  padding: var(--space-3);
-  margin-bottom: var(--space-4);
-  font-size: 13px;
+  background: var(--danger-soft);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  border-radius: var(--r-md);
+  padding: var(--s-3);
+  margin-bottom: var(--s-4);
+  font-size: var(--t-sm);
 }
 
 .setup-step__hint {
-  font-size: 12px;
-  color: #b45309;
-  margin-top: var(--space-1);
+  font-size: var(--t-xs);
+  color: var(--warning);
+  margin-top: var(--s-1);
 }
 
 .btn-secondary {
-  background: var(--color-surface);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: var(--space-2) var(--space-4);
+  background: var(--paper-2);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s-2) var(--s-4);
   font-weight: 500;
 }
 
 .btn-secondary:hover {
-  background: var(--color-bg);
+  background: var(--paper-3);
+  border-color: var(--border-strong);
 }
 
 .btn-primary[disabled],
@@ -557,7 +633,7 @@ h2 {
 
 /* Strength meter */
 .setup-strength {
-  margin-top: var(--space-1);
+  margin-top: var(--s-1);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -567,7 +643,7 @@ h2 {
   width: 100%;
   height: 6px;
   border-radius: 3px;
-  background: var(--color-border);
+  background: var(--paper-3);
   overflow: hidden;
 }
 
@@ -577,24 +653,24 @@ h2 {
 }
 
 .setup-strength__label {
-  font-size: 12px;
+  font-size: var(--t-xs);
 }
 
 /* System check */
 .setup-checks {
   list-style: none;
-  margin: var(--space-4) 0 var(--space-2);
+  margin: var(--s-4) 0 var(--s-2);
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--s-2);
 }
 
 .setup-checks__row {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  font-size: 13px;
+  gap: var(--s-3);
+  font-size: var(--t-sm);
 }
 
 .setup-checks__dot {
@@ -610,21 +686,21 @@ h2 {
 }
 
 .setup-checks__detail {
-  font-size: 12px;
+  font-size: var(--t-xs);
 }
 
 /* Review step */
 .setup-review {
   display: grid;
   grid-template-columns: 140px 1fr;
-  gap: var(--space-2) var(--space-4);
-  margin: var(--space-4) 0;
+  gap: var(--s-2) var(--s-4);
+  margin: var(--s-4) 0;
 }
 
 .setup-review dt {
   font-weight: 600;
-  color: var(--color-text-muted);
-  font-size: 13px;
+  color: var(--fg-muted);
+  font-size: var(--t-sm);
 }
 
 .setup-review dd {
