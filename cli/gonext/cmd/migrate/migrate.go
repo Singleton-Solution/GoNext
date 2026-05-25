@@ -40,6 +40,8 @@ Subcommands:
   status           Print the current schema version and dirty flag.
   wp               Import a WordPress WXR export. See 'migrate wp --help'.
   verify           Verify a WordPress import for fidelity. See 'migrate verify --help'.
+  replacements     Emit a Markdown report of GoNext equivalents for WP plugins.
+                   See 'migrate replacements --help'.
 
 Environment:
   DATABASE_URL              Required. Postgres DSN.
@@ -75,6 +77,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runWP(args[1:], stdout, stderr)
 	case "verify":
 		return runVerify(args[1:], stdout, stderr)
+	case "replacements":
+		return runReplacements(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "gonext migrate: unknown subcommand %q\n\n%s\n", args[0], usage)
 		return ExitUsage
