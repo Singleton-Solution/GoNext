@@ -646,6 +646,22 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 	if err := restposts.Mount(mux, "/api/v1/posts", restposts.Deps{
 		Store:    postsStore,
 		Policy:   postsPolicy,
+	// Posts REST surface (CRUD over /api/v1/posts). PgxStore persists
+	// to the canonical posts table from 000004_posts.up.sql — restart
+	// the api and the corpus is still there. The store is constructed
+	// only when the pool is non-nil; a nil pool falls back to the
+	// in-memory store so unit tests of buildRouter don't need a live
+	// database. (Production never reaches the fallback: db.New refuses
+	// to return nil without an error.)
+	var postsStore restposts.Store
+	if pool != nil {
+		postsStore = restposts.NewPgxStore(pool)
+	} else {
+		postsStore = restposts.NewMemoryStore()
+	}
+	if err := restposts.Mount(mux, "/api/v1/posts", restposts.Deps{
+		Store:    postsStore,
+		Policy:   policy.NewBasicPolicy(policy.DefaultRoleCapabilities()),
 		Audit:    audit.NewEmitter(audit.NewMemoryStore()),
 		Logger:   logger,
 		PostType: restposts.PostTypePost,
