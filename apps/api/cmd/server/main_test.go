@@ -29,7 +29,7 @@ func TestBuildRouter_DevPluginEndpointNotRegisteredWhenDevModeOff(t *testing.T) 
 	cfg := &config.Config{
 		Plugins: config.PluginsConfig{DevMode: false},
 	}
-	router := buildRouter(cfg, nil, nil, nil, "", testLogger(), nil, nil)
+	router := buildRouter(cfg, nil, nil, nil, "", testLogger(), nil, nil, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/_/plugins/dev/install", nil)
 	rr := httptest.NewRecorder()
@@ -49,7 +49,7 @@ func TestBuildRouter_DevPluginEndpointRegisteredWhenDevModeOn(t *testing.T) {
 	cfg := &config.Config{
 		Plugins: config.PluginsConfig{DevMode: true, DevToken: "test-token-123"},
 	}
-	router := buildRouter(cfg, nil, nil, nil, "", testLogger(), nil, nil)
+	router := buildRouter(cfg, nil, nil, nil, "", testLogger(), nil, nil, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/_/plugins/dev/install", nil)
 	rr := httptest.NewRecorder()

@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	goredis "github.com/redis/go-redis/v9"
@@ -68,6 +69,19 @@ import (
 )
 
 const serviceName = "api"
+
+// auditRetention is how long 'info'-severity audit rows survive before
+// the Sweeper deletes them. 90 days matches the production target for
+// the audit-log retention SLO (docs/06-auth-permissions.md §13.2 lists
+// the default at 365 days for the auth/permission slice; we floor to
+// 90 here because the in-table retention is the cheap tier — the
+// SIEM-export pipeline carries the longer horizon).
+//
+// Promote to config.Config in a follow-up when other retention knobs
+// graduate. We don't gate this behind an env var yet because the
+// downstream wiring (config redaction, the existing OptionsFromEnv
+// shape) isn't worth the surface for a single duration.
+const auditRetention = 90 * 24 * time.Hour
 
 func main() {
 	// --print-config is an operator-facing escape hatch: load the config
@@ -205,11 +219,31 @@ func run(ctx context.Context) error {
 	// and owns the /metrics surface (issue #286). The HTTP metrics
 	// middleware (issue #158) registers gonext_http_* against the same
 	// registry so scrapers see them on the dedicated /metrics endpoint.
-	//
-	// Audit remains stubbed; that wiring lands in #54.
 	metricsReg := gonextmetrics.NewRegistry()
 	orch.MustRegister(logger, "metrics.flusher", noopCloser("metrics"))
-	orch.MustRegister(logger, "audit.emitter", noopCloser("audit"))
+
+	// Audit emitter. The PostgresStore writes to the audit_log table
+	// created by migration 000029. Every privileged-action handler
+	// downstream of this point shares ONE Emitter (per-request
+	// derived emitters carry the actor / IP / plugin context); the
+	// shared root keeps every audit row in the same table and lets a
+	// single shutdown closer flush the retention sweep on the way
+	// out.
+	//
+	// auditStore retains a typed handle (PostgresStore, not Store) so
+	// the sweeper closer below can call Sweep without a type
+	// assertion. The Emitter sees it through the Store interface, so
+	// downstream handlers can't accidentally pluck out the concrete
+	// store and skip the Emit-side validation.
+	auditStore := audit.NewPostgresStore(pool)
+	auditEmitter := audit.NewEmitter(auditStore)
+	auditSweeper := audit.NewSweeper(auditStore, auditRetention, &audit.SweeperOptions{
+		Log: logger.With(slog.String("component", "audit.sweeper")),
+	})
+	auditSweeper.Start()
+	orch.MustRegister(logger, "audit.emitter", func(stopCtx context.Context) error {
+		return auditSweeper.Stop(stopCtx)
+	})
 
 	// Session manager. Built here (rather than inside buildRouter) so its
 	// Close hook can be registered with the shutdown orchestrator and so
@@ -237,7 +271,7 @@ func run(ctx context.Context) error {
 		return redirectEngine.Stop(stopCtx)
 	})
 
-	mux := buildRouter(cfg, pool, rdb, sessions, themeDir, logger, redirectStore, redirectEngine)
+	mux := buildRouter(cfg, pool, rdb, sessions, themeDir, logger, redirectStore, redirectEngine, auditEmitter)
 
 	// Build the middleware chain. Early Hints (issue #122) sits AFTER
 	// Recovery (so a panicking hints provider doesn't crash the
@@ -355,7 +389,17 @@ func run(ctx context.Context) error {
 // enable DevMode, so they never see this surface — registering the
 // route conditionally (rather than gating at request time) is the
 // strongest guarantee we can offer.
-func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, sessions *session.Manager, themeDir string, logger *slog.Logger, redirectStore redirects.Store, redirectEngine *redirects.Engine) http.Handler {
+func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, sessions *session.Manager, themeDir string, logger *slog.Logger, redirectStore redirects.Store, redirectEngine *redirects.Engine, auditEmitter *audit.Emitter) http.Handler {
+	// Defensive fallback. The production caller (run) always passes a
+	// real auditEmitter built from PostgresStore + the live pool;
+	// existing route-table tests pass nil and rely on buildRouter to
+	// stand up a self-contained MemoryStore emitter so the test
+	// surface still mounts every handler. Without this guard, those
+	// tests would panic in lifecycle.NewManager / restposts.Mount
+	// because both reject a nil emitter.
+	if auditEmitter == nil {
+		auditEmitter = audit.NewEmitter(audit.NewMemoryStore())
+	}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
@@ -565,7 +609,6 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 		if lalErr != nil {
 			logger.Warn("login: failed to build login limiter", slog.Any("err", lalErr))
 		} else {
-			loginAudit := audit.NewEmitter(audit.NewMemoryStore())
 			if err := login.Mount(mux, login.Deps{
 				Lookup:             userLookupByEmail(pool),
 				Sessions:           sessions,
@@ -573,7 +616,7 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 				SessionAbsoluteTTL: cfg.Auth.SessionTTL,
 				SessionIdleTTL:     cfg.Auth.SessionIdleTTL,
 				Limiter:            loginLimiter,
-				AuditEmitter:       loginAudit,
+				AuditEmitter:       auditEmitter,
 				Insecure:           cfg.Env != "production",
 				Log:                logger,
 			}); err != nil {
@@ -591,7 +634,7 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 	if sessions != nil {
 		sessionsHandlers := authsessions.NewHandlers(
 			sessions,
-			audit.NewEmitter(audit.NewMemoryStore()),
+			auditEmitter,
 			authsessions.WithLogger(logger),
 		)
 		guarded := authmw.RequireSession(sessions)(sessionsHandlers.Routes())
@@ -646,7 +689,7 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 	if err := restposts.Mount(mux, "/api/v1/posts", restposts.Deps{
 		Store:    postsStore,
 		Policy:   postsPolicy,
-		Audit:    audit.NewEmitter(audit.NewMemoryStore()),
+		Audit:    auditEmitter,
 		Logger:   logger,
 		PostType: restposts.PostTypePost,
 	}); err != nil {
@@ -745,12 +788,12 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 		// CLI's watch loop. Storage is intentionally in-memory: the
 		// dev surface is for hot-reloading a single plugin while you
 		// iterate; persistence across api restarts isn't part of the
-		// contract. The audit emitter writes to an in-memory store so
-		// nothing in the dev path touches the prod audit DB schema
-		// before #54 ships.
+		// contract. The audit emitter is the shared Postgres-backed
+		// one — dev-mode plugin installs are themselves an event we
+		// want in the audit log, just like the production path.
 		mgr := lifecycle.NewManager(
 			lifecycle.NewMemoryStorage(),
-			audit.NewEmitter(audit.NewMemoryStore()),
+			auditEmitter,
 			lifecycle.WithLogger(logger),
 		)
 		mux.Handle("POST /_/plugins/dev/install", plugindev.Mount(cfg.Plugins, mgr, plugindev.WithLogger(logger)))

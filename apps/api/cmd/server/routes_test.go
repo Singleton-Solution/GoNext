@@ -73,7 +73,7 @@ func TestBuildRouter_DocumentedRoutesAreMounted(t *testing.T) {
 	// REGISTRATION never touches Redis, only handler INVOCATION does,
 	// and we never invoke past the auth guard in this test.
 	sm := session.NewWithClient(nil, testLogger())
-	router := buildRouter(cfg, nil, nil, sm, "", testLogger(), nil, nil)
+	router := buildRouter(cfg, nil, nil, sm, "", testLogger(), nil, nil, nil)
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
