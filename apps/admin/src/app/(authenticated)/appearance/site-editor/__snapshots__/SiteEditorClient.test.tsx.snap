@@ -1,0 +1,133 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SiteEditorClient > snapshots the toolbar so the brand chrome is locked in 1`] = `
+<nav
+  aria-label="Template parts"
+  class="relative overflow-hidden rounded-lg border border-forest-border bg-forest p-4 shadow-md"
+  data-surface="forest"
+>
+  <div
+    aria-hidden="true"
+    class="pointer-events-none absolute -right-[40%] -top-[20%] h-[400px] w-[400px]"
+    style="background: radial-gradient(circle, rgba(16, 185, 129, 0.18) 0%, transparent 60%);"
+  />
+  <div
+    class="relative"
+  >
+    <p
+      class="mb-3 font-sans text-2xs font-medium uppercase tracking-[0.14em] text-emerald-bright"
+    >
+      Parts · 
+      2
+    </p>
+    <ul
+      class="m-0 flex list-none flex-col gap-1 p-0"
+      data-testid="site-editor-rail"
+    >
+      <li
+        aria-current="page"
+        class="rounded-md transition-colors duration-[160ms] ease-brand bg-emerald/15 ring-1 ring-inset ring-emerald-bright/50"
+        data-testid="site-editor-part-header"
+      >
+        <button
+          class="flex w-full items-center justify-between gap-2 rounded-md border-0 bg-transparent px-3 py-2 text-left font-sans text-sm font-semibold text-fg-on-forest"
+          type="button"
+        >
+          <span
+            class="flex items-center gap-2"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-file-text h-3.5 w-3.5 shrink-0 text-emerald-bright"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"
+              />
+              <path
+                d="M14 2v4a2 2 0 0 0 2 2h4"
+              />
+              <path
+                d="M10 9H8"
+              />
+              <path
+                d="M16 13H8"
+              />
+              <path
+                d="M16 17H8"
+              />
+            </svg>
+            <span
+              class="truncate"
+            >
+              Header
+            </span>
+          </span>
+        </button>
+      </li>
+      <li
+        class="rounded-md transition-colors duration-[160ms] ease-brand hover:bg-forest-3"
+        data-testid="site-editor-part-footer"
+      >
+        <button
+          class="flex w-full items-center justify-between gap-2 rounded-md border-0 bg-transparent px-3 py-2 text-left font-sans text-sm font-normal text-fg-on-forest-muted hover:text-fg-on-forest"
+          type="button"
+        >
+          <span
+            class="flex items-center gap-2"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-file-text h-3.5 w-3.5 shrink-0 text-fg-on-forest-muted"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"
+              />
+              <path
+                d="M14 2v4a2 2 0 0 0 2 2h4"
+              />
+              <path
+                d="M10 9H8"
+              />
+              <path
+                d="M16 13H8"
+              />
+              <path
+                d="M16 17H8"
+              />
+            </svg>
+            <span
+              class="truncate"
+            >
+              Footer
+            </span>
+          </span>
+          <span
+            class="inline-flex shrink-0 items-center rounded-sm bg-lavender-soft px-1.5 py-[2px] font-sans text-[10px] font-medium uppercase tracking-wide text-lavender-deep"
+            data-testid="site-editor-badge-footer"
+          >
+            Modified
+          </span>
+        </button>
+      </li>
+    </ul>
+  </div>
+</nav>
+`;

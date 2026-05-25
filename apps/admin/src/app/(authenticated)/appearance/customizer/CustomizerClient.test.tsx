@@ -321,6 +321,34 @@ describe('CustomizerClient', () => {
     });
   });
 
+  it('renders the brand headline with an italic-accent <em> on "site"', () => {
+    render(
+      <CustomizerClient
+        active={makeActive()}
+        publicSiteUrl="http://localhost:3000"
+        saveAction={vi.fn()}
+        resetAction={vi.fn()}
+      />,
+    );
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading.textContent).toContain('Customize your');
+    const em = heading.querySelector('em');
+    expect(em).not.toBeNull();
+    expect(em?.textContent).toBe('site');
+  });
+
+  it('snapshots the customizer header so the brand chrome is locked in', () => {
+    const { container } = render(
+      <CustomizerClient
+        active={makeActive()}
+        publicSiteUrl="http://localhost:3000"
+        saveAction={vi.fn()}
+        resetAction={vi.fn()}
+      />,
+    );
+    expect(container.querySelector('.customizer__header')).toMatchSnapshot();
+  });
+
   it('renders the validation error detail when Save fails', async () => {
     const { ApiError } = await import('@/lib/api-client');
     const saveAction = vi.fn().mockRejectedValue(

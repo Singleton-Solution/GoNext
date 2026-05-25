@@ -1,0 +1,23 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CustomizerClient > snapshots the customizer header so the brand chrome is locked in 1`] = `
+<header
+  class="customizer__header"
+>
+  <h1>
+    Customize your 
+    <em>
+      site
+    </em>
+    .
+  </h1>
+  <p
+    class="muted"
+  >
+    Active theme: 
+    <strong>
+      gn-hello
+    </strong>
+  </p>
+</header>
+`;

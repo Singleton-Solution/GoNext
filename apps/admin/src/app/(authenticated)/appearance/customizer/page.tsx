@@ -32,7 +32,31 @@ export default async function CustomizerPage(): Promise<ReactElement> {
   if (!result.available) {
     return (
       <section>
-        <h1>Customize</h1>
+        <h1
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 'var(--t-3xl)',
+            fontWeight: 800,
+            letterSpacing: 'var(--track-tight)',
+            color: 'var(--ink)',
+            margin: 0,
+            lineHeight: 'var(--lh-tight)',
+          }}
+        >
+          Customize your{' '}
+          <em
+            style={{
+              fontFamily: 'var(--font-serif)',
+              fontStyle: 'italic',
+              fontWeight: 400,
+              color: 'var(--emerald-deep)',
+              fontSize: '1.05em',
+            }}
+          >
+            site
+          </em>
+          .
+        </h1>
         <p className="customizer__banner" role="status">
           Theme customizer is unavailable: {result.error}
         </p>
