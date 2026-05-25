@@ -41,25 +41,28 @@
 --     numeric PK + timestamp range partitions.
 --
 -- ──────────────────────────────────────────────────────────────────
--- Why no FK on actor_user_id
+-- actor_user_id: UUID, no FK
 -- ──────────────────────────────────────────────────────────────────
 --
--- doc 06 §13 declares `actor_user_id BIGINT REFERENCES users(id)`.
--- In this codebase users.id is UUID (see 000002_users.up.sql) — a
--- carry-over from the ADR 0003 rollout that the audit-log doc hasn't
--- caught up to yet. Reconciling the two is a separate follow-up
--- (docs/_audit/audit_actor_type.md is the placeholder); for v1 we
--- ship the audit table WITHOUT the FK and treat actor_user_id as a
--- soft reference. Rows survive user deletion (which is the right
--- audit posture anyway — "user 42 was deleted" is itself an audit
--- event, and the events that user emitted before deletion remain
--- their forensic record).
+-- doc 06 §13 declares `actor_user_id BIGINT REFERENCES users(id)`,
+-- but ADR 0003 (issued AFTER the audit-log spec was drafted) pinned
+-- every PK to UUID v7, and 000002_users.up.sql duly created
+-- `users.id UUID`. The audit-log doc hasn't caught up; this migration
+-- aligns to the actual world and the Go store's `::UUID` cast in
+-- packages/go/audit/postgres.go. Reconciling the doc is tracked in
+-- the audit-log housekeeping issue.
+--
+-- We keep `actor_user_id` nullable and DO NOT enforce a FK:
+-- audit rows survive user deletion (which is the right audit
+-- posture — "user 42 was deleted" is itself an audit event, and
+-- the events that user emitted before deletion remain their
+-- forensic record).
 --
 -- The Go store passes ActorUserID as a string and casts via
--- `NULLIF($2, '')::BIGINT` in postgres.go. If a caller ever passes a
--- non-integer string the cast fails at INSERT time with a clear pgx
--- error; that's the correct posture during the UUID-vs-BIGINT
--- transition — we crash loudly rather than silently storing garbage.
+-- `NULLIF($2, '')::UUID` in postgres.go. If a caller ever passes a
+-- non-UUID string the cast fails at INSERT time with a clear pgx
+-- error; that's the correct posture — we crash loudly rather than
+-- silently storing garbage.
 
 -- =============================================================================
 -- Table
@@ -77,8 +80,8 @@ CREATE TABLE audit_log (
     occurred_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     -- Nullable: pre-auth events (failed login) and system-internal
-    -- actions have no acting user. See header re: no FK.
-    actor_user_id   BIGINT,
+    -- actions have no acting user. See header re: UUID + no FK.
+    actor_user_id   UUID,
 
     -- One of 'user', 'plugin', 'system'. Enforced as a CHECK rather
     -- than an ENUM so the set can grow without a TYPE alter — and so
