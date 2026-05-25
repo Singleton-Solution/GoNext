@@ -1,0 +1,1693 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SetupWizard — snapshots per step > matches the Admin step 1`] = `
+<div>
+  <section
+    class="setup relative mx-auto w-full max-w-[760px]"
+  >
+    <div
+      aria-hidden="true"
+      class="pointer-events-none fixed -top-[20%] -right-[15%] -z-10 h-[700px] w-[700px]"
+      style="background: radial-gradient(circle, rgba(16, 185, 129, 0.10) 0%, transparent 60%);"
+    />
+    <div
+      aria-hidden="true"
+      class="pointer-events-none fixed -bottom-[25%] -left-[15%] -z-10 h-[600px] w-[600px]"
+      style="background: radial-gradient(circle, rgba(167, 139, 250, 0.08) 0%, transparent 60%);"
+    />
+    <header
+      class="setup__header mb-6 flex flex-col gap-5"
+    >
+      <div
+        class="flex items-center justify-between gap-4"
+      >
+        <span
+          aria-label="GoNext"
+          class="inline-flex items-baseline gap-[1px] leading-none"
+        >
+          <span
+            class="font-display text-[19px] font-extrabold tracking-tight text-ink"
+          >
+            Go
+          </span>
+          <span
+            class="font-serif text-[21px] italic text-ink"
+          >
+            Next
+          </span>
+        </span>
+        <span
+          class="font-sans text-xs uppercase tracking-[0.12em] text-fg-subtle"
+        >
+          First-run setup
+        </span>
+      </div>
+      <ol
+        aria-label="Setup progress"
+        class="setup-steps flex w-full items-center gap-0 list-none p-0 m-0"
+      >
+        <li
+          class="setup-steps__item setup-steps__item--done relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-emerald border-emerald text-emerald-ink"
+            >
+              <svg
+                class="lucide lucide-check"
+                fill="none"
+                height="11"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="3"
+                viewBox="0 0 24 24"
+                width="11"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M20 6 9 17l-5-5"
+                />
+              </svg>
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-fg-muted"
+            >
+              Welcome
+            </span>
+          </span>
+        </li>
+        <li
+          aria-current="step"
+          class="setup-steps__item setup-steps__item--current relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            aria-hidden="true"
+            class="h-px flex-1 bg-border"
+          />
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-ink border-ink text-paper"
+            >
+              02
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-ink"
+            >
+              Admin
+            </span>
+          </span>
+        </li>
+        <li
+          class="setup-steps__item relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            aria-hidden="true"
+            class="h-px flex-1 bg-border"
+          />
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-paper-3 border-border text-fg-muted"
+            >
+              03
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-fg-muted"
+            >
+              Site
+            </span>
+          </span>
+        </li>
+        <li
+          class="setup-steps__item relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            aria-hidden="true"
+            class="h-px flex-1 bg-border"
+          />
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-paper-3 border-border text-fg-muted"
+            >
+              04
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-fg-muted"
+            >
+              Review
+            </span>
+          </span>
+        </li>
+        <li
+          class="setup-steps__item relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            aria-hidden="true"
+            class="h-px flex-1 bg-border"
+          />
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-paper-3 border-border text-fg-muted"
+            >
+              05
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-fg-muted"
+            >
+              Done
+            </span>
+          </span>
+        </li>
+      </ol>
+      <h1
+        class="sr-only"
+      >
+        Set up GoNext
+      </h1>
+    </header>
+    <div
+      class="setup__step rounded-xl border border-border bg-paper-2 shadow-md px-8 py-8 sm:px-10 sm:py-10"
+    >
+      <form
+        class="setup-step flex flex-col gap-6"
+        novalidate=""
+      >
+        <div
+          class="flex flex-col gap-3"
+        >
+          <span
+            class="font-sans text-xs font-medium uppercase tracking-[0.12em] text-emerald-deep"
+          >
+            Step 02 — Identity
+          </span>
+          <h2
+            class="font-display font-extrabold tracking-tight m-0 text-ink [&_em]:font-serif [&_em]:italic [&_em]:font-normal [&_em]:text-[1.05em] [&_em]:tracking-[-0.01em] [&_em]:text-emerald-deep data-[surface=forest]:text-fg-on-forest [[data-surface=forest]_&]:text-fg-on-forest data-[surface=forest]:[&_em]:text-emerald-bright [[data-surface=forest]_&]:[&_em]:text-emerald-bright text-[32px] leading-[1.15]"
+          >
+            <em>
+              First
+            </em>
+             Administrator
+          </h2>
+          <p
+            class="font-sans text-md text-fg-muted"
+          >
+            This account becomes the super_admin. Pick a long passphrase — short passwords are refused server-side regardless of what the meter reports.
+          </p>
+        </div>
+        <div
+          class="form-field flex flex-col gap-[6px]"
+        >
+          <label
+            class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            for="setup-email"
+          >
+            Email
+          </label>
+          <input
+            autocomplete="username"
+            class="flex h-9 w-full rounded-md border border-border bg-paper-3 px-3 py-1.5 font-sans text-sm leading-none text-ink placeholder:text-fg-faint transition-shadow duration-[160ms] ease-brand hover:border-border-strong focus-visible:outline-none focus-visible:border-emerald focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-ink"
+            id="setup-email"
+            name="admin_email"
+            placeholder="you@example.com"
+            required=""
+            type="email"
+            value=""
+          />
+        </div>
+        <div
+          class="form-field flex flex-col gap-[6px]"
+        >
+          <label
+            class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            for="setup-password"
+          >
+            Password
+          </label>
+          <input
+            aria-describedby="setup-password-strength"
+            autocomplete="new-password"
+            class="flex h-9 w-full rounded-md border border-border bg-paper-3 px-3 py-1.5 font-sans text-sm leading-none text-ink placeholder:text-fg-faint transition-shadow duration-[160ms] ease-brand hover:border-border-strong focus-visible:outline-none focus-visible:border-emerald focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-ink"
+            id="setup-password"
+            minlength="12"
+            name="admin_password"
+            placeholder="At least 12 characters"
+            required=""
+            type="password"
+            value=""
+          />
+          <div
+            aria-live="polite"
+            class="setup-strength mt-2 flex flex-col gap-2"
+            id="setup-password-strength"
+          >
+            <div
+              aria-valuemax="100"
+              aria-valuemin="0"
+              aria-valuenow="0"
+              aria-valuetext="No password entered"
+              class="setup-strength__track h-[6px] w-full overflow-hidden rounded-pill bg-paper-3 border border-border-subtle"
+              role="progressbar"
+            >
+              <div
+                class="setup-strength__fill h-full rounded-pill transition-[width,background] duration-[260ms] ease-brand"
+                style="width: 0%; background: transparent;"
+              />
+            </div>
+            <span
+              class="setup-strength__label font-sans text-xs text-fg-subtle"
+            >
+              Enter a password
+            </span>
+          </div>
+        </div>
+        <div
+          class="setup-step__actions flex items-center justify-between gap-3 border-t border-border pt-5"
+        >
+          <button
+            class="inline-flex items-center justify-center gap-[6px] whitespace-nowrap rounded-md font-display font-bold transition-shadow duration-[160ms] ease-brand focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 bg-paper-2 text-ink border border-border shadow-xs hover:bg-paper-3 hover:border-border-strong px-4 py-[9px] text-sm btn-secondary"
+            type="button"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-arrow-left"
+              fill="none"
+              height="14"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="14"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="m12 19-7-7 7-7"
+              />
+              <path
+                d="M19 12H5"
+              />
+            </svg>
+            Back
+          </button>
+          <button
+            class="inline-flex items-center justify-center gap-[6px] whitespace-nowrap rounded-md font-display font-bold transition-shadow duration-[160ms] ease-brand focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 bg-ink text-paper border border-ink shadow-xs hover:bg-forest-2 hover:border-forest-2 px-5 py-3 text-base btn-primary"
+            disabled=""
+            type="submit"
+          >
+            Continue
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-arrow-right"
+              fill="none"
+              height="14"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="14"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M5 12h14"
+              />
+              <path
+                d="m12 5 7 7-7 7"
+              />
+            </svg>
+          </button>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+`;
+
+exports[`SetupWizard — snapshots per step > matches the Done step after a successful install 1`] = `
+<div>
+  <section
+    class="setup relative mx-auto w-full max-w-[760px]"
+  >
+    <div
+      aria-hidden="true"
+      class="pointer-events-none fixed -top-[20%] -right-[15%] -z-10 h-[700px] w-[700px]"
+      style="background: radial-gradient(circle, rgba(16, 185, 129, 0.10) 0%, transparent 60%);"
+    />
+    <div
+      aria-hidden="true"
+      class="pointer-events-none fixed -bottom-[25%] -left-[15%] -z-10 h-[600px] w-[600px]"
+      style="background: radial-gradient(circle, rgba(167, 139, 250, 0.08) 0%, transparent 60%);"
+    />
+    <header
+      class="setup__header mb-6 flex flex-col gap-5"
+    >
+      <div
+        class="flex items-center justify-between gap-4"
+      >
+        <span
+          aria-label="GoNext"
+          class="inline-flex items-baseline gap-[1px] leading-none"
+        >
+          <span
+            class="font-display text-[19px] font-extrabold tracking-tight text-ink"
+          >
+            Go
+          </span>
+          <span
+            class="font-serif text-[21px] italic text-ink"
+          >
+            Next
+          </span>
+        </span>
+        <span
+          class="font-sans text-xs uppercase tracking-[0.12em] text-fg-subtle"
+        >
+          First-run setup
+        </span>
+      </div>
+      <ol
+        aria-label="Setup progress"
+        class="setup-steps flex w-full items-center gap-0 list-none p-0 m-0"
+      >
+        <li
+          class="setup-steps__item setup-steps__item--done relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-emerald border-emerald text-emerald-ink"
+            >
+              <svg
+                class="lucide lucide-check"
+                fill="none"
+                height="11"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="3"
+                viewBox="0 0 24 24"
+                width="11"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M20 6 9 17l-5-5"
+                />
+              </svg>
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-fg-muted"
+            >
+              Welcome
+            </span>
+          </span>
+        </li>
+        <li
+          class="setup-steps__item setup-steps__item--done relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            aria-hidden="true"
+            class="h-px flex-1 bg-border"
+          />
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-emerald border-emerald text-emerald-ink"
+            >
+              <svg
+                class="lucide lucide-check"
+                fill="none"
+                height="11"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="3"
+                viewBox="0 0 24 24"
+                width="11"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M20 6 9 17l-5-5"
+                />
+              </svg>
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-fg-muted"
+            >
+              Admin
+            </span>
+          </span>
+        </li>
+        <li
+          class="setup-steps__item setup-steps__item--done relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            aria-hidden="true"
+            class="h-px flex-1 bg-border"
+          />
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-emerald border-emerald text-emerald-ink"
+            >
+              <svg
+                class="lucide lucide-check"
+                fill="none"
+                height="11"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="3"
+                viewBox="0 0 24 24"
+                width="11"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M20 6 9 17l-5-5"
+                />
+              </svg>
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-fg-muted"
+            >
+              Site
+            </span>
+          </span>
+        </li>
+        <li
+          class="setup-steps__item setup-steps__item--done relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            aria-hidden="true"
+            class="h-px flex-1 bg-border"
+          />
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-emerald border-emerald text-emerald-ink"
+            >
+              <svg
+                class="lucide lucide-check"
+                fill="none"
+                height="11"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="3"
+                viewBox="0 0 24 24"
+                width="11"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M20 6 9 17l-5-5"
+                />
+              </svg>
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-fg-muted"
+            >
+              Review
+            </span>
+          </span>
+        </li>
+        <li
+          aria-current="step"
+          class="setup-steps__item setup-steps__item--current relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            aria-hidden="true"
+            class="h-px flex-1 bg-border"
+          />
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-ink border-ink text-paper"
+            >
+              05
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-ink"
+            >
+              Done
+            </span>
+          </span>
+        </li>
+      </ol>
+      <h1
+        class="sr-only"
+      >
+        Set up GoNext
+      </h1>
+    </header>
+    <div
+      class="setup__step rounded-xl border border-border bg-paper-2 shadow-md px-8 py-8 sm:px-10 sm:py-10"
+    >
+      <div
+        class="setup-step flex flex-col items-center gap-5 py-6 text-center"
+      >
+        <span
+          aria-hidden="true"
+          class="flex h-14 w-14 items-center justify-center rounded-pill bg-emerald-soft text-emerald-deep"
+        >
+          <svg
+            class="lucide lucide-circle-check"
+            fill="none"
+            height="28"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2.25"
+            viewBox="0 0 24 24"
+            width="28"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+            />
+            <path
+              d="m9 12 2 2 4-4"
+            />
+          </svg>
+        </span>
+        <span
+          class="font-sans text-xs font-medium uppercase tracking-[0.12em] text-emerald-deep"
+        >
+          Installed — welcome aboard
+        </span>
+        <h2
+          class="font-display font-extrabold tracking-tight m-0 text-ink [&_em]:font-serif [&_em]:italic [&_em]:font-normal [&_em]:text-[1.05em] [&_em]:tracking-[-0.01em] [&_em]:text-emerald-deep data-[surface=forest]:text-fg-on-forest [[data-surface=forest]_&]:text-fg-on-forest data-[surface=forest]:[&_em]:text-emerald-bright [[data-surface=forest]_&]:[&_em]:text-emerald-bright text-[32px] leading-[1.15]"
+        >
+          You are 
+          <em>
+            in
+          </em>
+          .
+        </h2>
+        <p
+          class="font-sans text-md text-fg-muted max-w-[420px]"
+        >
+          Install completed. Redirecting to the admin dashboard…
+        </p>
+        <span
+          aria-live="polite"
+          class="mt-2 inline-flex items-center gap-2 font-sans text-xs text-fg-subtle"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-sparkles text-emerald-deep"
+            fill="none"
+            height="12"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="12"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"
+            />
+            <path
+              d="M20 3v4"
+            />
+            <path
+              d="M22 5h-4"
+            />
+            <path
+              d="M4 17v2"
+            />
+            <path
+              d="M5 18H3"
+            />
+          </svg>
+          Spinning up your workspace
+        </span>
+      </div>
+    </div>
+  </section>
+</div>
+`;
+
+exports[`SetupWizard — snapshots per step > matches the Review step 1`] = `
+<div>
+  <section
+    class="setup relative mx-auto w-full max-w-[760px]"
+  >
+    <div
+      aria-hidden="true"
+      class="pointer-events-none fixed -top-[20%] -right-[15%] -z-10 h-[700px] w-[700px]"
+      style="background: radial-gradient(circle, rgba(16, 185, 129, 0.10) 0%, transparent 60%);"
+    />
+    <div
+      aria-hidden="true"
+      class="pointer-events-none fixed -bottom-[25%] -left-[15%] -z-10 h-[600px] w-[600px]"
+      style="background: radial-gradient(circle, rgba(167, 139, 250, 0.08) 0%, transparent 60%);"
+    />
+    <header
+      class="setup__header mb-6 flex flex-col gap-5"
+    >
+      <div
+        class="flex items-center justify-between gap-4"
+      >
+        <span
+          aria-label="GoNext"
+          class="inline-flex items-baseline gap-[1px] leading-none"
+        >
+          <span
+            class="font-display text-[19px] font-extrabold tracking-tight text-ink"
+          >
+            Go
+          </span>
+          <span
+            class="font-serif text-[21px] italic text-ink"
+          >
+            Next
+          </span>
+        </span>
+        <span
+          class="font-sans text-xs uppercase tracking-[0.12em] text-fg-subtle"
+        >
+          First-run setup
+        </span>
+      </div>
+      <ol
+        aria-label="Setup progress"
+        class="setup-steps flex w-full items-center gap-0 list-none p-0 m-0"
+      >
+        <li
+          class="setup-steps__item setup-steps__item--done relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-emerald border-emerald text-emerald-ink"
+            >
+              <svg
+                class="lucide lucide-check"
+                fill="none"
+                height="11"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="3"
+                viewBox="0 0 24 24"
+                width="11"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M20 6 9 17l-5-5"
+                />
+              </svg>
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-fg-muted"
+            >
+              Welcome
+            </span>
+          </span>
+        </li>
+        <li
+          class="setup-steps__item setup-steps__item--done relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            aria-hidden="true"
+            class="h-px flex-1 bg-border"
+          />
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-emerald border-emerald text-emerald-ink"
+            >
+              <svg
+                class="lucide lucide-check"
+                fill="none"
+                height="11"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="3"
+                viewBox="0 0 24 24"
+                width="11"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M20 6 9 17l-5-5"
+                />
+              </svg>
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-fg-muted"
+            >
+              Admin
+            </span>
+          </span>
+        </li>
+        <li
+          class="setup-steps__item setup-steps__item--done relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            aria-hidden="true"
+            class="h-px flex-1 bg-border"
+          />
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-emerald border-emerald text-emerald-ink"
+            >
+              <svg
+                class="lucide lucide-check"
+                fill="none"
+                height="11"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="3"
+                viewBox="0 0 24 24"
+                width="11"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M20 6 9 17l-5-5"
+                />
+              </svg>
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-fg-muted"
+            >
+              Site
+            </span>
+          </span>
+        </li>
+        <li
+          aria-current="step"
+          class="setup-steps__item setup-steps__item--current relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            aria-hidden="true"
+            class="h-px flex-1 bg-border"
+          />
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-ink border-ink text-paper"
+            >
+              04
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-ink"
+            >
+              Review
+            </span>
+          </span>
+        </li>
+        <li
+          class="setup-steps__item relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            aria-hidden="true"
+            class="h-px flex-1 bg-border"
+          />
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-paper-3 border-border text-fg-muted"
+            >
+              05
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-fg-muted"
+            >
+              Done
+            </span>
+          </span>
+        </li>
+      </ol>
+      <h1
+        class="sr-only"
+      >
+        Set up GoNext
+      </h1>
+    </header>
+    <div
+      class="setup__step rounded-xl border border-border bg-paper-2 shadow-md px-8 py-8 sm:px-10 sm:py-10"
+    >
+      <form
+        class="setup-step flex flex-col gap-6"
+        novalidate=""
+      >
+        <div
+          class="flex flex-col gap-3"
+        >
+          <span
+            class="font-sans text-xs font-medium uppercase tracking-[0.12em] text-emerald-deep"
+          >
+            Step 04 — Confirm
+          </span>
+          <h2
+            class="font-display font-extrabold tracking-tight m-0 text-ink [&_em]:font-serif [&_em]:italic [&_em]:font-normal [&_em]:text-[1.05em] [&_em]:tracking-[-0.01em] [&_em]:text-emerald-deep data-[surface=forest]:text-fg-on-forest [[data-surface=forest]_&]:text-fg-on-forest data-[surface=forest]:[&_em]:text-emerald-bright [[data-surface=forest]_&]:[&_em]:text-emerald-bright text-[32px] leading-[1.15]"
+          >
+            One last 
+            <em>
+              look
+            </em>
+            . Review.
+          </h2>
+          <p
+            class="font-sans text-md text-fg-muted"
+          >
+            Everything below ships to the API on confirm. The install lock seals after a 200 — you can't re-run this wizard.
+          </p>
+        </div>
+        <dl
+          class="setup-review grid grid-cols-[160px_1fr] gap-x-5 gap-y-3 rounded-lg border border-border bg-paper px-5 py-4"
+        >
+          <dt
+            class="font-sans text-xs uppercase tracking-[0.08em] text-fg-subtle"
+          >
+            Admin email
+          </dt>
+          <dd
+            class="font-mono text-sm text-ink"
+          >
+            admin@example.com
+          </dd>
+          <dt
+            class="font-sans text-xs uppercase tracking-[0.08em] text-fg-subtle"
+          >
+            Site name
+          </dt>
+          <dd
+            class="font-sans text-sm font-medium text-ink"
+          >
+            Acme CMS
+          </dd>
+          <dt
+            class="font-sans text-xs uppercase tracking-[0.08em] text-fg-subtle"
+          >
+            Site URL
+          </dt>
+          <dd
+            class="font-mono text-sm text-ink"
+          >
+            https://acme.example.com
+          </dd>
+          <dt
+            class="font-sans text-xs uppercase tracking-[0.08em] text-fg-subtle"
+          >
+            Password
+          </dt>
+          <dd
+            class="flex items-center gap-2 font-sans text-sm text-fg-muted"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-shield-check text-emerald-deep"
+              fill="none"
+              height="14"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="14"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+              />
+              <path
+                d="m9 12 2 2 4-4"
+              />
+            </svg>
+            <span
+              class="muted"
+            >
+              stored as argon2id
+            </span>
+          </dd>
+        </dl>
+        <div
+          class="setup-step__actions flex items-center justify-between gap-3 border-t border-border pt-5"
+        >
+          <button
+            class="inline-flex items-center justify-center gap-[6px] whitespace-nowrap rounded-md font-display font-bold transition-shadow duration-[160ms] ease-brand focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 bg-paper-2 text-ink border border-border shadow-xs hover:bg-paper-3 hover:border-border-strong px-4 py-[9px] text-sm btn-secondary"
+            type="button"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-arrow-left"
+              fill="none"
+              height="14"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="14"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="m12 19-7-7 7-7"
+              />
+              <path
+                d="M19 12H5"
+              />
+            </svg>
+            Back
+          </button>
+          <button
+            class="inline-flex items-center justify-center gap-[6px] whitespace-nowrap rounded-md font-display font-bold transition-shadow duration-[160ms] ease-brand focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 bg-emerald text-emerald-ink border border-emerald shadow-xs hover:bg-emerald-deep hover:text-paper hover:border-emerald-deep px-5 py-3 text-base btn-primary"
+            type="submit"
+          >
+            Confirm install
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-arrow-right"
+              fill="none"
+              height="14"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="14"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M5 12h14"
+              />
+              <path
+                d="m12 5 7 7-7 7"
+              />
+            </svg>
+          </button>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+`;
+
+exports[`SetupWizard — snapshots per step > matches the Site step 1`] = `
+<div>
+  <section
+    class="setup relative mx-auto w-full max-w-[760px]"
+  >
+    <div
+      aria-hidden="true"
+      class="pointer-events-none fixed -top-[20%] -right-[15%] -z-10 h-[700px] w-[700px]"
+      style="background: radial-gradient(circle, rgba(16, 185, 129, 0.10) 0%, transparent 60%);"
+    />
+    <div
+      aria-hidden="true"
+      class="pointer-events-none fixed -bottom-[25%] -left-[15%] -z-10 h-[600px] w-[600px]"
+      style="background: radial-gradient(circle, rgba(167, 139, 250, 0.08) 0%, transparent 60%);"
+    />
+    <header
+      class="setup__header mb-6 flex flex-col gap-5"
+    >
+      <div
+        class="flex items-center justify-between gap-4"
+      >
+        <span
+          aria-label="GoNext"
+          class="inline-flex items-baseline gap-[1px] leading-none"
+        >
+          <span
+            class="font-display text-[19px] font-extrabold tracking-tight text-ink"
+          >
+            Go
+          </span>
+          <span
+            class="font-serif text-[21px] italic text-ink"
+          >
+            Next
+          </span>
+        </span>
+        <span
+          class="font-sans text-xs uppercase tracking-[0.12em] text-fg-subtle"
+        >
+          First-run setup
+        </span>
+      </div>
+      <ol
+        aria-label="Setup progress"
+        class="setup-steps flex w-full items-center gap-0 list-none p-0 m-0"
+      >
+        <li
+          class="setup-steps__item setup-steps__item--done relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-emerald border-emerald text-emerald-ink"
+            >
+              <svg
+                class="lucide lucide-check"
+                fill="none"
+                height="11"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="3"
+                viewBox="0 0 24 24"
+                width="11"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M20 6 9 17l-5-5"
+                />
+              </svg>
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-fg-muted"
+            >
+              Welcome
+            </span>
+          </span>
+        </li>
+        <li
+          class="setup-steps__item setup-steps__item--done relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            aria-hidden="true"
+            class="h-px flex-1 bg-border"
+          />
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-emerald border-emerald text-emerald-ink"
+            >
+              <svg
+                class="lucide lucide-check"
+                fill="none"
+                height="11"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="3"
+                viewBox="0 0 24 24"
+                width="11"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M20 6 9 17l-5-5"
+                />
+              </svg>
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-fg-muted"
+            >
+              Admin
+            </span>
+          </span>
+        </li>
+        <li
+          aria-current="step"
+          class="setup-steps__item setup-steps__item--current relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            aria-hidden="true"
+            class="h-px flex-1 bg-border"
+          />
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-ink border-ink text-paper"
+            >
+              03
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-ink"
+            >
+              Site
+            </span>
+          </span>
+        </li>
+        <li
+          class="setup-steps__item relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            aria-hidden="true"
+            class="h-px flex-1 bg-border"
+          />
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-paper-3 border-border text-fg-muted"
+            >
+              04
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-fg-muted"
+            >
+              Review
+            </span>
+          </span>
+        </li>
+        <li
+          class="setup-steps__item relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            aria-hidden="true"
+            class="h-px flex-1 bg-border"
+          />
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-paper-3 border-border text-fg-muted"
+            >
+              05
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-fg-muted"
+            >
+              Done
+            </span>
+          </span>
+        </li>
+      </ol>
+      <h1
+        class="sr-only"
+      >
+        Set up GoNext
+      </h1>
+    </header>
+    <div
+      class="setup__step rounded-xl border border-border bg-paper-2 shadow-md px-8 py-8 sm:px-10 sm:py-10"
+    >
+      <form
+        class="setup-step flex flex-col gap-6"
+        novalidate=""
+      >
+        <div
+          class="flex flex-col gap-3"
+        >
+          <span
+            class="font-sans text-xs font-medium uppercase tracking-[0.12em] text-emerald-deep"
+          >
+            Step 03 — Identity
+          </span>
+          <h2
+            class="font-display font-extrabold tracking-tight m-0 text-ink [&_em]:font-serif [&_em]:italic [&_em]:font-normal [&_em]:text-[1.05em] [&_em]:tracking-[-0.01em] [&_em]:text-emerald-deep data-[surface=forest]:text-fg-on-forest [[data-surface=forest]_&]:text-fg-on-forest data-[surface=forest]:[&_em]:text-emerald-bright [[data-surface=forest]_&]:[&_em]:text-emerald-bright text-[32px] leading-[1.15]"
+          >
+            <em>
+              Site
+            </em>
+          </h2>
+          <p
+            class="font-sans text-md text-fg-muted"
+          >
+            You can change these later from Settings → General; they ship as the first values your visitors see.
+          </p>
+        </div>
+        <div
+          class="form-field flex flex-col gap-[6px]"
+        >
+          <label
+            class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            for="setup-site-name"
+          >
+            Site name
+          </label>
+          <input
+            class="flex h-9 w-full rounded-md border border-border bg-paper-3 px-3 py-1.5 font-sans text-sm leading-none text-ink placeholder:text-fg-faint transition-shadow duration-[160ms] ease-brand hover:border-border-strong focus-visible:outline-none focus-visible:border-emerald focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-ink"
+            id="setup-site-name"
+            maxlength="200"
+            name="site_name"
+            placeholder="Brick & Mortar"
+            required=""
+            type="text"
+            value=""
+          />
+        </div>
+        <div
+          class="form-field flex flex-col gap-[6px]"
+        >
+          <label
+            class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            for="setup-site-url"
+          >
+            Site URL
+          </label>
+          <input
+            class="flex h-9 w-full rounded-md border border-border bg-paper-3 px-3 py-1.5 font-sans text-sm leading-none text-ink placeholder:text-fg-faint transition-shadow duration-[160ms] ease-brand hover:border-border-strong focus-visible:outline-none focus-visible:border-emerald focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-ink"
+            id="setup-site-url"
+            name="site_url"
+            placeholder="https://example.com"
+            required=""
+            type="url"
+            value=""
+          />
+        </div>
+        <div
+          class="setup-step__actions flex items-center justify-between gap-3 border-t border-border pt-5"
+        >
+          <button
+            class="inline-flex items-center justify-center gap-[6px] whitespace-nowrap rounded-md font-display font-bold transition-shadow duration-[160ms] ease-brand focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 bg-paper-2 text-ink border border-border shadow-xs hover:bg-paper-3 hover:border-border-strong px-4 py-[9px] text-sm btn-secondary"
+            type="button"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-arrow-left"
+              fill="none"
+              height="14"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="14"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="m12 19-7-7 7-7"
+              />
+              <path
+                d="M19 12H5"
+              />
+            </svg>
+            Back
+          </button>
+          <button
+            class="inline-flex items-center justify-center gap-[6px] whitespace-nowrap rounded-md font-display font-bold transition-shadow duration-[160ms] ease-brand focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 bg-ink text-paper border border-ink shadow-xs hover:bg-forest-2 hover:border-forest-2 px-5 py-3 text-base btn-primary"
+            disabled=""
+            type="submit"
+          >
+            Continue
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-arrow-right"
+              fill="none"
+              height="14"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="14"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M5 12h14"
+              />
+              <path
+                d="m12 5 7 7-7 7"
+              />
+            </svg>
+          </button>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+`;
+
+exports[`SetupWizard — snapshots per step > matches the Welcome step 1`] = `
+<div>
+  <section
+    class="setup relative mx-auto w-full max-w-[760px]"
+  >
+    <div
+      aria-hidden="true"
+      class="pointer-events-none fixed -top-[20%] -right-[15%] -z-10 h-[700px] w-[700px]"
+      style="background: radial-gradient(circle, rgba(16, 185, 129, 0.10) 0%, transparent 60%);"
+    />
+    <div
+      aria-hidden="true"
+      class="pointer-events-none fixed -bottom-[25%] -left-[15%] -z-10 h-[600px] w-[600px]"
+      style="background: radial-gradient(circle, rgba(167, 139, 250, 0.08) 0%, transparent 60%);"
+    />
+    <header
+      class="setup__header mb-6 flex flex-col gap-5"
+    >
+      <div
+        class="flex items-center justify-between gap-4"
+      >
+        <span
+          aria-label="GoNext"
+          class="inline-flex items-baseline gap-[1px] leading-none"
+        >
+          <span
+            class="font-display text-[19px] font-extrabold tracking-tight text-ink"
+          >
+            Go
+          </span>
+          <span
+            class="font-serif text-[21px] italic text-ink"
+          >
+            Next
+          </span>
+        </span>
+        <span
+          class="font-sans text-xs uppercase tracking-[0.12em] text-fg-subtle"
+        >
+          First-run setup
+        </span>
+      </div>
+      <ol
+        aria-label="Setup progress"
+        class="setup-steps flex w-full items-center gap-0 list-none p-0 m-0"
+      >
+        <li
+          aria-current="step"
+          class="setup-steps__item setup-steps__item--current relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-ink border-ink text-paper"
+            >
+              01
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-ink"
+            >
+              Welcome
+            </span>
+          </span>
+        </li>
+        <li
+          class="setup-steps__item relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            aria-hidden="true"
+            class="h-px flex-1 bg-border"
+          />
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-paper-3 border-border text-fg-muted"
+            >
+              02
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-fg-muted"
+            >
+              Admin
+            </span>
+          </span>
+        </li>
+        <li
+          class="setup-steps__item relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            aria-hidden="true"
+            class="h-px flex-1 bg-border"
+          />
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-paper-3 border-border text-fg-muted"
+            >
+              03
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-fg-muted"
+            >
+              Site
+            </span>
+          </span>
+        </li>
+        <li
+          class="setup-steps__item relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            aria-hidden="true"
+            class="h-px flex-1 bg-border"
+          />
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-paper-3 border-border text-fg-muted"
+            >
+              04
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-fg-muted"
+            >
+              Review
+            </span>
+          </span>
+        </li>
+        <li
+          class="setup-steps__item relative flex flex-1 items-center gap-2 text-sm"
+        >
+          <span
+            aria-hidden="true"
+            class="h-px flex-1 bg-border"
+          />
+          <span
+            class="flex items-center gap-2 px-2"
+          >
+            <span
+              class="setup-steps__num flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium bg-paper-3 border-border text-fg-muted"
+            >
+              05
+            </span>
+            <span
+              class="setup-steps__label font-sans font-medium text-fg-muted"
+            >
+              Done
+            </span>
+          </span>
+        </li>
+      </ol>
+      <h1
+        class="sr-only"
+      >
+        Set up GoNext
+      </h1>
+    </header>
+    <div
+      class="setup__step rounded-xl border border-border bg-paper-2 shadow-md px-8 py-8 sm:px-10 sm:py-10"
+    >
+      <div
+        class="setup-step flex flex-col gap-6"
+      >
+        <div
+          class="flex flex-col gap-3"
+        >
+          <span
+            class="font-sans text-xs font-medium uppercase tracking-[0.12em] text-emerald-deep"
+          >
+            Welcome — let's begin
+          </span>
+          <h2
+            class="font-display font-extrabold tracking-tight m-0 text-ink [&_em]:font-serif [&_em]:italic [&_em]:font-normal [&_em]:text-[1.05em] [&_em]:tracking-[-0.01em] [&_em]:text-emerald-deep data-[surface=forest]:text-fg-on-forest [[data-surface=forest]_&]:text-fg-on-forest data-[surface=forest]:[&_em]:text-emerald-bright [[data-surface=forest]_&]:[&_em]:text-emerald-bright text-[32px] leading-[1.15]"
+          >
+            Welcome to GoNext. 
+            <em>
+              Let's begin
+            </em>
+            .
+          </h2>
+          <p
+            class="font-sans text-md text-fg-muted"
+          >
+            This wizard creates the bootstrap administrator and stamps the installation marker. It runs once — after a successful install this page returns to the login screen.
+          </p>
+        </div>
+        <ul
+          aria-label="System check"
+          class="setup-checks mt-6 flex flex-col gap-2 list-none p-0"
+        >
+          <li
+            class="setup-checks__row setup-checks__row--ok flex items-start gap-3 rounded-md border border-border bg-paper px-4 py-3"
+          >
+            <span
+              aria-hidden="true"
+              class="setup-checks__dot mt-[1px] flex h-5 w-5 shrink-0 items-center justify-center rounded-pill bg-emerald-soft text-emerald-deep"
+            >
+              <svg
+                class="lucide lucide-circle-check"
+                fill="none"
+                height="14"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2.25"
+                viewBox="0 0 24 24"
+                width="14"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                />
+                <path
+                  d="m9 12 2 2 4-4"
+                />
+              </svg>
+            </span>
+            <span
+              class="flex flex-1 flex-col gap-[2px]"
+            >
+              <span
+                class="setup-checks__label font-sans text-sm font-medium text-ink"
+              >
+                API reachable
+              </span>
+              <span
+                class="setup-checks__detail font-sans text-xs text-fg-muted"
+              >
+                GET /api/v1/setup/status returned 200
+              </span>
+            </span>
+          </li>
+          <li
+            class="setup-checks__row setup-checks__row--ok flex items-start gap-3 rounded-md border border-border bg-paper px-4 py-3"
+          >
+            <span
+              aria-hidden="true"
+              class="setup-checks__dot mt-[1px] flex h-5 w-5 shrink-0 items-center justify-center rounded-pill bg-emerald-soft text-emerald-deep"
+            >
+              <svg
+                class="lucide lucide-circle-check"
+                fill="none"
+                height="14"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2.25"
+                viewBox="0 0 24 24"
+                width="14"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                />
+                <path
+                  d="m9 12 2 2 4-4"
+                />
+              </svg>
+            </span>
+            <span
+              class="flex flex-1 flex-col gap-[2px]"
+            >
+              <span
+                class="setup-checks__label font-sans text-sm font-medium text-ink"
+              >
+                Installation lock
+              </span>
+              <span
+                class="setup-checks__detail font-sans text-xs text-fg-muted"
+              >
+                Ready to install.
+              </span>
+            </span>
+          </li>
+          <li
+            class="setup-checks__row setup-checks__row--ok flex items-start gap-3 rounded-md border border-border bg-paper px-4 py-3"
+          >
+            <span
+              aria-hidden="true"
+              class="setup-checks__dot mt-[1px] flex h-5 w-5 shrink-0 items-center justify-center rounded-pill bg-emerald-soft text-emerald-deep"
+            >
+              <svg
+                class="lucide lucide-circle-check"
+                fill="none"
+                height="14"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2.25"
+                viewBox="0 0 24 24"
+                width="14"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                />
+                <path
+                  d="m9 12 2 2 4-4"
+                />
+              </svg>
+            </span>
+            <span
+              class="flex flex-1 flex-col gap-[2px]"
+            >
+              <span
+                class="setup-checks__label font-sans text-sm font-medium text-ink"
+              >
+                Users present
+              </span>
+              <span
+                class="setup-checks__detail font-sans text-xs text-fg-muted"
+              >
+                No users yet — bootstrap will create the first one.
+              </span>
+            </span>
+          </li>
+        </ul>
+        <div
+          class="setup-step__actions flex items-center justify-end gap-3 border-t border-border pt-5"
+        >
+          <button
+            class="inline-flex items-center justify-center gap-[6px] whitespace-nowrap rounded-md font-display font-bold transition-shadow duration-[160ms] ease-brand focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 bg-ink text-paper border border-ink shadow-xs hover:bg-forest-2 hover:border-forest-2 px-5 py-3 text-base btn-primary"
+            type="button"
+          >
+            Begin
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-arrow-right"
+              fill="none"
+              height="14"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="14"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M5 12h14"
+              />
+              <path
+                d="m12 5 7 7-7 7"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+`;
