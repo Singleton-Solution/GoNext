@@ -718,11 +718,19 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 		}
 	}
 
-	// Posts REST surface (CRUD over /api/v1/posts). MemoryStore is
-	// intentional here — the PgStore lands with the shared DAO follow-
-	// up; the in-memory implementation keeps the K4 e2e able to drive
-	// the admin end-to-end against a stubbed corpus.
-	postsStore := restposts.NewMemoryStore()
+	// Posts REST surface (CRUD over /api/v1/posts). PgxStore persists
+	// to the canonical posts table from 000004_posts.up.sql — restart
+	// the api and the corpus is still there. The store is constructed
+	// only when the pool is non-nil; a nil pool falls back to the
+	// in-memory store so unit tests of buildRouter don't need a live
+	// database. (Production never reaches the fallback: db.New refuses
+	// to return nil without an error.)
+	var postsStore restposts.Store
+	if pool != nil {
+		postsStore = restposts.NewPgxStore(pool)
+	} else {
+		postsStore = restposts.NewMemoryStore()
+	}
 	postsPolicy := policy.NewBasicPolicy(policy.DefaultRoleCapabilities())
 	if err := restposts.Mount(mux, "/api/v1/posts", restposts.Deps{
 		Store:    postsStore,
