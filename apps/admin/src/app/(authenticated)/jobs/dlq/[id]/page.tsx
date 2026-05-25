@@ -4,11 +4,19 @@
  * Loads a single archived task by ID and hands it to the client island.
  * The queue query parameter is required because the Asynq Inspector
  * keys lookups by (queue, id) — a task ID alone is not enough.
+ *
+ * Brand: Living-Systems (#432). The Headline lives in the client island
+ * because the task type is part of the dynamic data we load — the page
+ * head is a serene cream-paper rule with the task type rendered as the
+ * italic accent so an operator immediately sees what kind of failure
+ * they're inspecting.
  */
 import { cookies } from 'next/headers';
 import Link from 'next/link';
+import { ChevronLeft } from 'lucide-react';
 import { Suspense, type ReactElement } from 'react';
 import { apiBaseUrl } from '@/lib/api-client';
+import { Card } from '@/components/ui/card';
 import { DLQDetailClient } from './DLQDetailClient';
 import type { ArchivedTask } from '../types';
 
@@ -52,28 +60,16 @@ async function fetchTask(
 
 function DetailSkeleton(): ReactElement {
   return (
-    <div aria-busy="true" aria-live="polite" style={{ padding: 16 }}>
-      <span className="visually-hidden">Loading task…</span>
-      <div
-        style={{
-          height: 24,
-          margin: '8px 0',
-          width: '40%',
-          background: 'var(--color-border)',
-          opacity: 0.4,
-          borderRadius: 'var(--radius)',
-        }}
-      />
-      <div
-        style={{
-          height: 200,
-          margin: '8px 0',
-          background: 'var(--color-border)',
-          opacity: 0.4,
-          borderRadius: 'var(--radius)',
-        }}
-      />
-    </div>
+    <Card
+      aria-busy="true"
+      aria-live="polite"
+      data-testid="dlq-detail-skeleton"
+      className="overflow-hidden p-6"
+    >
+      <span className="sr-only">Loading task…</span>
+      <div className="h-6 w-2/5 animate-pulse rounded-sm bg-paper-3/60" />
+      <div className="mt-3 h-[200px] animate-pulse rounded-sm bg-paper-3/60" />
+    </Card>
   );
 }
 
@@ -85,15 +81,23 @@ function FailureState({
   queue: string;
 }): ReactElement {
   return (
-    <section role="alert" style={{ padding: 16 }}>
-      <h1>Task not available</h1>
-      <p className="muted">
-        We couldn&apos;t load this task ({reason}). It may have been
-        replayed or discarded already.
-      </p>
-      <Link href={`/jobs/dlq?queue=${encodeURIComponent(queue)}`}>
-        ← Back to DLQ
-      </Link>
+    <section role="alert" data-testid="dlq-detail-failure">
+      <Card className="border-danger/30 bg-danger-soft/20 p-6">
+        <h1 className="font-display text-xl font-bold text-ink">
+          Task not available
+        </h1>
+        <p className="mt-2 font-sans text-sm text-fg-muted">
+          We couldn&apos;t load this task ({reason}). It may have been
+          replayed or discarded already.
+        </p>
+        <Link
+          href={`/jobs/dlq?queue=${encodeURIComponent(queue)}`}
+          className="mt-3 inline-flex items-center gap-1 font-sans text-sm text-emerald-deep hover:underline"
+        >
+          <ChevronLeft className="h-[13px] w-[13px]" aria-hidden="true" />
+          Back to DLQ
+        </Link>
+      </Card>
     </section>
   );
 }

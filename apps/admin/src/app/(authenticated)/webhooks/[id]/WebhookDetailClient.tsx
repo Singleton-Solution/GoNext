@@ -3,18 +3,27 @@
 /**
  * <WebhookDetailClient> — edit form + recent deliveries table.
  *
- * The page is split into two panels:
+ * Brand: Living-Systems (#432). The page is a two-section operator
+ * surface:
  *
- *   1. Edit panel — name / url / events / active. Saved via PATCH.
- *   2. Deliveries panel — newest-first table with response_code,
- *      duration_ms, and a body preview drawer.
- *
- * A small toolbar at the top wires the same Test/Disable/Delete
- * actions the list view exposes, so an operator can act on a
- * subscription without bouncing back.
+ *   1. Header — Headline ("Subscription: *name*"), StatusBadge,
+ *      mono URL, and a Test/Disable/Delete toolbar pinned to the
+ *      top-right. The italic accent lands on the subscription name.
+ *   2. Configuration Card — paper-2 panel holding the edit form
+ *      (Input/Label primitives, EventCatalog with lavender accents).
+ *   3. Deliveries Card — newest-first table with response_code in a
+ *      mono badge, duration in Geist Mono tabular-nums. Expanding a
+ *      row reveals the preview in a paper-3 recessed surface.
  */
 import { useRouter } from 'next/navigation';
 import {
+  ChevronLeft,
+  Power,
+  Trash2,
+  Zap,
+} from 'lucide-react';
+import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -23,6 +32,13 @@ import {
   type FormEvent,
   type ReactElement,
 } from 'react';
+import Link from 'next/link';
+import { Headline } from '@/components/ui/headline';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   deleteSubscription,
   disableSubscription,
@@ -53,19 +69,38 @@ function formatTime(iso: string): string {
   return Number.isNaN(t.getTime()) ? iso : t.toISOString();
 }
 
-function statusTone(status: Delivery['status']): string {
+/**
+ * Status → Badge variant. Deliveries inherit the same emerald / lavender
+ * / danger palette as the subscription StatusBadge.
+ */
+function deliveryVariant(
+  status: Delivery['status'],
+): 'emerald' | 'lavender' | 'danger' | 'outline' | 'default' {
   switch (status) {
     case 'success':
-      return 'var(--color-success, #16591a)';
+      return 'emerald';
     case 'retry':
-      return 'var(--color-warn, #7a5300)';
+      return 'lavender';
     case 'failed':
-      return 'var(--color-danger, #7a1f1f)';
+      return 'danger';
     case 'test':
-      return 'var(--color-info, #1e3a8a)';
+      return 'outline';
     default:
-      return 'inherit';
+      return 'default';
   }
+}
+
+/**
+ * HTTP response code → mono badge variant. 2xx → emerald, 3xx →
+ * lavender, 4xx → warning, 5xx → danger. Calm at-a-glance signal.
+ */
+function codeBadgeClass(code: number): string {
+  if (code === 0) return 'bg-paper-3 text-fg-subtle border-border';
+  if (code >= 500) return 'bg-danger-soft text-danger border-transparent';
+  if (code >= 400) return 'bg-warning-soft text-warning border-transparent';
+  if (code >= 300) return 'bg-lavender-soft text-lavender-deep border-transparent';
+  if (code >= 200) return 'bg-emerald-soft text-emerald-deep border-transparent';
+  return 'bg-paper-3 text-fg-subtle border-border';
 }
 
 export function WebhookDetailClient({
@@ -203,58 +238,87 @@ export function WebhookDetailClient({
   }, [delCursor, sub.id]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          flexWrap: 'wrap',
-        }}
-      >
-        <StatusBadge subscription={sub} />
-        <span className="muted">{sub.url}</span>
-        <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-          <button type="button" onClick={() => void handleTest()}>
-            Test
-          </button>
-          <button type="button" onClick={() => void handleToggleActive()}>
-            {sub.active ? 'Disable' : 'Enable'}
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleDelete()}
-            style={{ color: 'var(--color-danger, #a00)' }}
-          >
-            Delete
-          </button>
-        </span>
-      </header>
+    <section
+      data-testid="webhook-detail-page"
+      className="flex flex-col gap-6"
+    >
+      {/* Page head with breadcrumb + italic-accent on the name. */}
+      <div className="flex flex-wrap items-end justify-between gap-6 border-b border-border pb-6">
+        <div className="flex flex-col gap-3">
+          <span className="font-sans text-2xs font-medium uppercase tracking-[0.12em] text-emerald-deep">
+            Integrations · Outbound · Detail
+          </span>
+          <Headline as="h1" size="sub">
+            Subscription: <em>{sub.name}</em>
+          </Headline>
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge subscription={sub} />
+            <code className="font-mono text-2xs text-fg-subtle">
+              {sub.url}
+            </code>
+          </div>
+        </div>
+        <Link
+          href="/webhooks"
+          className="inline-flex shrink-0 items-center gap-1 font-sans text-sm text-fg-subtle transition-colors hover:text-ink"
+        >
+          <ChevronLeft className="h-[13px] w-[13px]" aria-hidden="true" />
+          Back to list
+        </Link>
+      </div>
+
+      {/* Action toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="emerald"
+          onClick={() => void handleTest()}
+        >
+          <Zap className="h-[14px] w-[14px]" aria-hidden="true" />
+          Test
+        </Button>
+        <Button
+          type="button"
+          variant="default"
+          onClick={() => void handleToggleActive()}
+        >
+          <Power className="h-[14px] w-[14px]" aria-hidden="true" />
+          {sub.active ? 'Disable' : 'Enable'}
+        </Button>
+        <Button
+          type="button"
+          variant="destructive"
+          onClick={() => void handleDelete()}
+        >
+          <Trash2 className="h-[14px] w-[14px]" aria-hidden="true" />
+          Delete
+        </Button>
+      </div>
 
       {testResult ? (
         <div
           role="status"
           data-testid="test-result"
-          style={{
-            padding: 12,
-            borderRadius: 4,
-            background: testResult.delivered
-              ? 'var(--color-success-bg, #d6f5d6)'
-              : 'var(--color-warn-bg, #fff4d6)',
-          }}
+          className={
+            testResult.delivered
+              ? 'rounded-md border border-emerald/30 bg-emerald-soft px-4 py-3 font-sans text-sm text-emerald-deep'
+              : 'rounded-md border border-warning/30 bg-warning-soft px-4 py-3 font-sans text-sm text-warning'
+          }
         >
-          {testResult.delivered ? 'Delivered' : 'Subscriber responded'} —
-          HTTP {testResult.response_code} in {testResult.duration_ms} ms
+          {testResult.delivered ? 'Delivered' : 'Subscriber responded'} —{' '}
+          <code className="font-mono text-xs">
+            HTTP {testResult.response_code}
+          </code>{' '}
+          in{' '}
+          <code className="font-mono text-xs tabular-nums">
+            {testResult.duration_ms} ms
+          </code>
         </div>
       ) : null}
       {testError ? (
         <div
           role="alert"
-          style={{
-            padding: 12,
-            borderRadius: 4,
-            background: 'var(--color-danger-bg, #fbd5d5)',
-          }}
+          className="rounded-md border border-danger/30 bg-danger-soft px-4 py-3 font-sans text-sm text-danger"
         >
           Test failed: {testError}
         </div>
@@ -262,140 +326,198 @@ export function WebhookDetailClient({
       {error ? (
         <div
           role="alert"
-          style={{
-            padding: 12,
-            borderRadius: 4,
-            background: 'var(--color-danger-bg, #fbd5d5)',
-          }}
+          className="rounded-md border border-danger/30 bg-danger-soft px-4 py-3 font-sans text-sm text-danger"
         >
           {error}
         </div>
       ) : null}
 
-      <form
-        onSubmit={(ev) => void handleSubmit(ev)}
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 12,
-          padding: 16,
-          border: '1px solid var(--color-border, #ddd)',
-          borderRadius: 4,
-        }}
-      >
-        <h2 style={{ marginTop: 0 }}>Configuration</h2>
-        <label>
-          Name
-          <input
-            type="text"
-            value={form.name}
-            onChange={handleField('name')}
-            required
-            maxLength={200}
-            style={{ display: 'block', width: '100%', marginTop: 4 }}
-          />
-        </label>
-        <label>
-          Endpoint URL
-          <input
-            type="url"
-            value={form.url}
-            onChange={handleField('url')}
-            required
-            style={{ display: 'block', width: '100%', marginTop: 4 }}
-          />
-        </label>
-        <EventCatalog value={form.events} onChange={handleEvents} />
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button type="submit" disabled={saving || !dirty}>
-            {saving ? 'Saving…' : 'Save changes'}
-          </button>
-          {saved && !dirty ? (
-            <span role="status" className="muted">
-              Saved
-            </span>
-          ) : null}
+      {/* Edit form */}
+      <Card className="overflow-hidden">
+        <div className="border-b border-border bg-paper-2 px-6 py-4">
+          <h2 className="font-display text-sm font-bold uppercase tracking-[0.08em] text-fg-subtle">
+            Configuration
+          </h2>
         </div>
-      </form>
+        <form
+          onSubmit={(ev) => void handleSubmit(ev)}
+          className="flex flex-col gap-5 px-6 py-5"
+        >
+          <div className="flex flex-col gap-[6px]">
+            <Label htmlFor="sub-name">Name</Label>
+            <Input
+              id="sub-name"
+              type="text"
+              value={form.name}
+              onChange={handleField('name')}
+              required
+              maxLength={200}
+            />
+          </div>
+          <div className="flex flex-col gap-[6px]">
+            <Label htmlFor="sub-url">Endpoint URL</Label>
+            <Input
+              id="sub-url"
+              type="url"
+              value={form.url}
+              onChange={handleField('url')}
+              required
+            />
+          </div>
+          <EventCatalog value={form.events} onChange={handleEvents} />
+          <div className="flex items-center gap-3">
+            <Button
+              type="submit"
+              variant="emerald"
+              disabled={saving || !dirty}
+            >
+              {saving ? 'Saving…' : 'Save changes'}
+            </Button>
+            {saved && !dirty ? (
+              <span
+                role="status"
+                className="font-sans text-xs text-emerald-deep"
+              >
+                Saved
+              </span>
+            ) : null}
+          </div>
+        </form>
+      </Card>
 
-      <section>
-        <h2 style={{ marginTop: 0 }}>Recent deliveries</h2>
+      {/* Deliveries panel */}
+      <Card className="overflow-hidden">
+        <div className="flex items-center justify-between border-b border-border bg-paper-2 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <h2 className="font-display text-sm font-bold text-ink">
+              Recent deliveries
+            </h2>
+            <span className="rounded-pill bg-paper-3 px-2 py-[2px] font-mono text-2xs tabular-nums text-fg-subtle">
+              {delRows.length}
+            </span>
+          </div>
+        </div>
         {delRows.length === 0 ? (
-          <p className="muted">
+          <div className="p-6 font-sans text-sm text-fg-muted">
             No deliveries yet. Use Test to send a synthetic event, or
             wait for a real one to fire.
-          </p>
+          </div>
         ) : (
           <table
             aria-label="Recent deliveries"
-            style={{ width: '100%', borderCollapse: 'collapse' }}
+            className="w-full border-collapse bg-paper"
           >
             <thead>
-              <tr style={{ textAlign: 'left' }}>
-                <th>Event</th>
-                <th>Attempt</th>
-                <th>Status</th>
-                <th>Code</th>
-                <th>Duration</th>
-                <th>When</th>
-                <th aria-label="Expand row" />
+              <tr className="bg-paper-2 text-left">
+                <th className="border-b border-border-subtle px-4 py-3 font-sans text-xs font-medium text-fg-subtle">
+                  Event
+                </th>
+                <th className="border-b border-border-subtle px-4 py-3 font-sans text-xs font-medium text-fg-subtle">
+                  Attempt
+                </th>
+                <th className="border-b border-border-subtle px-4 py-3 font-sans text-xs font-medium text-fg-subtle">
+                  Status
+                </th>
+                <th className="border-b border-border-subtle px-4 py-3 font-sans text-xs font-medium text-fg-subtle">
+                  Code
+                </th>
+                <th className="border-b border-border-subtle px-4 py-3 font-sans text-xs font-medium text-fg-subtle">
+                  Duration
+                </th>
+                <th className="border-b border-border-subtle px-4 py-3 font-sans text-xs font-medium text-fg-subtle">
+                  When
+                </th>
+                <th
+                  aria-label="Expand row"
+                  className="border-b border-border-subtle px-4 py-3"
+                />
               </tr>
             </thead>
             <tbody>
               {delRows.map((d) => (
-                <>
+                <Fragment key={d.id}>
                   <tr
-                    key={d.id}
                     data-testid={`delivery-row-${d.id}`}
-                    style={{
-                      borderTop: '1px solid var(--color-border, #eee)',
-                    }}
+                    className="border-b border-border-subtle transition-colors hover:bg-paper-2/60 last:border-b-0"
                   >
-                    <td>
-                      <code style={{ fontSize: 12 }}>{d.event_type}</code>
-                      <div className="muted" style={{ fontSize: 11 }}>
+                    <td className="px-4 py-3 align-middle">
+                      <code className="font-mono text-xs font-medium text-ink">
+                        {d.event_type}
+                      </code>
+                      <div className="mt-[2px] font-mono text-2xs text-fg-subtle">
                         {d.event_id}
                       </div>
                     </td>
-                    <td>#{d.attempt}</td>
-                    <td style={{ color: statusTone(d.status) }}>{d.status}</td>
-                    <td>{d.response_code || '—'}</td>
-                    <td>{d.duration_ms} ms</td>
-                    <td title={d.delivered_at}>{formatTime(d.delivered_at)}</td>
-                    <td>
+                    <td className="px-4 py-3 align-middle">
+                      <span className="font-mono text-xs tabular-nums text-fg-muted">
+                        #{d.attempt}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 align-middle">
+                      <Badge variant={deliveryVariant(d.status)} dot>
+                        {d.status}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 align-middle">
+                      {/* Response code rendered as a mono badge — same
+                          shape as a tag but the digits feel like an
+                          instrument-panel readout. */}
+                      <code
+                        className={`inline-flex items-center rounded-sm border px-2 py-[2px] font-mono text-xs tabular-nums ${codeBadgeClass(d.response_code)}`}
+                      >
+                        {d.response_code || '—'}
+                      </code>
+                    </td>
+                    <td className="px-4 py-3 align-middle">
+                      <span className="font-mono text-xs tabular-nums text-fg-muted">
+                        {d.duration_ms} ms
+                      </span>
+                    </td>
+                    <td
+                      title={d.delivered_at}
+                      className="px-4 py-3 align-middle font-mono text-2xs tabular-nums text-fg-subtle"
+                    >
+                      {formatTime(d.delivered_at)}
+                    </td>
+                    <td className="px-4 py-3 align-middle text-right">
                       {d.response_body_preview || d.error ? (
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() =>
-                            setExpanded((cur) => (cur === d.id ? null : d.id))
+                            setExpanded((cur) =>
+                              cur === d.id ? null : d.id,
+                            )
                           }
                           aria-expanded={expanded === d.id}
+                          className="h-7 px-2"
                         >
                           {expanded === d.id ? 'Hide' : 'Show'}
-                        </button>
+                        </Button>
                       ) : null}
                     </td>
                   </tr>
                   {expanded === d.id ? (
                     <tr>
-                      <td colSpan={7} style={{ background: 'var(--color-surface, #fafafa)', padding: 12 }}>
+                      <td
+                        colSpan={7}
+                        className="border-b border-border-subtle bg-paper-2 px-4 py-3"
+                      >
                         {d.error ? (
-                          <div>
-                            <strong>Error:</strong>{' '}
-                            <code>{d.error}</code>
+                          <div className="mb-2 flex items-center gap-2 font-sans text-xs text-danger">
+                            <strong>Error:</strong>
+                            <code className="font-mono text-2xs">
+                              {d.error}
+                            </code>
                           </div>
                         ) : null}
                         {d.response_body_preview ? (
-                          <div style={{ marginTop: 8 }}>
-                            <strong>Response body (preview):</strong>
-                            <pre
-                              style={{
-                                whiteSpace: 'pre-wrap',
-                                background: 'var(--color-code-bg, #f0f0f0)',
-                                padding: 8,
-                                borderRadius: 4,
-                              }}
-                            >
+                          <div>
+                            <div className="mb-1 font-display text-2xs font-bold uppercase tracking-[0.08em] text-fg-subtle">
+                              Response body (preview)
+                            </div>
+                            <pre className="max-h-[260px] overflow-auto whitespace-pre-wrap rounded-md border border-border bg-paper-3 p-3 font-mono text-2xs leading-relaxed text-ink-soft">
                               {d.response_body_preview}
                             </pre>
                           </div>
@@ -403,23 +525,25 @@ export function WebhookDetailClient({
                       </td>
                     </tr>
                   ) : null}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>
         )}
         {delCursor ? (
-          <p style={{ marginTop: 12 }}>
-            <button
+          <div className="flex justify-end border-t border-border bg-paper-2 px-4 py-3">
+            <Button
               type="button"
+              variant="default"
+              size="sm"
               onClick={() => void handleLoadMore()}
               disabled={delLoading}
             >
               {delLoading ? 'Loading…' : 'Load more deliveries'}
-            </button>
-          </p>
+            </Button>
+          </div>
         ) : null}
-      </section>
-    </div>
+      </Card>
+    </section>
   );
 }

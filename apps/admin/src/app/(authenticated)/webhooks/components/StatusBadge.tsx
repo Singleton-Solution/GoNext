@@ -2,73 +2,61 @@
 
 /**
  * <StatusBadge> renders the health pill the list view shows next to
- * each subscription. The classification rules:
+ * each subscription.
  *
- *  - degraded_at set → red "Degraded" badge. Operators should look.
- *  - active = false → grey "Disabled" badge.
- *  - last_delivery_status missing → blue "Pending" — never delivered.
- *  - last_delivery_status === 'success' → green "Healthy".
- *  - last_delivery_status === 'retry' → amber "Retrying".
- *  - last_delivery_status === 'failed' → red "Failed".
+ * Brand: Living-Systems (#432). The pill maps to the brand palette
+ * tokens directly via the shared <Badge> primitive so the colours stay
+ * in sync with the rest of the surface:
  *
- * The component is intentionally string-only (no icon dependency) so
- * the badge stays readable in monochrome contexts.
+ *  - degraded_at set     → danger
+ *  - active = false      → default (neutral)
+ *  - last_delivery_status missing → outline ("Pending")
+ *  - last_delivery_status = success → emerald ("Healthy")
+ *  - last_delivery_status = retry   → lavender ("Retrying")
+ *  - last_delivery_status = failed  → danger ("Failed")
+ *
+ * The pulse dot is on so an operator's eye is drawn to live state at
+ * a glance.
  */
 import type { ReactElement } from 'react';
+import { Badge } from '@/components/ui/badge';
 import type { Subscription } from '../types';
 
 export interface StatusBadgeProps {
   subscription: Pick<Subscription, 'active' | 'degraded_at' | 'last_delivery_status'>;
 }
 
-type Tone = 'success' | 'warn' | 'danger' | 'neutral' | 'info';
+type Variant = 'emerald' | 'lavender' | 'danger' | 'default' | 'outline';
 
 function classify(sub: StatusBadgeProps['subscription']): {
   label: string;
-  tone: Tone;
+  variant: Variant;
 } {
-  if (sub.degraded_at) return { label: 'Degraded', tone: 'danger' };
-  if (!sub.active) return { label: 'Disabled', tone: 'neutral' };
-  if (!sub.last_delivery_status) return { label: 'Pending', tone: 'info' };
+  if (sub.degraded_at) return { label: 'Degraded', variant: 'danger' };
+  if (!sub.active) return { label: 'Disabled', variant: 'default' };
+  if (!sub.last_delivery_status) return { label: 'Pending', variant: 'outline' };
   switch (sub.last_delivery_status) {
     case 'success':
-      return { label: 'Healthy', tone: 'success' };
+      return { label: 'Healthy', variant: 'emerald' };
     case 'retry':
-      return { label: 'Retrying', tone: 'warn' };
+      return { label: 'Retrying', variant: 'lavender' };
     case 'failed':
-      return { label: 'Failed', tone: 'danger' };
+      return { label: 'Failed', variant: 'danger' };
     default:
-      return { label: 'Unknown', tone: 'neutral' };
+      return { label: 'Unknown', variant: 'default' };
   }
 }
 
-const TONE_STYLES: Record<Tone, { background: string; color: string }> = {
-  success: { background: '#d6f5d6', color: '#16591a' },
-  warn: { background: '#fff4d6', color: '#7a5300' },
-  danger: { background: '#fbd5d5', color: '#7a1f1f' },
-  neutral: { background: '#eaeaea', color: '#444' },
-  info: { background: '#d6eaff', color: '#1e3a8a' },
-};
-
 export function StatusBadge({ subscription }: StatusBadgeProps): ReactElement {
-  const { label, tone } = classify(subscription);
-  const style = TONE_STYLES[tone];
+  const { label, variant } = classify(subscription);
   return (
-    <span
+    <Badge
       role="status"
       aria-label={`Subscription status: ${label}`}
-      style={{
-        display: 'inline-block',
-        padding: '2px 8px',
-        borderRadius: 999,
-        fontSize: 12,
-        fontWeight: 600,
-        background: style.background,
-        color: style.color,
-        lineHeight: 1.5,
-      }}
+      variant={variant}
+      dot
     >
       {label}
-    </span>
+    </Badge>
   );
 }
