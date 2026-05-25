@@ -1,7 +1,8 @@
 'use client';
 
 /**
- * StatusPage — the operator-facing System Status surface.
+ * StatusPage — the operator-facing System Status surface, restyled
+ * against the Living-Systems brand.
  *
  * The page is a client component because three of its responsibilities
  * are inherently interactive:
@@ -15,10 +16,12 @@
  *      clipboard via navigator.clipboard.writeText, for pasting into
  *      a support ticket.
  *
- * Data flow: useStatusReport (below) wraps a single fetch+state pair.
- * Refreshing replaces the report; an in-flight fetch is aborted when a
- * newer one starts so unmount or a click during a slow request doesn't
- * leak a setState into a torn-down tree.
+ * Visual treatment: Archivo display headline with the italic-accent
+ * rule (`System <em>status</em>.`), a soft "Refreshed Ns ago"
+ * auto-refresh badge in monospace + italic accent, and an emerald
+ * "Copy diagnostic" Button primitive with a Lucide Copy icon. The
+ * tone-tinted card surfaces live inside StatusCard; the page itself
+ * stays cream and lets the cards drive the colour.
  *
  * Error handling: a failed fetch keeps the last good report on screen
  * and renders an error banner above the grid — the operator still sees
@@ -26,16 +29,22 @@
  * signal. We don't show a full-page skeleton on every refresh because
  * the page is too low-frequency for that to be acceptable.
  */
+import { Check, Copy, RefreshCw, type LucideIcon } from 'lucide-react';
 import {
   useCallback,
   useEffect,
   useRef,
   useState,
-  type CSSProperties,
   type ReactElement,
 } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { Headline } from '@/components/ui/headline';
 import { ApiError } from '@/lib/api-client';
+import { cn } from '@/lib/utils';
+
 import { fetchStatusReport } from './api';
+import { StatusCard } from './components/StatusCard';
 import {
   deriveBuildInfo,
   deriveDatabase,
@@ -47,78 +56,9 @@ import {
   deriveTheme,
   redactDiagnostic,
 } from './derive';
-import { StatusCard } from './components/StatusCard';
 import type { StatusReport } from './types';
 
 const REFRESH_INTERVAL_MS = 30_000;
-
-const styles: Record<string, CSSProperties> = {
-  header: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: 12,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  toolbar: {
-    display: 'flex',
-    gap: 8,
-    alignItems: 'center',
-  },
-  meta: {
-    color: 'var(--color-text-muted, #6b7280)',
-    fontSize: 13,
-  },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-    gap: 12,
-  },
-  sectionHeading: {
-    fontSize: 14,
-    fontWeight: 600,
-    margin: '24px 0 8px',
-    color: 'var(--color-text-muted, #6b7280)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
-  },
-  errorBanner: {
-    padding: '10px 12px',
-    marginBottom: 12,
-    border: '1px solid #fecaca',
-    background: '#fef2f2',
-    color: '#991b1b',
-    borderRadius: 6,
-    fontSize: 13,
-  },
-  infoBanner: {
-    padding: '10px 12px',
-    marginBottom: 12,
-    border: '1px solid var(--color-border, #e4e6ea)',
-    background: 'var(--color-surface, #ffffff)',
-    color: 'var(--color-text-muted, #6b7280)',
-    borderRadius: 6,
-    fontSize: 13,
-  },
-  button: {
-    padding: '6px 12px',
-    border: '1px solid var(--color-border, #e4e6ea)',
-    borderRadius: 6,
-    background: 'var(--color-surface, #ffffff)',
-    color: 'var(--color-text, #1c2024)',
-    fontSize: 13,
-  },
-  buttonPrimary: {
-    padding: '6px 12px',
-    border: '1px solid var(--color-accent, #2563eb)',
-    borderRadius: 6,
-    background: 'var(--color-accent, #2563eb)',
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: 500,
-  },
-};
 
 interface UseStatusReportState {
   report: StatusReport | null;
@@ -159,11 +99,12 @@ function useStatusReport(): UseStatusReportState & {
       });
     } catch (err) {
       if (controller.signal.aborted) return;
-      const message = err instanceof ApiError
-        ? `API error ${err.status}: ${err.statusText}`
-        : err instanceof Error
-        ? err.message
-        : 'Unknown error';
+      const message =
+        err instanceof ApiError
+          ? `API error ${err.status}: ${err.statusText}`
+          : err instanceof Error
+            ? err.message
+            : 'Unknown error';
       setState((s) => ({ ...s, loading: false, error: message }));
     }
   }, []);
@@ -182,9 +123,67 @@ function useStatusReport(): UseStatusReportState & {
   return { ...state, refresh };
 }
 
+/**
+ * formatAgo turns a "last refreshed at" timestamp into the
+ * "Refreshed *Ns* ago" auto-refresh chip text. Live-tickers like
+ * this should always emit a label, even on first paint — fallback
+ * to "just now" for any value <1s.
+ */
+function formatAgo(refreshedAt: number, now: number): string {
+  const delta = Math.max(0, Math.floor((now - refreshedAt) / 1000));
+  if (delta < 1) return 'just now';
+  if (delta < 60) return `${delta}s ago`;
+  const minutes = Math.floor(delta / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
+}
+
+/**
+ * AutoRefreshBadge — small mono chip showing the "Refreshed Ns ago"
+ * label. Ticks once a second by holding its own `now` clock so the
+ * label visibly counts up between fetches.
+ */
+function AutoRefreshBadge({
+  refreshedAt,
+}: {
+  refreshedAt: number | null;
+}): ReactElement {
+  const [now, setNow] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-[6px] rounded-pill border border-emerald/30 bg-emerald-soft/50 px-3 py-1',
+        'font-mono text-xs text-emerald-deep',
+      )}
+      aria-live="polite"
+      data-testid="status-refreshed-ago"
+    >
+      <span
+        aria-hidden="true"
+        className="h-[6px] w-[6px] rounded-pill bg-emerald-deep"
+        // The dot pulses while data is being treated as "live"; for
+        // SSR'd tests we keep it static but the animation is fine to
+        // request on the client.
+        style={{ animation: 'pulse 2s ease-in-out infinite' }}
+      />
+      Refreshed{' '}
+      <em className="font-serif italic text-emerald-deep">
+        {refreshedAt ? formatAgo(refreshedAt, now) : 'never'}
+      </em>
+    </span>
+  );
+}
+
 export function StatusPage(): ReactElement {
   const { report, loading, error, refreshedAt, refresh } = useStatusReport();
-  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>(
+    'idle',
+  );
 
   const onCopy = useCallback(async () => {
     if (!report) return;
@@ -215,58 +214,82 @@ export function StatusPage(): ReactElement {
     window.setTimeout(() => setCopyStatus('idle'), 1500);
   }, [report]);
 
+  const CopyIcon: LucideIcon = copyStatus === 'copied' ? Check : Copy;
+
   return (
-    <section data-testid="status-page">
-      <div style={styles.header}>
-        <div>
-          <h1>System Status</h1>
-          <p style={styles.meta}>
-            {report?.generated
-              ? `Last refreshed: ${new Date(report.generated).toLocaleString()}`
-              : refreshedAt
-              ? `Last refreshed: ${new Date(refreshedAt).toLocaleString()}`
-              : 'Loading…'}
+    <section data-testid="status-page" className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border pb-4">
+        <div className="flex flex-col gap-2">
+          <span className="font-sans text-xs font-medium uppercase tracking-wide text-emerald-deep">
+            Observability
+          </span>
+          <Headline as="h1" size="sub">
+            System <em>status</em>.
+          </Headline>
+          <p className="m-0 max-w-[540px] font-sans text-sm text-fg-muted">
+            A live readout of the runtime — database, queues, themes,
+            plugins. Every <em className="font-serif italic text-emerald-deep">30s</em> a
+            fresh report ticks in.
           </p>
         </div>
-        <div style={styles.toolbar} role="toolbar" aria-label="Status actions">
-          <button
+        <div
+          className="flex flex-wrap items-center gap-2"
+          role="toolbar"
+          aria-label="Status actions"
+        >
+          <AutoRefreshBadge refreshedAt={refreshedAt} />
+          <Button
             type="button"
-            style={styles.button}
+            variant="default"
+            size="sm"
             onClick={() => {
               void refresh();
             }}
             disabled={loading}
             aria-label="Refresh status"
           >
+            <RefreshCw
+              aria-hidden="true"
+              className={cn('h-4 w-4', loading && 'animate-spin')}
+            />
             {loading ? 'Refreshing…' : 'Refresh'}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            style={styles.buttonPrimary}
+            variant="emerald"
+            size="sm"
             onClick={() => {
               void onCopy();
             }}
             disabled={!report}
             aria-label="Copy diagnostic to clipboard"
           >
+            <CopyIcon aria-hidden="true" className="h-4 w-4" />
             {copyStatus === 'copied'
               ? 'Copied!'
               : copyStatus === 'failed'
-              ? 'Copy failed'
-              : 'Copy diagnostic'}
-          </button>
+                ? 'Copy failed'
+                : 'Copy diagnostic'}
+          </Button>
         </div>
       </div>
 
       {error ? (
-        <div role="alert" style={styles.errorBanner} data-testid="status-error">
+        <div
+          role="alert"
+          data-testid="status-error"
+          className="rounded-md border border-danger/30 bg-danger-soft px-3 py-2 font-sans text-sm text-danger"
+        >
           Couldn&apos;t refresh status: {error}. Showing the last successful
           result.
         </div>
       ) : null}
 
       {!report && loading ? (
-        <div style={styles.infoBanner} data-testid="status-loading">
+        <div
+          data-testid="status-loading"
+          className="rounded-md border border-border bg-paper-2 px-3 py-2 font-sans text-sm text-fg-muted"
+        >
           Loading system status…
         </div>
       ) : null}
@@ -280,6 +303,14 @@ interface StatusGridProps {
   report: StatusReport;
 }
 
+function SectionHeading({ children }: { children: ReactElement | string }): ReactElement {
+  return (
+    <h2 className="m-0 mb-2 mt-2 font-sans text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+      {children}
+    </h2>
+  );
+}
+
 function StatusGrid({ report }: StatusGridProps): ReactElement {
   const bi = deriveBuildInfo(report);
   const db = deriveDatabase(report.database);
@@ -289,100 +320,111 @@ function StatusGrid({ report }: StatusGridProps): ReactElement {
   const plugins = derivePlugins(report.plugins);
   const disk = deriveDisk(report.disk);
 
+  const gridClass =
+    'grid gap-3 grid-cols-[repeat(auto-fit,minmax(260px,1fr))]';
+
   return (
-    <div data-testid="status-grid">
-      <h2 style={styles.sectionHeading}>Build</h2>
-      <div style={styles.grid}>
-        <StatusCard
-          title="Build info"
-          tone={bi.tone}
-          rows={bi.rows}
-          testId="card-build"
-        />
-      </div>
-
-      <h2 style={styles.sectionHeading}>Infrastructure</h2>
-      <div style={styles.grid}>
-        <StatusCard
-          title="Database"
-          tone={db.tone}
-          summary={db.summary}
-          errorMessage={db.errorMessage}
-          rows={db.rows}
-          testId="card-database"
-        />
-        <StatusCard
-          title="Redis"
-          tone={rds.tone}
-          summary={rds.summary}
-          errorMessage={rds.errorMessage}
-          rows={rds.rows}
-          testId="card-redis"
-        />
-        <StatusCard
-          title="Migrations"
-          tone={mig.tone}
-          summary={mig.summary}
-          errorMessage={mig.errorMessage}
-          rows={mig.rows}
-          testId="card-migrations"
-        />
-        <StatusCard
-          title="Disk"
-          tone={disk.tone}
-          summary={disk.summary}
-          errorMessage={disk.errorMessage}
-          rows={disk.rows}
-          testId="card-disk"
-        />
-      </div>
-
-      <h2 style={styles.sectionHeading}>Application</h2>
-      <div style={styles.grid}>
-        <StatusCard
-          title="Theme"
-          tone={theme.tone}
-          summary={theme.summary}
-          errorMessage={theme.errorMessage}
-          rows={theme.rows}
-          testId="card-theme"
-        />
-        <StatusCard
-          title="Plugins"
-          tone={plugins.tone}
-          summary={plugins.summary}
-          errorMessage={plugins.errorMessage}
-          rows={plugins.rows}
-          testId="card-plugins"
-        />
-      </div>
-
-      <h2 style={styles.sectionHeading}>Queues</h2>
-      <div style={styles.grid}>
-        {report.queues.length === 0 ? (
+    <div data-testid="status-grid" className="flex flex-col gap-5">
+      <section className="flex flex-col gap-2">
+        <SectionHeading>Build</SectionHeading>
+        <div className={gridClass}>
           <StatusCard
-            title="Queues"
-            tone="unknown"
-            summary="No queue inspector configured."
-            testId="card-queues-empty"
+            title="Build info"
+            tone={bi.tone}
+            rows={bi.rows}
+            testId="card-build"
           />
-        ) : (
-          report.queues.map((q) => {
-            const data = deriveQueue(q);
-            return (
-              <StatusCard
-                key={q.name}
-                title={`Queue: ${q.name}`}
-                tone={data.tone}
-                summary={data.summary}
-                errorMessage={data.errorMessage}
-                rows={data.rows}
-                testId={`card-queue-${q.name}`}
-              />
-            );
-          })
-        )}
-      </div>
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <SectionHeading>Infrastructure</SectionHeading>
+        <div className={gridClass}>
+          <StatusCard
+            title="Database"
+            tone={db.tone}
+            summary={db.summary}
+            errorMessage={db.errorMessage}
+            rows={db.rows}
+            testId="card-database"
+          />
+          <StatusCard
+            title="Redis"
+            tone={rds.tone}
+            summary={rds.summary}
+            errorMessage={rds.errorMessage}
+            rows={rds.rows}
+            testId="card-redis"
+          />
+          <StatusCard
+            title="Migrations"
+            tone={mig.tone}
+            summary={mig.summary}
+            errorMessage={mig.errorMessage}
+            rows={mig.rows}
+            testId="card-migrations"
+          />
+          <StatusCard
+            title="Disk"
+            tone={disk.tone}
+            summary={disk.summary}
+            errorMessage={disk.errorMessage}
+            rows={disk.rows}
+            testId="card-disk"
+          />
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <SectionHeading>Application</SectionHeading>
+        <div className={gridClass}>
+          <StatusCard
+            title="Theme"
+            tone={theme.tone}
+            summary={theme.summary}
+            errorMessage={theme.errorMessage}
+            rows={theme.rows}
+            testId="card-theme"
+          />
+          <StatusCard
+            title="Plugins"
+            tone={plugins.tone}
+            summary={plugins.summary}
+            errorMessage={plugins.errorMessage}
+            rows={plugins.rows}
+            testId="card-plugins"
+          />
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <SectionHeading>Queues</SectionHeading>
+        <div className={gridClass}>
+          {report.queues.length === 0 ? (
+            <StatusCard
+              title="Queues"
+              tone="unknown"
+              summary="No queue inspector configured."
+              testId="card-queues-empty"
+            />
+          ) : (
+            report.queues.map((q) => {
+              const data = deriveQueue(q);
+              return (
+                <StatusCard
+                  key={q.name}
+                  title={`Queue: ${q.name}`}
+                  tone={data.tone}
+                  summary={data.summary}
+                  errorMessage={data.errorMessage}
+                  rows={data.rows}
+                  testId={`card-queue-${q.name}`}
+                />
+              );
+            })
+          )}
+        </div>
+      </section>
     </div>
   );
 }

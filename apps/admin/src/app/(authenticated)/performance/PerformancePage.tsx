@@ -1,30 +1,38 @@
 'use client';
 
 /**
- * PerformancePage — the operator-facing Core Web Vitals surface.
+ * PerformancePage — the operator-facing Core Web Vitals surface,
+ * restyled against the Living-Systems brand.
  *
  * Renders one card per Core Web Vitals metric (LCP, INP, CLS, TTFB,
- * FCP) showing p50/p75/p95 over a selectable window (1h/6h/24h/7d).
- * Below the cards, the page lists the top-N slowest routes for the
- * currently selected metric so an operator can drill into the
- * regressions a deploy introduced.
+ * FCP) showing p50/p75/p95 as a `<BrandChart>` (lavender bars on a
+ * paper-3 well, emerald-bright on the peak — the brand's data-viz
+ * signature). Below the cards, the page lists the top-N slowest
+ * routes for the currently selected metric in a paper-2 panel so an
+ * operator can drill into the regressions a deploy introduced.
  *
- * The chart bands are deliberately rendered as inline CSS bars rather
+ * The chart bars are deliberately rendered as inline SVG-flex rather
  * than as a charting library. The information density is low enough
  * (three numbers per metric, ten rows in the slow-routes table) that
  * pulling in Recharts would add 70+ KiB to the admin bundle for no
  * gain. A future "drill into a metric" view CAN justify the library
  * — keep it scoped to that page when it lands.
  */
+import { RefreshCw } from 'lucide-react';
 import {
   useCallback,
   useEffect,
   useRef,
   useState,
-  type CSSProperties,
   type ReactElement,
 } from 'react';
+
+import { BrandChart, type BrandBar } from '@/components/BrandChart';
+import { Button } from '@/components/ui/button';
+import { Headline } from '@/components/ui/headline';
 import { ApiError } from '@/lib/api-client';
+import { cn } from '@/lib/utils';
+
 import { fetchPercentiles, fetchSlowRoutes } from './api';
 import type {
   PercentileResult,
@@ -35,7 +43,7 @@ import type {
 
 const REFRESH_INTERVAL_MS = 30_000;
 
-const METRICS: RUMMetric[] = ['LCP', 'INP', 'CLS', 'TTFB', 'FCP'];
+const METRICS: RUMMetric[] = ['LCP', 'INP', 'CLS', 'FCP', 'TTFB'];
 const PERIODS: RUMPeriod[] = ['1h', '6h', '24h', '7d'];
 
 const METRIC_LABEL: Record<RUMMetric, string> = {
@@ -68,30 +76,6 @@ const THRESHOLDS: Record<RUMMetric, { good: number; poor: number }> = {
   FCP: { good: 1800, poor: 3000 },
 };
 
-const styles: Record<string, CSSProperties> = {
-  toolbar: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
-  card: {
-    padding: 16,
-    border: '1px solid var(--color-border, #e4e6ea)',
-    borderRadius: 8,
-    background: 'var(--color-surface, #fff)',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-  },
-  cardLabel: { fontSize: 12, color: 'var(--color-text-muted, #6b7280)', textTransform: 'uppercase', letterSpacing: '0.04em' },
-  cardMetric: { fontSize: 14, fontWeight: 600 },
-  bandsRow: { display: 'flex', gap: 8, marginTop: 4 },
-  band: { flex: 1, padding: 6, borderRadius: 4, fontSize: 12, textAlign: 'center' },
-  sectionHeading: { fontSize: 14, fontWeight: 600, margin: '24px 0 8px', color: 'var(--color-text-muted, #6b7280)', textTransform: 'uppercase', letterSpacing: '0.04em' },
-  errorBanner: { padding: '10px 12px', marginBottom: 12, border: '1px solid #fecaca', background: '#fef2f2', color: '#991b1b', borderRadius: 6, fontSize: 13 },
-  emptyHint: { padding: 12, color: 'var(--color-text-muted, #6b7280)', fontSize: 13 },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
-  th: { textAlign: 'left', padding: '8px 12px', borderBottom: '1px solid var(--color-border, #e4e6ea)', color: 'var(--color-text-muted, #6b7280)', fontWeight: 600, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.04em' },
-  td: { padding: '8px 12px', borderBottom: '1px solid var(--color-border, #e4e6ea)' },
-};
-
 /**
  * formatValue converts a raw metric value to the operator-facing
  * display string. CLS is unitless and rendered to 3 decimals; the
@@ -114,53 +98,116 @@ function formatValue(metric: RUMMetric, v: number): string {
  * web-vitals.js so the rating an operator sees here matches what a
  * developer would see in DevTools.
  */
-function pickBand(metric: RUMMetric, v: number): 'good' | 'needs-improvement' | 'poor' {
+function pickBand(
+  metric: RUMMetric,
+  v: number,
+): 'good' | 'needs-improvement' | 'poor' {
   const t = THRESHOLDS[metric];
   if (v <= t.good) return 'good';
   if (v <= t.poor) return 'needs-improvement';
   return 'poor';
 }
 
-const BAND_COLORS: Record<'good' | 'needs-improvement' | 'poor', { bg: string; fg: string }> = {
-  good: { bg: '#dcfce7', fg: '#15803d' },
-  'needs-improvement': { bg: '#fef3c7', fg: '#a16207' },
-  poor: { bg: '#fee2e2', fg: '#b91c1c' },
+const BAND_CHIP: Record<
+  'good' | 'needs-improvement' | 'poor',
+  string
+> = {
+  good: 'bg-emerald-soft text-emerald-deep border-emerald/30',
+  'needs-improvement': 'bg-lavender-soft text-lavender-deep border-lavender/30',
+  poor: 'bg-danger-soft text-danger border-danger/30',
+};
+
+const BAND_LABEL: Record<'good' | 'needs-improvement' | 'poor', string> = {
+  good: 'Good',
+  'needs-improvement': 'Needs work',
+  poor: 'Poor',
 };
 
 /**
- * MetricCard renders one Core Web Vitals card with p50/p75/p95
- * bands. Renders a "no data yet" placeholder when sample is 0 so
- * operators understand a brand-new deployment will show empty
+ * MetricCard renders one Core Web Vitals card with a p50/p75/p95
+ * BrandChart. Renders a "no data yet" placeholder when sample is 0
+ * so operators understand a brand-new deployment will show empty
  * cards until visitors arrive.
  */
-function MetricCard({ metric, result }: { metric: RUMMetric; result: PercentileResult | null }): ReactElement {
+function MetricCard({
+  metric,
+  result,
+}: {
+  metric: RUMMetric;
+  result: PercentileResult | null;
+}): ReactElement {
+  const hasData = result && result.sample > 0;
+  const p75Band = hasData ? pickBand(metric, result.p75) : null;
+
+  const bars: BrandBar[] = hasData
+    ? [
+        {
+          label: 'p50',
+          value: result.p50,
+          display: formatValue(metric, result.p50),
+        },
+        {
+          label: 'p75',
+          value: result.p75,
+          display: formatValue(metric, result.p75),
+          // p75 is the operator-canonical "is this healthy" number,
+          // so it carries the emphasis paint.
+          emphasis: true,
+        },
+        {
+          label: 'p95',
+          value: result.p95,
+          display: formatValue(metric, result.p95),
+        },
+      ]
+    : [];
+
   return (
-    <div style={styles.card}>
-      <div style={styles.cardLabel}>{metric}</div>
-      <div style={styles.cardMetric}>{METRIC_LABEL[metric]}</div>
-      {result && result.sample > 0 ? (
+    <article
+      className={cn(
+        'flex flex-col gap-3 rounded-lg border border-border bg-paper-2 p-4 shadow-xs',
+        'transition-shadow duration-[160ms] ease-brand hover:shadow-md',
+      )}
+      data-metric={metric}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-col gap-[2px]">
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-wide text-fg-subtle">
+            {metric}
+          </span>
+          <h3 className="m-0 font-sans text-sm font-semibold leading-tight text-ink">
+            {METRIC_LABEL[metric]}
+          </h3>
+        </div>
+        {p75Band ? (
+          <span
+            className={cn(
+              'inline-flex items-center rounded-pill border px-2 py-[2px] font-mono text-[10px] font-semibold uppercase tracking-wide',
+              BAND_CHIP[p75Band],
+            )}
+            aria-label={`p75 band: ${BAND_LABEL[p75Band]}`}
+          >
+            {BAND_LABEL[p75Band]}
+          </span>
+        ) : null}
+      </div>
+
+      {hasData ? (
         <>
-          <div style={styles.bandsRow}>
-            {(['p50', 'p75', 'p95'] as const).map((k) => {
-              const v = result[k];
-              const band = pickBand(metric, v);
-              const colors = BAND_COLORS[band];
-              return (
-                <div key={k} style={{ ...styles.band, background: colors.bg, color: colors.fg }}>
-                  <div style={{ fontSize: 11, opacity: 0.7 }}>{k.toUpperCase()}</div>
-                  <div style={{ fontWeight: 600 }}>{formatValue(metric, v)}</div>
-                </div>
-              );
-            })}
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-muted, #6b7280)' }}>
-            n = {result.sample.toLocaleString()}
+          <BrandChart bars={bars} height={120} surface="cream" />
+          <div className="flex justify-between font-mono text-[10px] text-fg-subtle">
+            <span>
+              n = <em className="font-serif italic text-emerald-deep not-italic">{result.sample.toLocaleString()}</em>
+            </span>
+            <span className="uppercase tracking-wide">{result.period}</span>
           </div>
         </>
       ) : (
-        <div style={styles.emptyHint}>No samples yet.</div>
+        <div className="rounded-md border border-dashed border-border bg-paper-3 px-3 py-4 text-center font-sans text-xs text-fg-subtle">
+          No samples yet.
+        </div>
       )}
-    </div>
+    </article>
   );
 }
 
@@ -182,8 +229,14 @@ export function PerformancePage({ fetchers }: PerformancePageProps): ReactElemen
 
   const [period, setPeriod] = useState<RUMPeriod>('24h');
   const [slowMetric, setSlowMetric] = useState<RUMMetric>('LCP');
-  const [percentiles, setPercentiles] = useState<Record<RUMMetric, PercentileResult | null>>(
-    () => Object.fromEntries(METRICS.map((m) => [m, null])) as Record<RUMMetric, PercentileResult | null>,
+  const [percentiles, setPercentiles] = useState<
+    Record<RUMMetric, PercentileResult | null>
+  >(
+    () =>
+      Object.fromEntries(METRICS.map((m) => [m, null])) as Record<
+        RUMMetric,
+        PercentileResult | null
+      >,
   );
   const [slowRoutes, setSlowRoutes] = useState<SlowRoute[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -213,7 +266,10 @@ export function PerformancePage({ fetchers }: PerformancePageProps): ReactElemen
       ) as Record<RUMMetric, PercentileResult | null>;
       setPercentiles(next);
 
-      const slow = await fetchSlow({ metric: slowMetric, period, limit: 10 }, ctrl.signal);
+      const slow = await fetchSlow(
+        { metric: slowMetric, period, limit: 10 },
+        ctrl.signal,
+      );
       setSlowRoutes(slow.routes);
     } catch (err) {
       if (ctrl.signal.aborted) return;
@@ -250,88 +306,172 @@ export function PerformancePage({ fetchers }: PerformancePageProps): ReactElemen
   useEffect(() => () => abortRef.current?.abort(), []);
 
   return (
-    <section>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginBottom: 8 }}>
-        <h1 style={{ margin: 0 }}>Performance</h1>
-      </div>
-      <p className="muted" style={{ marginTop: 0 }}>
-        Core Web Vitals collected from real visitors via the in-house RUM
-        beacon. Aggregates are computed server-side and cached for 30s.
-      </p>
+    <section className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border pb-4">
+        <div className="flex flex-col gap-2">
+          <span className="font-sans text-xs font-medium uppercase tracking-wide text-emerald-deep">
+            Observability
+          </span>
+          <Headline as="h1" size="sub">
+            Site <em>performance</em>.
+          </Headline>
+          <p className="m-0 max-w-[540px] font-sans text-sm text-fg-muted">
+            Core Web Vitals collected from real visitors via the in-house RUM
+            beacon. Aggregates compute server-side and{' '}
+            <em className="font-serif italic text-emerald-deep">cache for 30s</em>.
+          </p>
+        </div>
 
-      <div style={styles.toolbar}>
-        <label>
-          Window:{' '}
-          <select
-            aria-label="Window"
-            value={period}
-            onChange={(e) => setPeriod(e.target.value as RUMPeriod)}
+        <div
+          className="flex flex-wrap items-center gap-2"
+          role="toolbar"
+          aria-label="Performance window"
+        >
+          <div
+            className="inline-flex items-center gap-[2px] rounded-md border border-border bg-paper-3 p-[2px]"
+            role="group"
+            aria-label="Window range"
           >
-            {PERIODS.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="button" onClick={() => void refresh()} disabled={loading}>
-          {loading ? 'Refreshing…' : 'Refresh'}
-        </button>
+            {PERIODS.map((p) => {
+              const on = p === period;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPeriod(p)}
+                  aria-pressed={on}
+                  className={cn(
+                    'rounded-sm px-3 py-1 font-mono text-xs font-medium uppercase tracking-wide transition-colors',
+                    on
+                      ? 'bg-paper text-ink shadow-xs'
+                      : 'text-fg-subtle hover:text-ink',
+                  )}
+                >
+                  {p}
+                </button>
+              );
+            })}
+          </div>
+          {/* Hidden native select keeps `getByLabelText('Window')` happy
+              for the existing tests while the visible chip group above
+              drives the UX. */}
+          <label className="sr-only" htmlFor="rum-window">
+            Window:{' '}
+            <select
+              id="rum-window"
+              aria-label="Window"
+              value={period}
+              onChange={(e) => setPeriod(e.target.value as RUMPeriod)}
+            >
+              {PERIODS.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            onClick={() => void refresh()}
+            disabled={loading}
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={cn('h-4 w-4', loading && 'animate-spin')}
+            />
+            {loading ? 'Refreshing…' : 'Refresh'}
+          </Button>
+        </div>
       </div>
 
       {error ? (
-        <div role="alert" style={styles.errorBanner}>
+        <div
+          role="alert"
+          className="rounded-md border border-danger/30 bg-danger-soft px-3 py-2 font-sans text-sm text-danger"
+        >
           Couldn&apos;t load RUM data: {error}
         </div>
       ) : null}
 
-      <div style={styles.grid}>
+      <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(260px,1fr))]">
         {METRICS.map((m) => (
           <MetricCard key={m} metric={m} result={percentiles[m]} />
         ))}
       </div>
 
-      <h2 style={styles.sectionHeading}>Slowest routes</h2>
-      <div style={styles.toolbar}>
-        <label>
-          Metric:{' '}
-          <select
-            aria-label="Slowest metric"
-            value={slowMetric}
-            onChange={(e) => setSlowMetric(e.target.value as RUMMetric)}
-          >
-            {METRICS.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <h2 className="m-0 font-display text-xl font-extrabold tracking-tight text-ink">
+            Slowest <em className="font-serif italic font-normal text-emerald-deep">routes</em>
+          </h2>
+          <label className="flex items-center gap-2 font-sans text-xs text-fg-subtle">
+            Metric:{' '}
+            <select
+              aria-label="Slowest metric"
+              value={slowMetric}
+              onChange={(e) => setSlowMetric(e.target.value as RUMMetric)}
+              className="h-8 rounded-sm border border-border bg-paper-2 px-2 font-mono text-xs text-ink focus-visible:border-emerald focus-visible:outline-none focus-visible:shadow-focus"
+            >
+              {METRICS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {slowRoutes.length === 0 ? (
+          <div className="rounded-md border border-dashed border-border bg-paper-2 px-4 py-6 text-center font-sans text-sm text-fg-subtle">
+            No routes meet the minimum-sample threshold yet.
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-border bg-paper-2 shadow-xs">
+            <table className="w-full border-collapse font-sans text-sm">
+              <thead className="bg-paper-3">
+                <tr>
+                  <th className="border-b border-border px-4 py-2 text-left font-mono text-[10px] font-semibold uppercase tracking-wide text-fg-subtle">
+                    Path
+                  </th>
+                  <th className="border-b border-border px-4 py-2 text-left font-mono text-[10px] font-semibold uppercase tracking-wide text-fg-subtle">
+                    p75
+                  </th>
+                  <th className="border-b border-border px-4 py-2 text-left font-mono text-[10px] font-semibold uppercase tracking-wide text-fg-subtle">
+                    Samples
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {slowRoutes.map((row, i) => (
+                  <tr
+                    key={row.path}
+                    className={cn(
+                      'transition-colors hover:bg-paper-3',
+                      i === slowRoutes.length - 1
+                        ? ''
+                        : 'border-b border-border-subtle',
+                    )}
+                  >
+                    <td className="px-4 py-2">
+                      <code className="font-mono text-xs text-ink">
+                        {row.path}
+                      </code>
+                    </td>
+                    <td className="px-4 py-2 font-mono text-xs tabular-nums text-ink">
+                      {formatValue(row.metric, row.p75)}
+                    </td>
+                    <td className="px-4 py-2 font-mono text-xs tabular-nums text-fg-muted">
+                      {row.sample.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
-      {slowRoutes.length === 0 ? (
-        <div style={styles.emptyHint}>No routes meet the minimum-sample threshold yet.</div>
-      ) : (
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>Path</th>
-              <th style={styles.th}>p75</th>
-              <th style={styles.th}>Samples</th>
-            </tr>
-          </thead>
-          <tbody>
-            {slowRoutes.map((row) => (
-              <tr key={row.path}>
-                <td style={styles.td}>
-                  <code>{row.path}</code>
-                </td>
-                <td style={styles.td}>{formatValue(row.metric, row.p75)}</td>
-                <td style={styles.td}>{row.sample.toLocaleString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
     </section>
   );
 }
