@@ -1,4 +1,4 @@
--- 000032_plugin_data_abi.up.sql
+-- 000030_plugin_data_abi.up.sql
 --
 -- Persistent storage surface for the plugin host data ABIs:
 --

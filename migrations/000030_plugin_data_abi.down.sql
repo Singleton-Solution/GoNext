@@ -1,6 +1,6 @@
--- 000032_plugin_data_abi.down.sql
+-- 000030_plugin_data_abi.down.sql
 --
--- Reverse 000032_plugin_data_abi.up.sql. Order matters: the FK on
+-- Reverse 000030_plugin_data_abi.up.sql. Order matters: the FK on
 -- plugin_kv_index references plugin_kv_quotas, so the index table
 -- drops first.
 

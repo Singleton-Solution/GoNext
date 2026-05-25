@@ -23,7 +23,7 @@ import (
 //
 // This file is the implementation half of issues #118 (db.read /
 // db.write), #146 (kv.*), and #175 (cache.invalidate). The schema half
-// lives in migrations/000032_plugin_data_abi.up.sql; the cache-outbox
+// lives in migrations/000030_plugin_data_abi.up.sql; the cache-outbox
 // worker lives in packages/go/cache/invalidator. See
 // docs/02-plugin-system.md §4 (forthcoming) for the catalog narrative.
 //

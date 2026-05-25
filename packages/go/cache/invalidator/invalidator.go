@@ -3,7 +3,7 @@
 //
 // The outbox shape and the host-side write path live in
 // packages/go/plugins/runtime/host_data.go (gn_cache_invalidate);
-// migrations/000032_plugin_data_abi.up.sql owns the schema.
+// migrations/000030_plugin_data_abi.up.sql owns the schema.
 //
 // # Why a separate worker (vs. inline notify)
 //
@@ -190,14 +190,27 @@ func (w *Worker) Run(ctx context.Context) error {
 
 // drainOnce reads up to batchSize unconsumed rows, publishes each,
 // and marks them consumed.
+//
+// Important: the tx context is decoupled from the caller's ctx. Once
+// we have committed to publishing this batch, cancellation of the
+// outer ctx (e.g. the worker is shutting down) must NOT strand
+// already-published messages by killing the UPDATE that marks them
+// consumed. Without this, a cancel between PUBLISH and UPDATE would
+// leave rows that get re-published on the next worker boot — at-
+// least-once is honored but pile-up under repeated restarts is
+// painful. The 30s deadline keeps a wedged tx from holding locks
+// forever if the outer ctx never completes naturally.
 func (w *Worker) drainOnce(ctx context.Context) (int, error) {
-	tx, err := w.pool.Begin(ctx)
+	txCtx, txCancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	defer txCancel()
+
+	tx, err := w.pool.Begin(txCtx)
 	if err != nil {
 		return 0, fmt.Errorf("begin: %w", err)
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer func() { _ = tx.Rollback(txCtx) }()
 
-	rows, err := tx.Query(ctx, `
+	rows, err := tx.Query(txCtx, `
 		SELECT id, plugin_slug, tag
 		FROM cache_invalidations
 		WHERE consumed_at IS NULL
@@ -236,7 +249,7 @@ func (w *Worker) drainOnce(ctx context.Context) (int, error) {
 	consumedIDs := make([]int64, 0, len(batch))
 	for _, p := range batch {
 		payload := fmt.Sprintf("%s:%s", p.slug, p.tag)
-		if err := w.redis.Publish(ctx, w.channel, payload).Err(); err != nil {
+		if err := w.redis.Publish(txCtx, w.channel, payload).Err(); err != nil {
 			w.logger.Warn("cache invalidator: publish failed",
 				slog.Int64("id", p.id),
 				slog.String("plugin", p.slug),
@@ -248,7 +261,7 @@ func (w *Worker) drainOnce(ctx context.Context) (int, error) {
 	}
 
 	if len(consumedIDs) > 0 {
-		if _, err := tx.Exec(ctx, `
+		if _, err := tx.Exec(txCtx, `
 			UPDATE cache_invalidations
 			SET consumed_at = now()
 			WHERE id = ANY($1)`,
@@ -257,7 +270,7 @@ func (w *Worker) drainOnce(ctx context.Context) (int, error) {
 		}
 	}
 
-	if err := tx.Commit(ctx); err != nil {
+	if err := tx.Commit(txCtx); err != nil {
 		return 0, fmt.Errorf("commit: %w", err)
 	}
 	return len(consumedIDs), nil
