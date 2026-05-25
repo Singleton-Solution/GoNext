@@ -17,6 +17,10 @@
  *   │  fetches first page │    │  search/filter/sort/etc. │
  *   └─────────────────────┘    └──────────────────────────┘
  *
+ * Brand treatment ("Living systems"): the page head adopts the
+ * display-type with the italic-serif accent ("All *posts*.") matching
+ * the admin moodboard in `docs/design/ui_kits/admin/index.html`.
+ *
  * Auth
  * ====
  * Admin pages are session-protected. The session cookie lives on the
@@ -25,38 +29,14 @@
  * the server-side fetch would issue an anonymous request and the API
  * would 401 every list screen. The auth middleware in front of the
  * admin guarantees `cookies()` is populated by the time we get here.
- *
- * REST API dependency
- * ===================
- * The endpoint `GET /api/v1/posts` is tracked in issue #76 and may not
- * yet exist in `main` when this PR lands. The component is defensive:
- * on any fetch failure (network error, 404, 5xx, etc.) we render the
- * empty / error state inline. The page never throws and never crashes
- * the surrounding layout. When #76 ships the only thing that changes
- * is that real data starts appearing — no code change here.
- *
- * Suspense + Error boundary
- * =========================
- * Initial fetch happens inside a `<Suspense>` boundary with a simple
- * skeleton fallback so the surrounding layout (sidebar, header) paints
- * immediately. A client-side `PostsErrorBoundary` wraps the interactive
- * island to catch any render error and offer a retry.
- *
- * Pagination
- * ==========
- * "Load more" (cursor-based). Chosen over numbered pages because
- *   (a) it composes naturally with the API's cursor scheme,
- *   (b) the implementation is simpler — no need for total-count math
- *       on the server,
- *   (c) the user need for direct page jumps is low for an admin list
- *       (Saved Views handle the "I want exactly this slice" case).
- * Numbered pages can be added later if the activity log grows large
- * enough to warrant a page-jump UI.
  */
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { Suspense, type ReactElement } from 'react';
+import { Download, Plus } from 'lucide-react';
 import { apiBaseUrl } from '@/lib/api-client';
+import { Headline } from '@/components/ui/headline';
+import { Button } from '@/components/ui/button';
 import { PostListClient } from './PostListClient';
 import { PostsErrorBoundary } from './PostsErrorBoundary';
 import type { PostListResponse } from './columns';
@@ -185,16 +165,34 @@ async function PostsListServer(): Promise<ReactElement> {
 
 export default function PostsPage(): ReactElement {
   return (
-    <section>
-      <div className={styles.headerBar}>
-        <h1>Posts</h1>
-        <Link
-          href={{ pathname: '/posts/new' }}
-          className={styles.primaryAction}
-        >
-          New post
-        </Link>
+    <section data-testid="posts-page" className="flex flex-col gap-6">
+      {/* ─── Page head — brand display-type with italic accent ─── */}
+      <div className="flex flex-wrap items-end justify-between gap-6 border-b border-border pb-6">
+        <div>
+          <Headline as="h1" size="page" className="text-[clamp(36px,4.5vw,44px)]">
+            All <em>posts</em>.
+          </Headline>
+          <p className="mt-[10px] max-w-[480px] text-sm text-fg-muted">
+            Drafts, scheduled, and published content. Filter by status to focus
+            on what needs attention.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="default" size="default" asChild>
+            <Link href="/posts/import">
+              <Download aria-hidden="true" width={14} height={14} />
+              Import
+            </Link>
+          </Button>
+          <Button variant="primary" size="default" asChild>
+            <Link href="/posts/new">
+              <Plus aria-hidden="true" width={14} height={14} />
+              New post
+            </Link>
+          </Button>
+        </div>
       </div>
+
       <PostsErrorBoundary>
         <Suspense fallback={<PostsSkeleton />}>
           <PostsListServer />

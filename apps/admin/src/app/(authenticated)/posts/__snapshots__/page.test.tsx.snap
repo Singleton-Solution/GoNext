@@ -1,0 +1,13 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Posts page head > matches the page-head snapshot 1`] = `
+<h1
+  class="font-display font-extrabold tracking-tight m-0 text-ink [&_em]:font-serif [&_em]:italic [&_em]:font-normal [&_em]:text-[1.05em] [&_em]:tracking-[-0.01em] [&_em]:text-emerald-deep data-[surface=forest]:text-fg-on-forest [[data-surface=forest]_&]:text-fg-on-forest data-[surface=forest]:[&_em]:text-emerald-bright [[data-surface=forest]_&]:[&_em]:text-emerald-bright text-[44px]"
+>
+  All 
+  <em>
+    posts
+  </em>
+  .
+</h1>
+`;
