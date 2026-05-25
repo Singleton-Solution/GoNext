@@ -44,6 +44,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runSign(args[1:], stdout, stderr)
 	case "diff":
 		return runDiff(args[1:], stdout, stderr)
+	case "init":
+		return runInit(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "gonext plugin: unknown subcommand %q\n\n%s\n", args[0], usage)
 		return ExitUsage
@@ -60,6 +62,7 @@ Usage:
   gonext plugin <subcommand> [args]
 
 Subcommands:
+  init       Scaffold a new plugin project (Go template via TinyGo).
   test       Run the plugin contract checks against a bundle.
   dev        Run the plugin author dev loop (auto-detect, build, upload, watch).
   replay     Re-run a recorded plugin trap against the currently-loaded bytes.

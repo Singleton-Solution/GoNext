@@ -1,0 +1,84 @@
+// Package main is the entry point for the {{PLUGIN_NAME}} plugin.
+//
+// Build with TinyGo:
+//
+//	tinygo build -target=wasi -no-debug -o plugin.wasm .
+//
+// The output is a wasm32-wasi module the GoNext lifecycle Manager
+// accepts. Pack with the bundled Makefile:
+//
+//	make bundle   # produces {{PLUGIN_NAME}}.gnplugin
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+
+	"github.com/Singleton-Solution/GoNext/packages/go/sdk"
+)
+
+// main is the TinyGo entry point. Register every hook handler here,
+// then call sdk.PluginInit with the manifest the plugin declares.
+// Dispatch is via the SDK's gn_handle_hook export — main only
+// configures the registry.
+func main() {
+	sdk.RegisterAction("posts.publish", onPostsPublish)
+	sdk.RegisterFilter("the_content", onTheContent)
+
+	sdk.PluginInit(sdk.NewManifest("{{PLUGIN_NAME}}", "0.1.0").
+		WithCapability("kv.write").
+		WithCapability("audit.emit").
+		WithCapability("hooks.subscribe").
+		WithAction("posts.publish").
+		WithFilter("the_content").
+		WithHostRequirement(">=0.1.0").
+		MustBuild())
+}
+
+// onPostsPublish is the action handler stub. The host bus invokes
+// this hook when a post moves into the published state; args[0] is
+// the JSON-decoded post object.
+//
+// Returning a non-nil error surfaces as ResultStatusError to the
+// host bus. The rest of the chain still runs; the operator sees the
+// failure in audit + slog.
+func onPostsPublish(args []any) error {
+	if len(args) == 0 {
+		return fmt.Errorf("posts.publish: no post argument")
+	}
+	post, ok := args[0].(map[string]any)
+	if !ok {
+		return fmt.Errorf("posts.publish: arg[0] is %T, want map", args[0])
+	}
+	id, _ := post["id"].(string)
+	if id == "" {
+		return fmt.Errorf("posts.publish: missing or empty id")
+	}
+
+	// Stash the latest published post id under the plugin's KV
+	// namespace. The host prefixes keys with the plugin slug; we
+	// see our own bare keys.
+	if err := sdk.Host.KV.Set("last-published-id", []byte(id)); err != nil {
+		sdk.Host.Log.Warn("kv.set failed: " + err.Error())
+	}
+
+	// Emit one audit row. The host tags the row with our slug.
+	if err := sdk.Host.Audit.Emit("post.indexed", map[string]any{
+		"post_id": id,
+	}); err != nil {
+		sdk.Host.Log.Warn("audit.emit failed: " + err.Error())
+	}
+	return nil
+}
+
+// onTheContent is the filter handler stub. The host bus passes the
+// post body as a JSON-encoded string in value; the return must be a
+// JSON-encoded string of the transformed body.
+func onTheContent(value json.RawMessage, _ []any) (json.RawMessage, error) {
+	var body string
+	if err := json.Unmarshal(value, &body); err != nil {
+		return nil, fmt.Errorf("the_content: unmarshal value: %w", err)
+	}
+	body += "\n<!-- enhanced by {{PLUGIN_NAME}} -->"
+	return json.Marshal(body)
+}
