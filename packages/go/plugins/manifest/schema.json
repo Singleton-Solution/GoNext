@@ -111,6 +111,30 @@
       "description": "Detached ed25519 signature over the canonical bundle bytes, lowercase hex. Optional in v1 because the registry handles signing centrally; unsigned bundles are rejected by the operator-side install gate.",
       "type": "string",
       "pattern": "^[0-9a-f]{128}$"
+    },
+    "storage": {
+      "description": "Optional declarative budgets for the plugin's persistent-storage surface. Only the kv namespace is described today; future fields (db, blob) will land here.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kv": {
+          "description": "Per-plugin Redis-backed KV namespace budget. The host soft-evicts the oldest keys when a write would exceed either ceiling; plugins MUST treat eviction as expected behavior.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_bytes": {
+              "description": "Cumulative value bytes the plugin may store. Omit for unlimited (operator-overridable; the install gate does not grant unlimited by default).",
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_keys": {
+              "description": "Maximum number of keys the plugin may hold. Omit for unlimited.",
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
     }
   }
 }
