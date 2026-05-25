@@ -19,7 +19,7 @@ const Input = React.forwardRef<
     <input
       type={type}
       className={cn(
-        'flex h-10 w-full rounded-md border border-border bg-paper-3 px-3 py-2 font-sans text-sm text-ink',
+        'flex h-9 w-full rounded-md border border-border bg-paper-3 px-3 py-1.5 font-sans text-sm leading-none text-ink',
         'placeholder:text-fg-faint',
         'transition-colors transition-shadow duration-[160ms] ease-brand',
         'hover:border-border-strong',
