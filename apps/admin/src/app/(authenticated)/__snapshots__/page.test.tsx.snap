@@ -1,0 +1,34 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Dashboard page > matches the dashboard structure snapshot 1`] = `
+<div
+  class="flex flex-wrap items-end justify-between gap-6 border-b border-border pb-6"
+>
+  <div>
+    <h1
+      class="font-display font-extrabold tracking-tight m-0 text-ink [&_em]:font-serif [&_em]:italic [&_em]:font-normal [&_em]:text-[1.05em] [&_em]:tracking-[-0.01em] [&_em]:text-emerald-deep data-[surface=forest]:text-fg-on-forest [[data-surface=forest]_&]:text-fg-on-forest data-[surface=forest]:[&_em]:text-emerald-bright [[data-surface=forest]_&]:[&_em]:text-emerald-bright text-[clamp(40px,5vw,52px)]"
+    >
+      Site 
+      <em>
+        pulse
+      </em>
+      .
+    </h1>
+    <p
+      class="mt-[10px] max-w-[480px] text-sm text-fg-muted"
+    >
+      A vital-signs view of the workspace. Drafts, readers, and revenue — updated as the site lives and grows.
+    </p>
+  </div>
+  <span
+    aria-label="Live status"
+    class="inline-flex items-center gap-2 rounded-pill border border-emerald/35 bg-emerald-soft/60 px-3 py-[6px] text-xs font-medium text-emerald-deep"
+  >
+    <span
+      aria-hidden="true"
+      class="h-[6px] w-[6px] animate-pulse rounded-pill bg-emerald"
+    />
+    Live · updated just now
+  </span>
+</div>
+`;
