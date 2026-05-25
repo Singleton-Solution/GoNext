@@ -1,15 +1,25 @@
 /**
- * Landing page.
+ * Landing page — the docs site front door.
  *
- * Three pieces, ordered top-down on the page:
- *  1. A hero with the project name, one-line value prop, and a Getting
- *     Started CTA that links into the first doc.
- *  2. A feature grid summarising what the docs cover.
+ * Three sections, ordered top-down:
+ *  1. A hero with a giant Archivo headline ("Docs that *grow* with you.")
+ *     where the italic emerald `grow` ties to the brand's
+ *     italic-accent rule. Beneath it sits a Geist subtitle and two
+ *     prominent CTAs — emerald primary (Read the docs) and a cream
+ *     secondary (API reference).
+ *  2. A forest "alive band" with organic radial-glow gradients in
+ *     emerald + lavender. Inside the band lives the feature grid of
+ *     subsystem entry points (each card jumps into a specific doc).
  *  3. A direct path into the ADR list for readers who came here looking
  *     for design decisions, not how-to.
+ *
+ * The italic emphasis (`<em>grow</em>`) follows HANDOFF.md "The italic
+ * accent rule": one italic word per headline, max two. It is emphasis
+ * not decoration.
  */
 import Link from 'next/link';
 import type { ReactElement } from 'react';
+import { ArrowRight, BookOpen } from 'lucide-react';
 
 const FEATURES = [
   {
@@ -48,33 +58,50 @@ export default function LandingPage(): ReactElement {
   return (
     <main className="landing">
       <section className="landing__hero">
-        <h1 className="landing__title">GoNext Documentation</h1>
+        <span className="landing__eyebrow">Living documentation</span>
+        <h1 className="landing__title">
+          Docs that <em>grow</em> with you.
+        </h1>
         <p className="landing__subtitle">
-          A modern, modular CMS built on Go and Next.js. Familiar mental model,
-          modern stack, plugin and theme ecosystems engineered for safety.
+          Subsystem guides, architectural decisions, and the API reference for the
+          GoNext platform. One coherent surface for the whole stack — Go backend,
+          Next.js frontend, plugin and theme ecosystems.
         </p>
-        <Link href="/docs/00-architecture-overview" className="landing__cta">
-          Start with the architecture overview &rarr;
-        </Link>
+        <div className="landing__ctas">
+          <Link href="/docs/00-architecture-overview" className="landing__cta landing__cta--primary">
+            <BookOpen className="landing__cta-icon" aria-hidden="true" />
+            Read the docs
+          </Link>
+          <Link href="/api" className="landing__cta landing__cta--secondary">
+            API reference
+            <ArrowRight className="landing__cta-icon" aria-hidden="true" />
+          </Link>
+        </div>
       </section>
 
-      <section aria-label="Documentation areas">
+      <section className="landing__band" aria-label="Documentation areas">
+        <div className="landing__band-eyebrow">By subsystem</div>
+        <h2 className="landing__band-title">
+          One product for everything you used <em>five</em> for.
+        </h2>
+        <p className="landing__band-sub">
+          Each guide is self-contained — the architecture overview is the entry
+          point, but you can drop into any subsystem on its own.
+        </p>
         <div className="feature-grid">
           {FEATURES.map((f) => (
             <Link key={f.href} href={f.href} className="feature-card">
-              <h2 className="feature-card__title">{f.title}</h2>
+              <h3 className="feature-card__title">{f.title}</h3>
               <p className="feature-card__body">{f.body}</p>
             </Link>
           ))}
         </div>
       </section>
 
-      <section style={{ marginTop: '48px', textAlign: 'center' }}>
-        <p style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>
-          Looking for design decisions? Read the{' '}
-          <Link href="/adr">Architecture Decision Records</Link>.
-        </p>
-      </section>
+      <p className="landing__footnote">
+        Looking for design decisions? Read the{' '}
+        <Link href="/adr">Architecture Decision Records</Link>.
+      </p>
     </main>
   );
 }
