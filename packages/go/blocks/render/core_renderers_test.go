@@ -25,7 +25,7 @@ func walkOne(t *testing.T, blockType string, attrs map[string]any, inner []Block
 	return string(res.HTML)
 }
 
-func TestCoreRegister_AllSixteenSeeded(t *testing.T) {
+func TestCoreRegister_AllSeeded(t *testing.T) {
 	t.Parallel()
 	reg := NewRegistry()
 	if err := RegisterCoreBlocks(reg); err != nil {
@@ -36,6 +36,7 @@ func TestCoreRegister_AllSixteenSeeded(t *testing.T) {
 		"core/quote", "core/code", "core/separator", "core/spacer",
 		"core/columns", "core/group", "core/table", "core/gallery",
 		"core/video", "core/button", "core/file", "core/embed",
+		"core/html",
 	}
 	if reg.Len() != len(want) {
 		t.Fatalf("registered %d block types, want %d", reg.Len(), len(want))
@@ -406,5 +407,32 @@ func TestCoreRenderers_NestedColumnsWithHeadingAndParagraph(t *testing.T) {
 	}
 	if !strings.Contains(html, "gn-block-columns--cols-2") {
 		t.Fatalf("missing columns class: %q", html)
+	}
+}
+
+// TestRenderHTML_SanitizesSVG: the core/html block runs author
+// content through safehtml.SanitizeSVG, dropping <script> and
+// event handlers.
+func TestRenderHTML_SanitizesSVG(t *testing.T) {
+	t.Parallel()
+	raw := `<svg onload="alert(1)"><script>x()</script><circle r="5"/></svg>`
+	out := walkOne(t, "core/html", map[string]any{"content": raw}, nil)
+	if strings.Contains(strings.ToLower(out), "<script") || strings.Contains(out, "alert") {
+		t.Errorf("script/alert leaked: %q", out)
+	}
+	if strings.Contains(strings.ToLower(out), "onload") {
+		t.Errorf("onload leaked: %q", out)
+	}
+	if !strings.Contains(out, "<circle") {
+		t.Errorf("legit child stripped: %q", out)
+	}
+}
+
+// TestRenderHTML_Empty returns an empty container for empty input.
+func TestRenderHTML_Empty(t *testing.T) {
+	t.Parallel()
+	out := walkOne(t, "core/html", map[string]any{"content": ""}, nil)
+	if !strings.Contains(out, "gn-block-html--empty") {
+		t.Errorf("expected empty marker, got %q", out)
 	}
 }
