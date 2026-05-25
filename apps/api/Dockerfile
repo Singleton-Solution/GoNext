@@ -24,10 +24,26 @@
 # ---------- Stage 1: build ----------
 FROM golang:1.25-alpine AS build
 
+# IMAGEPROC_BACKEND selects between the pure-Go default (`stdlib`) and
+# the libvips-backed `govips` build of the on-the-fly image proxy
+# (packages/go/media/imgproxy). `stdlib` keeps the runtime stage
+# distroless/static and CGO-free — the right default for the small
+# binary, fast cold-start path. `govips` pulls in libvips at runtime
+# for the faster + higher-quality variant pipeline; it requires CGO
+# and a Debian-based runtime so libvips dynlinks resolve.
+ARG IMAGEPROC_BACKEND=stdlib
+
 # Install build-time tools. ca-certificates and tzdata are pulled in here
 # so the runtime stage can copy them over (distroless/static does ship
 # ca-certificates, but we keep the COPY explicit for clarity).
-RUN apk add --no-cache git ca-certificates tzdata
+#
+# The govips build adds vips-dev + the gcc toolchain so cgo can compile
+# the wrapper. We branch on $IMAGEPROC_BACKEND so the stdlib image
+# remains tiny and free of compiler debris.
+RUN apk add --no-cache git ca-certificates tzdata && \
+    if [ "$IMAGEPROC_BACKEND" = "govips" ]; then \
+      apk add --no-cache build-base vips-dev pkgconfig; \
+    fi
 
 WORKDIR /src
 
@@ -46,8 +62,11 @@ ARG BUILD_DATE=unknown
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
 
-ENV CGO_ENABLED=0 \
-    GOOS=${TARGETOS} \
+# CGO + build tags are conditional on IMAGEPROC_BACKEND. The stdlib
+# branch keeps CGO_ENABLED=0 so the runtime stays distroless/static;
+# the govips branch flips CGO_ENABLED=1 and adds the `vips` tag so
+# the transform_govips.go file is compiled in.
+ENV GOOS=${TARGETOS} \
     GOARCH=${TARGETARCH} \
     GOWORK=off
 
@@ -57,9 +76,14 @@ ENV CGO_ENABLED=0 \
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     cd apps/api && \
+    if [ "$IMAGEPROC_BACKEND" = "govips" ]; then \
+      export CGO_ENABLED=1 && export BUILD_TAGS="vips,netgo,osusergo"; \
+    else \
+      export CGO_ENABLED=0 && export BUILD_TAGS="netgo,osusergo"; \
+    fi && \
     go build \
       -trimpath \
-      -tags "netgo,osusergo" \
+      -tags "$BUILD_TAGS" \
       -ldflags "-s -w \
         -X 'github.com/Singleton-Solution/GoNext/packages/go/buildinfo.Version=${VERSION}' \
         -X 'github.com/Singleton-Solution/GoNext/packages/go/buildinfo.Commit=${COMMIT}' \
@@ -67,8 +91,39 @@ RUN --mount=type=cache,target=/go/pkg/mod \
       -o /out/api \
       ./cmd/server
 
-# ---------- Stage 2: runtime ----------
-FROM gcr.io/distroless/static-debian12:nonroot AS runtime
+# ---------- Stage 2a: runtime (stdlib backend, distroless static) ----------
+#
+# The default runtime. Pure-Go binary; no libvips on the runtime image.
+# The smaller surface and absence of a libc make this the right base
+# for the stdlib build. Selected when IMAGEPROC_BACKEND is stdlib
+# (the default).
+FROM gcr.io/distroless/static-debian12:nonroot AS runtime-stdlib
+COPY --from=build /out/api /app/api
+
+# ---------- Stage 2b: runtime (govips backend, debian-slim + libvips) ----------
+#
+# The govips runtime needs libvips at link time. distroless/cc-debian12
+# would work but we want explicit control over the libvips package
+# version, so we use debian:bookworm-slim and apt-get just the dynamic
+# library + a single user setup. The runtime is still small (~80 MB)
+# but markedly larger than the static image.
+FROM debian:bookworm-slim AS runtime-govips
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libvips42 ca-certificates tzdata \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -g 65532 nonroot \
+    && useradd -u 65532 -g 65532 -s /sbin/nologin nonroot
+COPY --from=build /out/api /app/api
+
+# ---------- Stage 3: final runtime selector ----------
+#
+# The two runtime stages above are mutually exclusive — Docker builds
+# them both but only one is tagged as `runtime`. We pick via a build
+# arg that re-uses IMAGEPROC_BACKEND so a single `--build-arg
+# IMAGEPROC_BACKEND=govips` flips both the build flags and the final
+# image base.
+ARG IMAGEPROC_BACKEND=stdlib
+FROM runtime-${IMAGEPROC_BACKEND} AS runtime
 
 ARG VERSION=dev
 ARG COMMIT=unknown
@@ -85,7 +140,8 @@ LABEL org.opencontainers.image.title="gonext-api" \
       org.opencontainers.image.revision="${COMMIT}" \
       org.opencontainers.image.created="${BUILD_DATE}"
 
-COPY --from=build /out/api /app/api
+# Binary already COPYed in the runtime-stdlib / runtime-govips stages
+# above so the layers are cached per-base; we don't need to re-COPY here.
 # Seed theme content is embedded via go:embed (packages/go/theme/seed),
 # so the seeder unpacks to GONEXT_THEME_DIR at boot — no in-image theme
 # tree is required. Compose mounts a writable volume at /themes so the
