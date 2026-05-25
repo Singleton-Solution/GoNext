@@ -25,6 +25,7 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/Singleton-Solution/GoNext/packages/go/i18n"
 	"github.com/tetratelabs/wazero"
@@ -50,11 +51,12 @@ type AuditEmitter interface {
 // branch on "no sink wired" before touching the field.
 //
 // More sinks land in follow-up commits — a SpanEventReceiver for
-// gn_span_event (#194), a *PluginMetrics for #181's Prometheus
-// counters, and a *CardinalityDam for #226's gn_metric_observe.
+// gn_span_event (#194), and a *CardinalityDam for #226's
+// gn_metric_observe.
 type observability struct {
 	translator   i18n.Translator
 	auditEmitter AuditEmitter
+	metrics      *PluginMetrics
 }
 
 // observabilityRegistry is the side-channel state for observability
@@ -137,6 +139,17 @@ func (b *ObservabilityBuilder) WithAuditEmitter(e AuditEmitter) *ObservabilityBu
 	return b
 }
 
+// WithPluginMetrics installs the slug-bounded Prometheus catalogue.
+// Passing nil disables every plugin metric. After installation, the
+// runtime calls pm.RegisterSlug from LoadModule and pm.UnregisterSlug
+// from Close — so a runtime with metrics wired in will refuse to
+// load the 101st distinct plugin (the cardinality cap) and surface
+// *ErrPluginSlugLimit.
+func (b *ObservabilityBuilder) WithPluginMetrics(pm *PluginMetrics) *ObservabilityBuilder {
+	mutateObs(b.rt, func(o *observability) { o.metrics = pm })
+	return b
+}
+
 // ===========================================================================
 // Accessors.
 // ===========================================================================
@@ -148,6 +161,10 @@ func (r *Runtime) Translator() i18n.Translator { return obsFor(r).translator }
 
 // AuditEmitter returns the configured audit emitter or nil.
 func (r *Runtime) AuditEmitter() AuditEmitter { return obsFor(r).auditEmitter }
+
+// PluginMetrics returns the runtime's metrics catalogue or nil when
+// none has been wired in.
+func (r *Runtime) PluginMetrics() *PluginMetrics { return obsFor(r).metrics }
 
 // ===========================================================================
 // Registration helper.
@@ -209,12 +226,18 @@ func (r *Runtime) hostGnI18nTranslate(ctx context.Context, mod api.Module, stack
 	o := obsFor(r)
 	slug := mod.Name()
 
+	start := time.Now()
+	defer func() {
+		o.metrics.ObserveABICallDuration(slug, "gn_i18n_translate", time.Since(start).Seconds())
+	}()
+
 	keyBuf, err := readHostString("gn_i18n_translate", mod, keyPtr, keyLen)
 	if err != nil {
 		r.logger.Warn("gn_i18n_translate: bad key args",
 			slog.String("plugin", slug),
 			slog.String("err", err.Error()))
 		stack[0] = api.EncodeI64(0)
+		o.metrics.IncABICall(slug, "gn_i18n_translate", "error")
 		return
 	}
 	localeBuf, err := readHostString("gn_i18n_translate", mod, localePtr, localeLen)
@@ -223,12 +246,14 @@ func (r *Runtime) hostGnI18nTranslate(ctx context.Context, mod api.Module, stack
 			slog.String("plugin", slug),
 			slog.String("err", err.Error()))
 		stack[0] = api.EncodeI64(0)
+		o.metrics.IncABICall(slug, "gn_i18n_translate", "error")
 		return
 	}
 
 	key := string(keyBuf)
 	locale := string(localeBuf)
 	translated := o.translator.Translate(key, locale)
+	o.metrics.IncABICall(slug, "gn_i18n_translate", "ok")
 
 	// No translation available: signal (0, 0) so the guest SDK can
 	// surface its own fallback (typically the key, formatted client-
@@ -352,6 +377,9 @@ func (r *Runtime) ObservePluginTrap(ctx context.Context, evt TrapEvent) {
 	if evt.Slug == "" {
 		return
 	}
+	o := obsFor(r)
+	o.metrics.IncLifecycle(evt.Slug, "trap")
+
 	meta := map[string]any{
 		"reason":      evt.Reason,
 		"instance_id": evt.InstanceID,
@@ -369,4 +397,69 @@ func (r *Runtime) ObservePluginTrap(ctx context.Context, evt TrapEvent) {
 		slog.String("instance_id", evt.InstanceID),
 		slog.String("reason", evt.Reason),
 		slog.Float64("fuel_remaining", evt.Fuel))
+}
+
+// ===========================================================================
+// Lifecycle hooks (#181). These are called by external integration
+// code (the lifecycle Manager) on plugin load / close so the metric
+// catalogue stays in sync with what's actually running. We don't bake
+// the calls into Runtime.LoadModule / Module.Close to keep this PR
+// from touching the central runtime.go — parallel ABI agents would
+// then have to rebase through every observability change.
+// ===========================================================================
+
+// RegisterPluginSlug admits slug into the cardinality-bounded metric
+// catalogue and bumps the create-event lifecycle counter. The two
+// happen together so a caller that successfully registers always sees
+// the corresponding create counter increment.
+//
+// Returns *ErrPluginSlugLimit when the slug cap is hit; the caller is
+// expected to surface the failure as a clean "plugin temporarily
+// unavailable" condition to the operator. The slug is NOT loaded into
+// the runtime in that case.
+//
+// Calling this for a slug that's already admitted is a no-op and
+// returns nil — registration is idempotent. The lifecycle counter
+// still bumps, which is intentional: a fresh "create" event reflects
+// the new instance even though the slug was admitted earlier.
+func (r *Runtime) RegisterPluginSlug(slug string) error {
+	o := obsFor(r)
+	if o.metrics == nil {
+		// No metrics catalogue wired in — nothing to gate. The lifecycle
+		// counter is also a no-op. Return nil so callers can still call
+		// this unconditionally.
+		return nil
+	}
+	if err := o.metrics.RegisterSlug(slug); err != nil {
+		return err
+	}
+	o.metrics.IncLifecycle(slug, "create")
+	return nil
+}
+
+// UnregisterPluginSlug drops slug from the cardinality set and bumps
+// the destroy-event lifecycle counter. Idempotent.
+func (r *Runtime) UnregisterPluginSlug(slug string) {
+	o := obsFor(r)
+	if o.metrics == nil {
+		return
+	}
+	o.metrics.IncLifecycle(slug, "destroy")
+	o.metrics.UnregisterSlug(slug)
+}
+
+// RecordPluginTimeout bumps the timeout counter for (slug, abi).
+// External integration code calls this from the per-call deadline
+// path when the enforcer's hard cancel fires. abi is the host
+// function the call was inside when the deadline tripped, or empty
+// to attribute against the outer Module.Call envelope.
+func (r *Runtime) RecordPluginTimeout(slug, abi string) {
+	obsFor(r).metrics.IncTimeout(slug, abi)
+}
+
+// RecordPluginFuel adds fuel units burned by slug. Bumped from the
+// per-call deadline integration once a fuel meter ships; the seam is
+// here so the lifecycle Manager has a single place to call.
+func (r *Runtime) RecordPluginFuel(slug string, fuel float64) {
+	obsFor(r).metrics.IncFuel(slug, fuel)
 }
