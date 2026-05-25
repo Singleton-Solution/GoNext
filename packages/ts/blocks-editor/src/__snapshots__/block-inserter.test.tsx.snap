@@ -1,0 +1,194 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<BlockInserter> > matches the snapshot for the default text-tab view 1`] = `
+<div
+  class="gonext-block-inserter"
+  data-testid="block-inserter"
+  style="background: var(--paper-2, #EFEBE0); border: 1px solid var(--border, #D9D2C0); border-radius: var(--r-lg, 12px); padding: var(--s-4, 16px); box-shadow: var(--sh-xs, 0 1px 2px rgba(14, 26, 20, 0.04)); font-family: var(--font-sans, 'Geist', -apple-system, system-ui, sans-serif); color: var(--ink, #0E1A14); width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: var(--s-3, 12px);"
+>
+  <input
+    aria-label="Search blocks"
+    class="gonext-block-inserter__search"
+    data-testid="block-inserter-search"
+    placeholder="Search blocks"
+    role="searchbox"
+    style="width: 100%; background: var(--paper-3, #E6E1D2); border: 1px solid var(--border, #D9D2C0); border-radius: var(--r-md, 8px); padding: 8px 12px; font-family: inherit; font-size: var(--t-sm, 13px); color: var(--ink, #0E1A14); outline: none;"
+    type="search"
+    value=""
+  />
+  <div
+    aria-label="Block categories"
+    class="gonext-block-inserter__tabs"
+    role="tablist"
+    style="display: flex; flex-wrap: wrap; gap: var(--s-1, 4px); padding-bottom: var(--s-2, 8px); border-bottom: 1px solid var(--border-subtle, #E8E2D1);"
+  >
+    <button
+      aria-controls="gonext-block-inserter-panel-text"
+      aria-selected="true"
+      class="gonext-block-inserter__tab"
+      data-active="true"
+      data-testid="block-inserter-tab-text"
+      role="tab"
+      style="padding: 4px 10px; background: var(--emerald-soft, #D1FAE5); border: 1px solid transparent; border-radius: var(--r-pill, 999px); font-family: inherit; font-size: var(--t-xs, 12px); font-weight: 500; color: var(--emerald-deep, #047857); cursor: pointer; text-transform: lowercase;"
+      type="button"
+    >
+      text
+    </button>
+    <button
+      aria-controls="gonext-block-inserter-panel-media"
+      aria-selected="false"
+      class="gonext-block-inserter__tab"
+      data-active="false"
+      data-testid="block-inserter-tab-media"
+      disabled=""
+      role="tab"
+      style="padding: 4px 10px; background: transparent; border: 1px solid transparent; border-radius: var(--r-pill, 999px); font-family: inherit; font-size: var(--t-xs, 12px); font-weight: 500; color: var(--fg-faint, #94A199); cursor: not-allowed; text-transform: lowercase; opacity: 0.6;"
+      type="button"
+    >
+      media
+    </button>
+    <button
+      aria-controls="gonext-block-inserter-panel-design"
+      aria-selected="false"
+      class="gonext-block-inserter__tab"
+      data-active="false"
+      data-testid="block-inserter-tab-design"
+      disabled=""
+      role="tab"
+      style="padding: 4px 10px; background: transparent; border: 1px solid transparent; border-radius: var(--r-pill, 999px); font-family: inherit; font-size: var(--t-xs, 12px); font-weight: 500; color: var(--fg-faint, #94A199); cursor: not-allowed; text-transform: lowercase; opacity: 0.6;"
+      type="button"
+    >
+      design
+    </button>
+    <button
+      aria-controls="gonext-block-inserter-panel-widgets"
+      aria-selected="false"
+      class="gonext-block-inserter__tab"
+      data-active="false"
+      data-testid="block-inserter-tab-widgets"
+      disabled=""
+      role="tab"
+      style="padding: 4px 10px; background: transparent; border: 1px solid transparent; border-radius: var(--r-pill, 999px); font-family: inherit; font-size: var(--t-xs, 12px); font-weight: 500; color: var(--fg-faint, #94A199); cursor: not-allowed; text-transform: lowercase; opacity: 0.6;"
+      type="button"
+    >
+      widgets
+    </button>
+    <button
+      aria-controls="gonext-block-inserter-panel-theme"
+      aria-selected="false"
+      class="gonext-block-inserter__tab"
+      data-active="false"
+      data-testid="block-inserter-tab-theme"
+      disabled=""
+      role="tab"
+      style="padding: 4px 10px; background: transparent; border: 1px solid transparent; border-radius: var(--r-pill, 999px); font-family: inherit; font-size: var(--t-xs, 12px); font-weight: 500; color: var(--fg-faint, #94A199); cursor: not-allowed; text-transform: lowercase; opacity: 0.6;"
+      type="button"
+    >
+      theme
+    </button>
+    <button
+      aria-controls="gonext-block-inserter-panel-embed"
+      aria-selected="false"
+      class="gonext-block-inserter__tab"
+      data-active="false"
+      data-testid="block-inserter-tab-embed"
+      disabled=""
+      role="tab"
+      style="padding: 4px 10px; background: transparent; border: 1px solid transparent; border-radius: var(--r-pill, 999px); font-family: inherit; font-size: var(--t-xs, 12px); font-weight: 500; color: var(--fg-faint, #94A199); cursor: not-allowed; text-transform: lowercase; opacity: 0.6;"
+      type="button"
+    >
+      embed
+    </button>
+    <button
+      aria-controls="gonext-block-inserter-panel-custom"
+      aria-selected="false"
+      class="gonext-block-inserter__tab"
+      data-active="false"
+      data-testid="block-inserter-tab-custom"
+      disabled=""
+      role="tab"
+      style="padding: 4px 10px; background: transparent; border: 1px solid transparent; border-radius: var(--r-pill, 999px); font-family: inherit; font-size: var(--t-xs, 12px); font-weight: 500; color: var(--fg-faint, #94A199); cursor: not-allowed; text-transform: lowercase; opacity: 0.6;"
+      type="button"
+    >
+      custom
+    </button>
+  </div>
+  <div
+    aria-label="text blocks"
+    class="gonext-block-inserter__grid"
+    data-testid="block-inserter-panel-text"
+    id="gonext-block-inserter-panel-text"
+    role="tabpanel"
+    style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-2, 8px);"
+  >
+    <button
+      class="gonext-block-inserter__tile"
+      data-testid="block-inserter-tile-core/paragraph"
+      style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-1, 4px); padding: var(--s-3, 12px) var(--s-2, 8px); background: var(--paper, #F5F2EA); border: 1px solid var(--border, #D9D2C0); border-radius: var(--r-md, 8px); cursor: pointer; transition: background var(--dur-fast, 100ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1)), border-color var(--dur-fast, 100ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1)), box-shadow var(--dur, 160ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1)); font-family: inherit;"
+      title="Start with the building block of all narrative."
+      type="button"
+    >
+      <span
+        aria-hidden="true"
+        class="gonext-block-inserter__tile-icon"
+        data-testid="block-inserter-tile-icon-core/paragraph"
+        style="width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; color: var(--fg-muted, #4A5C52);"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+        >
+          <text
+            font-family="serif"
+            font-size="18"
+            x="6"
+            y="18"
+          >
+            P
+          </text>
+        </svg>
+      </span>
+      <span
+        class="gonext-block-inserter__tile-title"
+        style="font-size: var(--t-xs, 12px); font-weight: 500; color: var(--ink, #0E1A14); text-align: center;"
+      >
+        Paragraph
+      </span>
+    </button>
+    <button
+      class="gonext-block-inserter__tile"
+      data-testid="block-inserter-tile-core/heading"
+      style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-1, 4px); padding: var(--s-3, 12px) var(--s-2, 8px); background: var(--paper, #F5F2EA); border: 1px solid var(--border, #D9D2C0); border-radius: var(--r-md, 8px); cursor: pointer; transition: background var(--dur-fast, 100ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1)), border-color var(--dur-fast, 100ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1)), box-shadow var(--dur, 160ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1)); font-family: inherit;"
+      title="Introduce a new section."
+      type="button"
+    >
+      <span
+        aria-hidden="true"
+        class="gonext-block-inserter__tile-icon"
+        data-testid="block-inserter-tile-icon-core/heading"
+        style="width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; color: var(--fg-muted, #4A5C52);"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+        >
+          <text
+            font-family="serif"
+            font-size="16"
+            x="3"
+            y="18"
+          >
+            H
+          </text>
+        </svg>
+      </span>
+      <span
+        class="gonext-block-inserter__tile-title"
+        style="font-size: var(--t-xs, 12px); font-weight: 500; color: var(--ink, #0E1A14); text-align: center;"
+      >
+        Heading
+      </span>
+    </button>
+  </div>
+</div>
+`;

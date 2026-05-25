@@ -224,4 +224,45 @@ describe('<BlockInserter>', () => {
       screen.getByTestId('block-inserter-tile-plugin/noicon'),
     ).toBeInTheDocument();
   });
+
+  it('renders a brand Lucide glyph for icon-less blocks (no plain-text id)', () => {
+    const registry = new BlockRegistry();
+    registry.register({
+      name: 'plugin/noicon',
+      title: 'No Icon',
+      category: 'text',
+      attributes: { type: 'object', additionalProperties: true },
+      edit: async () => ({ default: () => null }),
+    });
+    render(<BlockInserter registry={registry} onInsert={vi.fn()} />);
+
+    // No icon string means the inserter falls back to its inline-SVG
+    // Lucide glyph map. The icon host should carry an <svg> element
+    // *and* not leak the block name into the visible label.
+    const iconHost = screen.getByTestId('block-inserter-tile-icon-plugin/noicon');
+    expect(iconHost.querySelector('svg')).not.toBeNull();
+    expect(iconHost.textContent).toBe('');
+  });
+
+  it('applies brand surface tokens to the inserter panel', () => {
+    const registry = buildCoreRegistry();
+    render(<BlockInserter registry={registry} onInsert={vi.fn()} />);
+
+    const panel = screen.getByTestId('block-inserter');
+    expect(panel.getAttribute('style')).toMatch(/--paper-2/);
+    expect(panel.getAttribute('style')).toMatch(/--border/);
+    const search = screen.getByTestId('block-inserter-search');
+    expect(search.getAttribute('style')).toMatch(/--paper-3/);
+    // The active tab carries the emerald-soft pill.
+    const activeTab = screen.getByTestId('block-inserter-tab-text');
+    expect(activeTab.getAttribute('style')).toMatch(/--emerald-soft/);
+  });
+
+  it('matches the snapshot for the default text-tab view', () => {
+    const registry = buildCoreRegistry();
+    const { container } = render(
+      <BlockInserter registry={registry} onInsert={vi.fn()} />,
+    );
+    expect(container.firstChild).toMatchSnapshot();
+  });
 });
