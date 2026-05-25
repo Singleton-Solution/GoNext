@@ -1,0 +1,50 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Pages list page > matches the page-head snapshot 1`] = `
+<div
+  class="flex flex-wrap items-end justify-between gap-6 border-b border-border pb-6"
+>
+  <div>
+    <h1
+      class="font-display font-extrabold tracking-tight m-0 text-ink [&_em]:font-serif [&_em]:italic [&_em]:font-normal [&_em]:text-[1.05em] [&_em]:tracking-[-0.01em] [&_em]:text-emerald-deep data-[surface=forest]:text-fg-on-forest [[data-surface=forest]_&]:text-fg-on-forest data-[surface=forest]:[&_em]:text-emerald-bright [[data-surface=forest]_&]:[&_em]:text-emerald-bright text-[clamp(36px,4.5vw,44px)]"
+    >
+      All 
+      <em>
+        pages
+      </em>
+      .
+    </h1>
+    <p
+      class="mt-[10px] max-w-[480px] text-sm text-fg-muted"
+    >
+      Evergreen content — about, contact, policy. Edit metadata or open the block editor for layout-heavy pages.
+    </p>
+  </div>
+  <a
+    class="inline-flex items-center justify-center gap-[6px] whitespace-nowrap rounded-md font-display font-bold transition-shadow duration-[160ms] ease-brand focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 bg-ink text-paper border border-ink shadow-xs hover:bg-forest-2 hover:border-forest-2 px-4 py-[9px] text-sm"
+    href="/pages/new"
+  >
+    <svg
+      aria-hidden="true"
+      class="lucide lucide-plus"
+      fill="none"
+      height="14"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="14"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M5 12h14"
+      />
+      <path
+        d="M12 5v14"
+      />
+    </svg>
+    New page
+  </a>
+</div>
+`;

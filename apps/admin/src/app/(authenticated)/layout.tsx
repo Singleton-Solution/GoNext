@@ -13,9 +13,15 @@
  * client-side guard here. Keeping the redirect in one place avoids
  * the double-redirect / flash patterns that bedevil mixed client/server
  * auth gates.
+ *
+ * Brand treatment ("Living systems"): the chrome is a forest-dark
+ * sidebar paired with a cream paper main pane. The top header
+ * carries the GoNext wordmark — its italic "Next" inherits the
+ * brand's signature serif-italic accent.
  */
 import type { ReactElement, ReactNode } from 'react';
 import { Sidebar } from './_components/Sidebar';
+import { TopHeader } from './_components/TopHeader';
 
 export default function AuthenticatedLayout({
   children,
@@ -26,7 +32,7 @@ export default function AuthenticatedLayout({
     <div className="app-shell">
       <Sidebar />
       <div className="app-shell__main">
-        <header className="app-shell__header">GoNext Admin</header>
+        <TopHeader />
         <main className="app-shell__content">{children}</main>
       </div>
     </div>

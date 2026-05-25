@@ -79,6 +79,13 @@ export function serializeSort(spec: SortSpec): string {
 /**
  * Status badge — small coloured pill that maps a status string onto an
  * accessible label + visual treatment.
+ *
+ * Brand palette ("Living systems" — docs/design/colors_and_type.css
+ * `.tag` variants):
+ *   • published → success-soft / success-deep
+ *   • scheduled → lavender-soft / lavender-deep
+ *   • draft / pending → paper-3 / fg-muted (neutral)
+ *   • trash    → danger-soft / danger
  */
 export function StatusBadge({ status }: { status: PostStatus }): ReactElement {
   const className =
@@ -86,9 +93,11 @@ export function StatusBadge({ status }: { status: PostStatus }): ReactElement {
       ? `${styles.badge} ${styles.badgePublished}`
       : status === 'trash'
         ? `${styles.badge} ${styles.badgeTrash}`
-        : status === 'draft' || status === 'pending'
-          ? `${styles.badge} ${styles.badgeDraft}`
-          : styles.badge;
+        : status === 'future'
+          ? `${styles.badge} ${styles.badgeScheduled}`
+          : status === 'draft' || status === 'pending'
+            ? `${styles.badge} ${styles.badgeDraft}`
+            : styles.badge;
 
   const label =
     status === 'publish'
