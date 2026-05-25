@@ -1,0 +1,168 @@
+name: E2E Blog Loop (canary)
+
+# Full "write a blog post" canary. Sibling to e2e-smoke.yml — runs the
+# tools/e2e/tests/full-blog-loop.spec.ts journey end-to-end (login →
+# author → publish → log out → assert public render → assert SEO).
+#
+# Advisory initially (continue-on-error: true). Promotion to a
+# required check happens once the journey lands three consecutive
+# green PRs without manual reruns — the gate flip is a one-line
+# workflow edit and a branch-protection update.
+#
+# Triggered on PRs touching the apps or shared packages, since those
+# are the moving parts of the publish loop. Changes scoped purely to
+# docs, ops scripts, or CLI surfaces don't run this workflow.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'tools/e2e/**'
+      - '.github/workflows/e2e-blog-loop.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  blog-loop:
+    name: e2e-blog-loop
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Advisory: the job runs to completion and reports; a failure
+    # does not gate the PR until the canary is promoted. Once we see
+    # three consecutive green runs on unrelated PRs, drop this line
+    # and require the check in branch protection.
+    continue-on-error: true
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gonext
+          POSTGRES_PASSWORD: gonext_dev_only
+          POSTGRES_DB: gonext_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gonext -d gonext_dev"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.work'
+          cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Install JS deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Install e2e deps
+        # tools/e2e is outside the pnpm workspace (see #241) so we
+        # install it independently rather than relying on a
+        # workspace filter.
+        working-directory: tools/e2e
+        run: pnpm install
+
+      - name: Install Playwright browsers
+        working-directory: tools/e2e
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Install psql client
+        # `freshDatabase()` uses psql to TRUNCATE state between
+        # tests. Without it the helper falls back to the dev-only
+        # REST reset endpoint, which is fine but less direct.
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Build the stack
+        # `make up` requires docker compose; on the GitHub-hosted
+        # runner we boot the API + admin + web processes directly
+        # against the Postgres/Redis services declared above. This
+        # is the minimal slice the canary needs.
+        run: |
+          make build-go
+          (cd apps/api && ./api &) >/tmp/api.log 2>&1
+          (cd apps/admin && pnpm dev &) >/tmp/admin.log 2>&1
+          (cd apps/web && pnpm dev &) >/tmp/web.log 2>&1
+        env:
+          DATABASE_URL: postgres://gonext:gonext_dev_only@localhost:5432/gonext_dev?sslmode=disable
+          REDIS_URL: redis://localhost:6379
+          GONEXT_DEV_RESET: '1'
+
+      - name: Wait for the stack
+        run: |
+          for i in {1..30}; do
+            if curl -sf http://localhost:8080/healthz && curl -sf http://localhost:3000; then
+              echo "stack up"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "stack did not come up in time"
+          tail -n +1 /tmp/api.log /tmp/admin.log /tmp/web.log || true
+          exit 1
+
+      - name: Run blog loop
+        working-directory: tools/e2e
+        env:
+          CI: 'true'
+          E2E_FRESH_INSTALL: '1'
+          E2E_ALLOW_DESTRUCTIVE: '1'
+          E2E_BASE_URL: http://localhost:3000
+          E2E_API_BASE_URL: http://localhost:8080
+          E2E_PG_HOST: localhost
+          E2E_PG_PORT: '5432'
+          E2E_PG_USER: gonext
+          E2E_PG_PASSWORD: gonext_dev_only
+          E2E_PG_DATABASE: gonext_dev
+        run: pnpm exec playwright test tests/full-blog-loop.spec.ts --project=chromium
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-blog-loop
+          path: tools/e2e/playwright-report
+          retention-days: 14
+
+      - name: Upload stack logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stack-logs-blog-loop
+          path: |
+            /tmp/api.log
+            /tmp/admin.log
+            /tmp/web.log
+          retention-days: 7

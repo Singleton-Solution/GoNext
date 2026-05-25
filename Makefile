@@ -94,6 +94,15 @@ e2e-smoke: ## Run the fresh-install happy-path smoke against a running stack.
 	@# stray invocation can't nuke a real one.
 	@cd tools/e2e && E2E_ALLOW_DESTRUCTIVE=1 pnpm run e2e:smoke
 
+.PHONY: e2e-blog-loop
+e2e-blog-loop: ## Run the full "write a blog post" canary against a running stack.
+	@echo "==> Running e2e blog loop (tools/e2e/tests/full-blog-loop.spec.ts)"
+	@# Same destructive guard as e2e-smoke: the spec depends on
+	@# globalSetup running gonext init, which TRUNCATEs the e2e
+	@# database. The E2E_ALLOW_DESTRUCTIVE flag is the failsafe.
+	@cd tools/e2e && E2E_FRESH_INSTALL=1 E2E_ALLOW_DESTRUCTIVE=1 \
+		pnpm exec playwright test tests/full-blog-loop.spec.ts --project=chromium
+
 # ---------------------------------------------------------------------------
 # Lint
 
