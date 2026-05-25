@@ -3,6 +3,13 @@
 /**
  * <NewSubscriptionClient> — form for creating a webhook subscription.
  *
+ * Brand: Living-Systems (#432). The form lives inside a paper-2 Card.
+ * The post-create state replaces the form with a "secret reveal" panel:
+ * a recessed paper-3 surface holding the HMAC hex in Geist Mono, an
+ * emerald "Copy" CTA, and a hard-stop warning on the danger-soft
+ * surface — this is the one-time secret reveal the API contract
+ * specifies.
+ *
  * Flow:
  *
  *  1. Operator types a name, URL, and selects events.
@@ -17,6 +24,7 @@
  * persistence. Webhook subscriptions are quick to fill in.
  */
 import { useRouter } from 'next/navigation';
+import { AlertTriangle, Check, Copy, KeyRound } from 'lucide-react';
 import {
   useCallback,
   useState,
@@ -24,6 +32,10 @@ import {
   type FormEvent,
   type ReactElement,
 } from 'react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { createSubscription } from '../actions';
 import { EventCatalog } from '../components/EventCatalog';
 import type { SubscriptionWithSecret } from '../types';
@@ -91,88 +103,159 @@ export function NewSubscriptionClient(): ReactElement {
 
   if (created) {
     return (
-      <div
-        style={{
-          padding: 16,
-          border: '1px solid var(--color-border, #ddd)',
-          borderRadius: 4,
-        }}
+      <Card
+        data-testid="webhook-created-panel"
+        className="overflow-hidden"
       >
-        <h2 style={{ marginTop: 0 }}>Subscription created</h2>
-        <div role="alert" style={{ marginBottom: 16 }}>
-          <strong>Copy the signing secret now.</strong> We do not show it
-          again — subscribers need this to verify our signature.
+        <div className="border-b border-border bg-paper-2 px-6 py-4">
+          <div className="flex items-center gap-2">
+            <KeyRound
+              className="h-[18px] w-[18px] text-emerald-deep"
+              aria-hidden="true"
+            />
+            <h2 className="font-display text-lg font-bold tracking-tight text-ink">
+              Subscription <em className="font-serif italic font-normal text-emerald-deep text-[1.05em] tracking-[-0.01em]">
+                created
+              </em>
+            </h2>
+          </div>
         </div>
-        <label style={{ display: 'block', marginBottom: 8 }}>
-          Signing secret
-          <textarea
-            readOnly
-            value={created.secret}
-            rows={2}
-            data-testid="created-secret"
-            style={{ width: '100%', fontFamily: 'monospace', marginTop: 4 }}
-          />
-        </label>
-        <button type="button" onClick={() => void handleCopy()}>
-          {copied ? 'Copied' : 'Copy to clipboard'}
-        </button>{' '}
-        <button
-          type="button"
-          onClick={() => router.push(`/webhooks/${encodeURIComponent(created.id)}`)}
-        >
-          Go to subscription
-        </button>
-      </div>
+        <div className="px-6 py-5">
+          {/* One-time secret reveal warning — danger-soft on a deliberate
+              alert tone, but using a calm warning glyph so the surface
+              still feels measured. */}
+          <div
+            role="alert"
+            className="mb-4 flex items-start gap-3 rounded-md border border-warning/40 bg-warning-soft px-4 py-3"
+          >
+            <AlertTriangle
+              className="mt-[2px] h-4 w-4 flex-shrink-0 text-warning"
+              aria-hidden="true"
+            />
+            <div className="font-sans text-sm text-ink-soft">
+              <strong className="font-bold">
+                Copy the signing secret now.
+              </strong>{' '}
+              We do not show it again — subscribers need this to verify
+              our HMAC signature.
+            </div>
+          </div>
+
+          {/* Recessed paper-3 surface holding the secret in Geist Mono.
+              The textarea remains for fallback select-all on browsers
+              without the async clipboard API. */}
+          <div className="flex flex-col gap-2">
+            <Label
+              htmlFor="created-secret-field"
+              className="font-display text-xs font-bold uppercase tracking-[0.08em] text-fg-subtle"
+            >
+              Signing secret
+            </Label>
+            <textarea
+              id="created-secret-field"
+              readOnly
+              value={created.secret}
+              rows={3}
+              data-testid="created-secret"
+              className="w-full resize-none rounded-md border border-border bg-paper-3 px-3 py-2 font-mono text-xs text-ink-soft selection:bg-emerald-soft focus-visible:outline-none focus-visible:border-emerald focus-visible:shadow-focus"
+            />
+          </div>
+
+          <div className="mt-5 flex items-center gap-2">
+            <Button
+              type="button"
+              variant="emerald"
+              onClick={() => void handleCopy()}
+            >
+              {copied ? (
+                <>
+                  <Check className="h-[14px] w-[14px]" aria-hidden="true" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="h-[14px] w-[14px]" aria-hidden="true" />
+                  Copy to clipboard
+                </>
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="default"
+              onClick={() =>
+                router.push(`/webhooks/${encodeURIComponent(created.id)}`)
+              }
+            >
+              Go to subscription
+            </Button>
+          </div>
+        </div>
+      </Card>
     );
   }
 
   return (
-    <form onSubmit={(ev) => void handleSubmit(ev)} noValidate>
-      {error ? (
-        <div role="alert" style={{ color: 'var(--color-danger, #a00)', marginBottom: 8 }}>
-          {error}
+    <Card className="overflow-hidden">
+      <div className="border-b border-border bg-paper-2 px-6 py-4">
+        <h2 className="font-display text-sm font-bold uppercase tracking-[0.08em] text-fg-subtle">
+          Configuration
+        </h2>
+      </div>
+      <form
+        onSubmit={(ev) => void handleSubmit(ev)}
+        noValidate
+        className="flex flex-col gap-5 px-6 py-5"
+      >
+        {error ? (
+          <div
+            role="alert"
+            className="rounded-md border border-danger/30 bg-danger-soft px-4 py-3 font-sans text-sm text-danger"
+          >
+            {error}
+          </div>
+        ) : null}
+        <div className="flex flex-col gap-[6px]">
+          <Label htmlFor="name">Name</Label>
+          <Input
+            id="name"
+            type="text"
+            value={state.name}
+            onChange={handleChange('name')}
+            required
+            maxLength={200}
+            aria-describedby="name-hint"
+          />
+          <small id="name-hint" className="font-sans text-xs text-fg-subtle">
+            A human-readable label. Shown in the list and in audit log
+            entries.
+          </small>
         </div>
-      ) : null}
-      <label style={{ display: 'block', marginBottom: 12 }}>
-        Name
-        <input
-          type="text"
-          value={state.name}
-          onChange={handleChange('name')}
-          required
-          maxLength={200}
-          style={{ display: 'block', width: '100%', marginTop: 4 }}
-          aria-describedby="name-hint"
-        />
-        <small id="name-hint" className="muted">
-          A human-readable label. Shown in the list and in audit log entries.
-        </small>
-      </label>
-      <label style={{ display: 'block', marginBottom: 12 }}>
-        Endpoint URL
-        <input
-          type="url"
-          value={state.url}
-          onChange={handleChange('url')}
-          required
-          placeholder="https://example.com/webhooks/gonext"
-          style={{ display: 'block', width: '100%', marginTop: 4 }}
-          aria-describedby="url-hint"
-        />
-        <small id="url-hint" className="muted">
-          We send a POST to this URL on every matching event. The
-          worker enforces HTTPS in production.
-        </small>
-      </label>
-      <div style={{ marginBottom: 16 }}>
+        <div className="flex flex-col gap-[6px]">
+          <Label htmlFor="url">Endpoint URL</Label>
+          <Input
+            id="url"
+            type="url"
+            value={state.url}
+            onChange={handleChange('url')}
+            required
+            placeholder="https://example.com/webhooks/gonext"
+            aria-describedby="url-hint"
+          />
+          <small id="url-hint" className="font-sans text-xs text-fg-subtle">
+            We send a POST to this URL on every matching event. The
+            worker enforces HTTPS in production.
+          </small>
+        </div>
         <EventCatalog
           value={state.events}
           onChange={handleEventsChange}
         />
-      </div>
-      <button type="submit" disabled={submitting}>
-        {submitting ? 'Creating…' : 'Create subscription'}
-      </button>
-    </form>
+        <div>
+          <Button type="submit" variant="emerald" disabled={submitting}>
+            {submitting ? 'Creating…' : 'Create subscription'}
+          </Button>
+        </div>
+      </form>
+    </Card>
   );
 }
