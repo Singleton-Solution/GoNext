@@ -23,6 +23,7 @@ package runtime
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -46,17 +47,71 @@ type AuditEmitter interface {
 	EmitPluginEvent(ctx context.Context, slug, eventType, severity string, metadata map[string]any) error
 }
 
+// Tracer is the narrow OTel-tracing surface the runtime uses to
+// wrap hook-bus dispatch and ABI calls. We define it as an interface
+// rather than importing go.opentelemetry.io/otel/trace directly so:
+//
+//  1. The runtime package stays free of a hard OTel SDK dependency.
+//     Hosts that don't run OTel pay zero cost.
+//  2. Tests can supply a recording stub without spinning up the SDK.
+//  3. The interface freezes the SHAPE we use even if upstream OTel
+//     changes its API.
+//
+// Production wiring adapts otel.Tracer().Start to this interface
+// (one-line wrapper). The SpanEventReceiver below covers the
+// gn_span_event seam — separate from Tracer because span CREATION
+// happens host-side, span EVENTS come from the guest.
+//
+// Implementations MUST be safe for concurrent use.
+type Tracer interface {
+	// StartSpan begins a span named `name` and returns a derived
+	// context plus a closer. attrs is the initial attribute set
+	// (gonext.plugin.slug, gonext.plugin.abi, ...). The returned
+	// SpanCloser MUST be called exactly once when the span ends; it
+	// records any error and finalises the span.
+	StartSpan(ctx context.Context, name string, attrs map[string]string) (context.Context, SpanCloser)
+}
+
+// SpanCloser is the cleanup half of a Tracer span. Implementations
+// MUST be safe for concurrent use. Call End exactly once; calling
+// SetAttribute / RecordError before End amends the span.
+type SpanCloser interface {
+	// End closes the span. err, if non-nil, is recorded as the span's
+	// status. End is idempotent — additional calls after the first
+	// are no-ops.
+	End(err error)
+
+	// SetAttribute amends the span with one (key, value) tag. Safe
+	// to call between StartSpan and End. After End, this is a no-op.
+	SetAttribute(key, value string)
+}
+
+// SpanEventReceiver is the seam the runtime uses to forward
+// gn_span_event calls without taking a hard dependency on the OTel
+// SDK. Production wiring adapts an OTel tracer; tests can supply a
+// recording stub.
+//
+// Implementations MUST be safe for concurrent use.
+type SpanEventReceiver interface {
+	// AddSpanEvent attaches an event to whatever span is active for
+	// (ctx, slug). Implementations with no active span SHOULD log the
+	// event so plugin-emitted breadcrumbs aren't silently lost.
+	AddSpanEvent(ctx context.Context, slug, name string, attrs map[string]string)
+}
+
 // observability is the per-Runtime sink bundle stored in the
 // observabilityRegistry. Every field is nil-safe: the host functions
 // branch on "no sink wired" before touching the field.
 //
-// More sinks land in follow-up commits — a SpanEventReceiver for
-// gn_span_event (#194), and a *CardinalityDam for #226's
-// gn_metric_observe.
+// The *CardinalityDam for #226's gn_metric_observe joins this struct
+// in the next commit.
 type observability struct {
 	translator   i18n.Translator
 	auditEmitter AuditEmitter
 	metrics      *PluginMetrics
+	tracer       Tracer
+	spanReceiver SpanEventReceiver
+	spanCtxs     *spanContextRegistry
 }
 
 // observabilityRegistry is the side-channel state for observability
@@ -80,6 +135,7 @@ func obsFor(r *Runtime) *observability {
 	}
 	o := &observability{
 		translator: i18n.NoopTranslator{},
+		spanCtxs:   newSpanContextRegistry(),
 	}
 	actual, _ := observabilityRegistry.LoadOrStore(r, o)
 	return actual.(*observability)
@@ -150,6 +206,23 @@ func (b *ObservabilityBuilder) WithPluginMetrics(pm *PluginMetrics) *Observabili
 	return b
 }
 
+// WithTracer installs an OTel-style Tracer for hook and ABI span
+// wrapping (#194). Passing nil disables tracing; the StartPluginSpan
+// helper then becomes a no-op pass-through.
+func (b *ObservabilityBuilder) WithTracer(t Tracer) *ObservabilityBuilder {
+	mutateObs(b.rt, func(o *observability) { o.tracer = t })
+	return b
+}
+
+// WithSpanEventReceiver installs the gn_span_event sink. Passing nil
+// disables span propagation; gn_span_event then logs at debug level
+// so plugin authors developing without an OTel pipeline still see
+// their breadcrumbs.
+func (b *ObservabilityBuilder) WithSpanEventReceiver(r SpanEventReceiver) *ObservabilityBuilder {
+	mutateObs(b.rt, func(o *observability) { o.spanReceiver = r })
+	return b
+}
+
 // ===========================================================================
 // Accessors.
 // ===========================================================================
@@ -165,6 +238,12 @@ func (r *Runtime) AuditEmitter() AuditEmitter { return obsFor(r).auditEmitter }
 // PluginMetrics returns the runtime's metrics catalogue or nil when
 // none has been wired in.
 func (r *Runtime) PluginMetrics() *PluginMetrics { return obsFor(r).metrics }
+
+// Tracer returns the configured Tracer or nil.
+func (r *Runtime) Tracer() Tracer { return obsFor(r).tracer }
+
+// SpanEventReceiver returns the configured span event receiver or nil.
+func (r *Runtime) SpanEventReceiver() SpanEventReceiver { return obsFor(r).spanReceiver }
 
 // ===========================================================================
 // Registration helper.
@@ -195,6 +274,13 @@ func (r *Runtime) registerObservabilityHost(b wazero.HostModuleBuilder) {
 			[]api.ValueType{api.ValueTypeI64}).
 		WithParameterNames("key_ptr", "key_len", "locale_ptr", "locale_len").
 		Export("gn_i18n_translate")
+
+	b.NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(r.hostGnSpanEvent),
+			[]api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32},
+			[]api.ValueType{api.ValueTypeI32}).
+		WithParameterNames("name_ptr", "name_len", "attrs_ptr", "attrs_len").
+		Export("gn_span_event")
 }
 
 // ===========================================================================
@@ -276,9 +362,186 @@ func (r *Runtime) hostGnI18nTranslate(ctx context.Context, mod api.Module, stack
 	stack[0] = api.EncodeI64(int64(uint64(ptr)<<32 | uint64(uint32(len(translated)))))
 }
 
+// hostGnSpanEvent implements env.gn_span_event.
+// Signature: (name_ptr i32, name_len i32, attrs_ptr i32, attrs_len i32) -> i32.
+//
+// Plugins use this to attach an event onto whatever OTel span the
+// host is currently propagating for their call. The span itself is
+// owned by the host (StartPluginSpan wraps every hook dispatch and
+// ABI call); gn_span_event is the guest-side way to add named
+// breadcrumbs inside that span.
+//
+// The attrs blob is a minimal-msgpack string-keyed string-valued
+// map — same format the data ABI uses for filter args. On decode
+// failure the host logs and returns statusBadTags; the guest call
+// otherwise returns statusOK.
+//
+// When no SpanEventReceiver is wired in, the call falls back to a
+// debug log so plugin authors developing without an OTel pipeline
+// still see their breadcrumbs.
+func (r *Runtime) hostGnSpanEvent(ctx context.Context, mod api.Module, stack []uint64) {
+	namePtr := api.DecodeU32(stack[0])
+	nameLen := api.DecodeU32(stack[1])
+	attrsPtr := api.DecodeU32(stack[2])
+	attrsLen := api.DecodeU32(stack[3])
+
+	o := obsFor(r)
+	slug := mod.Name()
+	start := time.Now()
+	defer func() {
+		o.metrics.ObserveABICallDuration(slug, "gn_span_event", time.Since(start).Seconds())
+	}()
+
+	nameBuf, err := readHostString("gn_span_event", mod, namePtr, nameLen)
+	if err != nil || len(nameBuf) == 0 {
+		o.metrics.IncABICall(slug, "gn_span_event", "error")
+		stack[0] = api.EncodeI32(statusBadName)
+		return
+	}
+	eventName := string(nameBuf)
+
+	attrs, err := readHostTags(mod, attrsPtr, attrsLen)
+	if err != nil {
+		r.logger.Warn("gn_span_event: bad attrs blob",
+			slog.String("plugin", slug),
+			slog.String("event", eventName),
+			slog.String("err", err.Error()))
+		o.metrics.IncABICall(slug, "gn_span_event", "error")
+		stack[0] = api.EncodeI32(statusBadTags)
+		return
+	}
+
+	if o.spanReceiver != nil {
+		o.spanReceiver.AddSpanEvent(ctx, slug, eventName, attrs)
+	} else {
+		r.logger.Debug("plugin span event (no receiver wired)",
+			slog.String("plugin", slug),
+			slog.String("event", eventName),
+			slog.Any("attrs", attrs))
+	}
+	o.metrics.IncABICall(slug, "gn_span_event", "ok")
+	stack[0] = api.EncodeI32(statusOK)
+}
+
+// ===========================================================================
+// Span wrapper for hook dispatch and ABI calls (#194).
+// ===========================================================================
+
+// StartPluginSpan begins a span for one plugin operation — a hook
+// dispatch or an ABI call — and returns the derived context plus a
+// closer the caller must invoke on the way out.
+//
+// Attributes:
+//
+//	gonext.plugin.slug   — the plugin's manifest slug
+//	gonext.plugin.abi    — the host function or hook name being run
+//	(amend with fuel_consumed via spanCloser.SetAttribute on exit)
+//
+// The dispatcher wraps each hook-bus call this way; the runtime
+// wraps each ABI call. Tracer can be nil (no OTel configured) — the
+// returned closer is a no-op and ctx is the input ctx.
+//
+// The function records the active span context on the per-Module
+// registry so any gn_span_event the guest fires can attach to the
+// same span — even though wazero strips arbitrary ctx values on the
+// guest hop. End() clears the registry entry.
+func (r *Runtime) StartPluginSpan(ctx context.Context, slug, abi string) (context.Context, SpanCloser) {
+	o := obsFor(r)
+	if o.tracer == nil {
+		return ctx, noopSpanCloser{}
+	}
+	attrs := map[string]string{
+		"gonext.plugin.slug": slug,
+		"gonext.plugin.abi":  abi,
+	}
+	spanCtx, closer := o.tracer.StartSpan(ctx, "plugin."+abi, attrs)
+	// Record the span context against the module so gn_span_event
+	// can correlate. We use a string key derived from slug+abi rather
+	// than the raw module name because a single module can be in
+	// multiple concurrent ABI calls; the (slug, abi) tuple is the
+	// finest-grain correlation we have without bolting an instance
+	// id into the runtime.
+	if o.spanCtxs != nil {
+		o.spanCtxs.markActive(slug, abi)
+	}
+	wrapped := &trackedSpanCloser{
+		SpanCloser: closer,
+		runtime:    r,
+		slug:       slug,
+		abi:        abi,
+	}
+	return spanCtx, wrapped
+}
+
+// trackedSpanCloser wraps a Tracer-returned SpanCloser so we can
+// clear the active-span registry on End. The wrapping is needed
+// because the runtime tracks "is there a live span for this module?"
+// independent of OTel — the tracker is what gn_span_event consults
+// to decide whether to forward to the SpanEventReceiver or log.
+type trackedSpanCloser struct {
+	SpanCloser
+	runtime *Runtime
+	slug    string
+	abi     string
+	done    sync.Once
+}
+
+func (c *trackedSpanCloser) End(err error) {
+	c.done.Do(func() {
+		c.SpanCloser.End(err)
+		if o := obsFor(c.runtime); o.spanCtxs != nil {
+			o.spanCtxs.clearActive(c.slug, c.abi)
+		}
+	})
+}
+
+// noopSpanCloser is the SpanCloser returned when no Tracer is wired
+// in. Every method is a no-op so callers can chain unconditionally.
+type noopSpanCloser struct{}
+
+func (noopSpanCloser) End(error)              {}
+func (noopSpanCloser) SetAttribute(_, _ string) {}
+
+// ===========================================================================
+// Status return codes shared by the gn_span_event ABI (and, in
+// follow-up commits, gn_metric_observe and gn_event_emit). 0 is
+// success; the rest are negative sentinels so a successful
+// drop-through can never be misread as an error.
+// ===========================================================================
+
+const (
+	statusOK                  int32 = 0
+	statusBadName             int32 = -1
+	statusBadTags             int32 = -3
+	statusCardinalityExceeded int32 = -4
+	statusBackendUnavailable  int32 = -5
+)
+
 // ===========================================================================
 // Helpers.
 // ===========================================================================
+
+// readHostTags reads a tag/attribute blob out of guest memory and
+// decodes it as a flat string-keyed string-valued map.
+//
+// The wire format is a minimal subset of msgpack that the runtime
+// supports without dragging in a full msgpack dependency: a fixmap
+// (or map16) whose keys and values are all fixstr (or str8/str16).
+// This is the exact subset the plugin SDKs emit; richer types fall
+// back to fmt-style stringification at the SDK boundary.
+//
+// On any decode failure the call returns the error; callers surface
+// it as statusBadTags. nil/zero-length input decodes to an empty map.
+func readHostTags(mod api.Module, ptr, length uint32) (map[string]string, error) {
+	if length == 0 {
+		return map[string]string{}, nil
+	}
+	buf, err := readHostString("readHostTags", mod, ptr, length)
+	if err != nil {
+		return nil, err
+	}
+	return decodeStringMap(buf)
+}
 
 // allocAndWriteGuest is the host-side analogue of the dispatcher's
 // allocAndWrite: it asks the guest's gn_alloc for `len(data)` bytes
@@ -462,4 +725,206 @@ func (r *Runtime) RecordPluginTimeout(slug, abi string) {
 // here so the lifecycle Manager has a single place to call.
 func (r *Runtime) RecordPluginFuel(slug string, fuel float64) {
 	obsFor(r).metrics.IncFuel(slug, fuel)
+}
+
+// ===========================================================================
+// Tiny msgpack decoder (string -> string maps only).
+// ===========================================================================
+
+// decodeStringMap parses a msgpack-encoded map whose keys and values
+// are all strings, into a Go map. Supports:
+//
+//   - fixmap   (0x80..0x8f)               — count in low 4 bits
+//   - map16    (0xde)                     — count in next 2 bytes BE
+//   - map32    (0xdf)                     — count in next 4 bytes BE
+//   - fixstr   (0xa0..0xbf)               — len in low 5 bits
+//   - str8     (0xd9)                     — len in next 1 byte
+//   - str16    (0xda)                     — len in next 2 bytes BE
+//   - str32    (0xdb)                     — len in next 4 bytes BE
+//
+// Anything else returns an error. We deliberately don't pull in a full
+// msgpack library — the runtime's wire surface is tiny and bringing in
+// a generic codec would bloat the binary and the ABI test matrix.
+//
+// To keep accidental abuse bounded, the decoder rejects any single
+// string longer than maxHostStringLen.
+func decodeStringMap(buf []byte) (map[string]string, error) {
+	d := &mpDecoder{buf: buf}
+	count, err := d.readMapHeader()
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]string, count)
+	for i := uint32(0); i < count; i++ {
+		k, err := d.readString()
+		if err != nil {
+			return nil, fmt.Errorf("key %d: %w", i, err)
+		}
+		v, err := d.readString()
+		if err != nil {
+			return nil, fmt.Errorf("value %d: %w", i, err)
+		}
+		out[k] = v
+	}
+	return out, nil
+}
+
+type mpDecoder struct {
+	buf []byte
+	pos int
+}
+
+func (d *mpDecoder) need(n int) error {
+	if d.pos+n > len(d.buf) {
+		return fmt.Errorf("msgpack: need %d bytes at pos %d, have %d", n, d.pos, len(d.buf)-d.pos)
+	}
+	return nil
+}
+
+func (d *mpDecoder) readMapHeader() (uint32, error) {
+	if err := d.need(1); err != nil {
+		return 0, err
+	}
+	b := d.buf[d.pos]
+	d.pos++
+	switch {
+	case b >= 0x80 && b <= 0x8f:
+		return uint32(b & 0x0f), nil
+	case b == 0xde:
+		if err := d.need(2); err != nil {
+			return 0, err
+		}
+		n := uint32(d.buf[d.pos])<<8 | uint32(d.buf[d.pos+1])
+		d.pos += 2
+		return n, nil
+	case b == 0xdf:
+		if err := d.need(4); err != nil {
+			return 0, err
+		}
+		n := uint32(d.buf[d.pos])<<24 | uint32(d.buf[d.pos+1])<<16 |
+			uint32(d.buf[d.pos+2])<<8 | uint32(d.buf[d.pos+3])
+		d.pos += 4
+		return n, nil
+	default:
+		return 0, fmt.Errorf("msgpack: expected map header, got 0x%02x", b)
+	}
+}
+
+func (d *mpDecoder) readString() (string, error) {
+	if err := d.need(1); err != nil {
+		return "", err
+	}
+	b := d.buf[d.pos]
+	d.pos++
+	var length uint32
+	switch {
+	case b >= 0xa0 && b <= 0xbf:
+		length = uint32(b & 0x1f)
+	case b == 0xd9:
+		if err := d.need(1); err != nil {
+			return "", err
+		}
+		length = uint32(d.buf[d.pos])
+		d.pos++
+	case b == 0xda:
+		if err := d.need(2); err != nil {
+			return "", err
+		}
+		length = uint32(d.buf[d.pos])<<8 | uint32(d.buf[d.pos+1])
+		d.pos += 2
+	case b == 0xdb:
+		if err := d.need(4); err != nil {
+			return "", err
+		}
+		length = uint32(d.buf[d.pos])<<24 | uint32(d.buf[d.pos+1])<<16 |
+			uint32(d.buf[d.pos+2])<<8 | uint32(d.buf[d.pos+3])
+		d.pos += 4
+	default:
+		return "", fmt.Errorf("msgpack: expected string header, got 0x%02x", b)
+	}
+	if length > maxHostStringLen {
+		return "", fmt.Errorf("msgpack: string length %d exceeds host cap %d", length, maxHostStringLen)
+	}
+	if err := d.need(int(length)); err != nil {
+		return "", err
+	}
+	s := string(d.buf[d.pos : d.pos+int(length)])
+	d.pos += int(length)
+	return s, nil
+}
+
+// EncodeStringMap is the inverse of decodeStringMap, exposed for tests
+// and tooling that build the msgpack blobs guests would emit. The
+// production guest SDKs have their own msgpack encoder; this function
+// is the host-side fixture builder.
+//
+// Always emits map16 / str16 prefixes to keep the encoding code one
+// branch deep. The resulting blob is larger than a tight fixmap but
+// the decoder accepts both forms.
+func EncodeStringMap(m map[string]string) []byte {
+	out := make([]byte, 0, 64)
+	out = append(out, 0xde, byte(len(m)>>8), byte(len(m)))
+	for k, v := range m {
+		out = append(out, 0xda, byte(len(k)>>8), byte(len(k)))
+		out = append(out, k...)
+		out = append(out, 0xda, byte(len(v)>>8), byte(len(v)))
+		out = append(out, v...)
+	}
+	return out
+}
+
+// ===========================================================================
+// Span propagation context state.
+// ===========================================================================
+
+// spanContextRegistry threads OTel span state across the WASM
+// boundary. We hang the live-span set off this registry rather than
+// ctx (which wazero strips of arbitrary values on its way into the
+// guest).
+//
+// The set is per-(slug, abi) — a single plugin can be inside multiple
+// concurrent ABI calls, each carrying its own span. The registry
+// tracks "is there a host-side span live for this tuple?" so
+// gn_span_event can decide whether to forward to the SpanEventReceiver
+// or fall back to a debug log.
+type spanContextRegistry struct {
+	mu     sync.Mutex
+	active map[string]int // key="slug|abi", value=ref count for nested calls
+}
+
+func newSpanContextRegistry() *spanContextRegistry {
+	return &spanContextRegistry{active: make(map[string]int)}
+}
+
+func spanKey(slug, abi string) string { return slug + "|" + abi }
+
+func (s *spanContextRegistry) markActive(slug, abi string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.active[spanKey(slug, abi)]++
+}
+
+func (s *spanContextRegistry) clearActive(slug, abi string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	k := spanKey(slug, abi)
+	s.active[k]--
+	if s.active[k] <= 0 {
+		delete(s.active, k)
+	}
+}
+
+// IsSpanActive reports whether StartPluginSpan has an open span for
+// (slug, abi). Exposed for tests and the gn_span_event fast path —
+// the production receiver typically reaches into ctx for the real
+// span, but the registry is a cheap "is there anything to attach to?"
+// signal.
+func (r *Runtime) IsSpanActive(slug, abi string) bool {
+	o := obsFor(r)
+	if o.spanCtxs == nil {
+		return false
+	}
+	o.spanCtxs.mu.Lock()
+	defer o.spanCtxs.mu.Unlock()
+	return o.spanCtxs.active[spanKey(slug, abi)] > 0
 }
