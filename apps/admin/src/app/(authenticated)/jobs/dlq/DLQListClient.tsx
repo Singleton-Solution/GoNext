@@ -8,6 +8,12 @@
  * (replay / discard / redact) onto the row link + the bulk-action
  * toolbar.
  *
+ * Brand: Living-Systems (#432). Mono row IDs (Geist Mono on paper-3),
+ * lavender-accent queue chips ("critical" → emerald, "important" /
+ * "webhooks" → lavender, defaults → fg, low-priority → fg-subtle), and
+ * a danger-soft row tint on redacted entries so an operator can see at
+ * a glance which payloads are masked.
+ *
  * Why the bulk toolbar uses confirm dialogs:
  *  - Replay re-enqueues work that might still be broken (the operator
  *    might've fixed only one of several bugs the task surfaced). A
@@ -32,6 +38,7 @@ import {
   type ReactElement,
 } from 'react';
 import { ResourceList } from '@/components/ResourceList';
+import { Badge } from '@/components/ui/badge';
 import type {
   BulkAction,
   Column,
@@ -51,6 +58,25 @@ export interface DLQListClientProps {
 }
 
 const PAGE_LIMIT = 30;
+
+/**
+ * Queue tone map — mirrors the pulse.html data-viz palette:
+ *
+ *  - critical → emerald (urgent but healthy)
+ *  - webhooks, important → lavender (the deliveries surface accent)
+ *  - default, media, search, reports → fg-muted (neutral)
+ *  - low → fg-subtle (cold)
+ *
+ * Unknown queue names fall through to the neutral tone.
+ */
+function queueTone(
+  queue: string,
+): 'emerald' | 'lavender' | 'default' | 'outline' {
+  if (queue === 'critical') return 'emerald';
+  if (queue === 'webhooks' || queue === 'important') return 'lavender';
+  if (queue === 'low') return 'outline';
+  return 'default';
+}
 
 /**
  * formatFailedAt renders an ISO8601 timestamp as a compact "5m ago"
@@ -136,30 +162,39 @@ export function DLQListClient({
               pathname: `/jobs/dlq/${encodeURIComponent(row.id)}`,
               query: { queue: row.queue },
             }}
+            className="block transition-colors hover:text-emerald-deep"
           >
-            <code>{row.type}</code>
+            {/* Mono row identity — keep types on a Geist Mono surface so
+                operators can scan task names at a glance. */}
+            <code className="font-mono text-xs font-medium text-ink">
+              {row.type}
+            </code>
+            <div className="mt-[2px] truncate font-mono text-2xs text-fg-subtle">
+              {row.id}
+            </div>
           </Link>
         ),
       },
       {
         key: 'queue',
         label: 'Queue',
-        width: '110px',
+        width: '120px',
+        render: (row) => (
+          <Badge variant={queueTone(row.queue)} dot>
+            {row.queue}
+          </Badge>
+        ),
       },
       {
         key: 'failed_at',
         label: 'Failed',
-        width: '120px',
+        width: '110px',
         render: (row) => (
-          <span title={row.failed_at}>{formatFailedAt(row.failed_at)}</span>
-        ),
-      },
-      {
-        key: 'last_error',
-        label: 'Error',
-        render: (row) => (
-          <span title={row.last_error} className="muted">
-            {truncateError(row.last_error)}
+          <span
+            title={row.failed_at}
+            className="font-sans text-xs tabular-nums text-fg-subtle"
+          >
+            {formatFailedAt(row.failed_at)}
           </span>
         ),
       },
@@ -168,8 +203,20 @@ export function DLQListClient({
         label: 'Retries',
         width: '90px',
         render: (row) => (
-          <span>
+          <span className="font-mono text-xs tabular-nums text-ink-soft">
             {row.retried}/{row.max_retry}
+          </span>
+        ),
+      },
+      {
+        key: 'last_error',
+        label: 'Error',
+        render: (row) => (
+          <span
+            title={row.last_error}
+            className="block truncate font-sans text-xs text-fg-muted"
+          >
+            {truncateError(row.last_error)}
           </span>
         ),
       },
@@ -177,7 +224,15 @@ export function DLQListClient({
         key: 'payload_preview',
         label: 'Payload',
         render: (row) => (
-          <code style={{ fontSize: 12 }}>
+          // Redacted rows pick up a danger-soft tint on the payload chip
+          // so the masked state reads at a glance — calm, but unmistakable.
+          <code
+            className={
+              row.redacted
+                ? 'inline-block max-w-[280px] truncate rounded-xs bg-danger-soft/60 px-[6px] py-[2px] font-mono text-2xs text-danger'
+                : 'inline-block max-w-[280px] truncate rounded-xs bg-paper-3 px-[6px] py-[2px] font-mono text-2xs text-fg-muted'
+            }
+          >
             {row.payload_preview}
             {row.redacted ? ' (redacted)' : ''}
           </code>
@@ -285,9 +340,11 @@ export function DLQListClient({
         void refetch(queue);
       }}
       emptyState={
-        <div>
-          <strong>No archived tasks on this queue.</strong>
-          <div className="muted" style={{ marginTop: 4 }}>
+        <div className="flex flex-col gap-1">
+          <strong className="font-display text-sm font-bold text-ink">
+            No archived tasks on this queue.
+          </strong>
+          <div className="font-sans text-xs text-fg-muted">
             That&apos;s the desired state — failures move here once their
             retry budget is exhausted.
           </div>

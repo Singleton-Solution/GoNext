@@ -5,12 +5,21 @@
  * hands it to the client island for interactive behaviour. Cookies are
  * forwarded so the API sees the admin's session.
  *
+ * Brand: Living-Systems (#432). The page surface is cream paper-2.
+ * The page-head follows the handoff's instrument-panel feel — calm,
+ * dense, with the signature italic accent on `*queue*`. The italic
+ * sits on the second word so the headline reads "Dead-letter *queue*"
+ * with the serif emphasising what surface the operator is on.
+ *
  * Issue #262.
  */
 import { cookies } from 'next/headers';
+import { type ReactElement, Suspense } from 'react';
 import Link from 'next/link';
-import { Suspense, type ReactElement } from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { apiBaseUrl } from '@/lib/api-client';
+import { Headline } from '@/components/ui/headline';
+import { Card } from '@/components/ui/card';
 import { DLQListClient } from './DLQListClient';
 import type { DLQListResponse } from './types';
 
@@ -63,36 +72,51 @@ async function fetchInitialDLQ(
   }
 }
 
+/**
+ * Skeleton — paper-3 rows on the panel surface. Eight strips to fill
+ * the usual viewport without feeling like a loading bar.
+ */
 function DLQSkeleton(): ReactElement {
   return (
-    <div aria-busy="true" aria-live="polite" style={{ padding: 16 }}>
-      <span className="visually-hidden">Loading archived tasks…</span>
-      {Array.from({ length: 4 }).map((_, idx) => (
-        <div
-          key={idx}
-          style={{
-            height: 32,
-            margin: '8px 0',
-            background: 'var(--color-border)',
-            opacity: 0.4,
-            borderRadius: 'var(--radius)',
-          }}
-        />
-      ))}
-    </div>
+    <Card
+      aria-busy="true"
+      aria-live="polite"
+      data-testid="dlq-skeleton"
+      className="overflow-hidden"
+    >
+      <span className="sr-only">Loading archived tasks…</span>
+      <div className="flex flex-col gap-1 p-2">
+        {Array.from({ length: 8 }).map((_, idx) => (
+          <div
+            key={idx}
+            className="h-8 animate-pulse rounded-sm bg-paper-3/60"
+          />
+        ))}
+      </div>
+    </Card>
   );
 }
 
 function FailureState({ reason }: { reason: string }): ReactElement {
   return (
-    <div role="alert" style={{ padding: 16 }}>
-      <h2>Couldn&apos;t load the DLQ</h2>
-      <p className="muted">
+    <Card
+      role="alert"
+      data-testid="dlq-failure"
+      className="border-danger/30 bg-danger-soft/20 p-6"
+    >
+      <h2 className="font-display text-lg font-bold text-ink">
+        Couldn&apos;t load the DLQ
+      </h2>
+      <p className="mt-2 font-sans text-sm text-fg-muted">
         We couldn&apos;t fetch archived tasks from the API ({reason}). If
-        you don&apos;t have the <code>jobs.admin</code> capability, that
-        explains it — ask an admin to grant it. Otherwise, try refreshing.
+        you don&apos;t have the{' '}
+        <code className="rounded-xs bg-paper-3 px-1 font-mono text-2xs text-ink-soft">
+          jobs.admin
+        </code>{' '}
+        capability, that explains it — ask an admin to grant it. Otherwise,
+        try refreshing.
       </p>
-    </div>
+    </Card>
   );
 }
 
@@ -111,26 +135,36 @@ export default async function DLQPage(props: PageProps): Promise<ReactElement> {
   const { data, error } = await fetchInitialDLQ(queue);
 
   return (
-    <section>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'baseline',
-          gap: 16,
-          marginBottom: 16,
-        }}
-      >
-        <h1 style={{ margin: 0 }}>Dead-letter queue</h1>
-        <Link href="/jobs" className="muted">
-          ← Back to jobs
+    <section
+      data-testid="dlq-list-page"
+      className="flex flex-col gap-6"
+    >
+      {/* Page head — operator surface: calm, instrument-panel feel.
+          The italic accent on "queue" follows the brand rule
+          ("the second word, the noun being acted on"). */}
+      <div className="flex items-end justify-between gap-6 border-b border-border pb-6">
+        <div className="flex flex-col gap-3">
+          <span className="font-sans text-2xs font-medium uppercase tracking-[0.12em] text-emerald-deep">
+            Jobs · Failed
+          </span>
+          <Headline as="h1" size="page">
+            Dead-letter <em>queue</em>.
+          </Headline>
+          <p className="max-w-[540px] font-sans text-sm text-fg-muted">
+            Background tasks whose handlers exhausted their retry budget.
+            Inspect the payload, replay if the upstream issue is resolved,
+            or discard if the work is no longer relevant. Use redact to
+            mask sensitive fields before sharing.
+          </p>
+        </div>
+        <Link
+          href="/jobs"
+          className="inline-flex shrink-0 items-center gap-1 font-sans text-sm text-fg-subtle transition-colors hover:text-ink"
+        >
+          <ChevronLeft className="h-[13px] w-[13px]" aria-hidden="true" />
+          Back to jobs
         </Link>
       </div>
-      <p className="muted" style={{ marginTop: 0 }}>
-        Background tasks whose handlers exhausted their retry budget.
-        Inspect the payload, replay if the upstream issue is resolved,
-        or discard if the work is no longer relevant. Use redact to
-        mask sensitive fields before sharing a screenshot.
-      </p>
       <Suspense fallback={<DLQSkeleton />}>
         {error || !data ? (
           <FailureState reason={error ?? 'no data'} />
