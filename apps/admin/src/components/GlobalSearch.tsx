@@ -30,6 +30,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Search as SearchIcon } from 'lucide-react';
 import { api, ApiError } from '@/lib/api-client';
+import { SafeHTML } from '@/components/SafeHTML';
 
 // DEBOUNCE_MS is the input-to-fetch delay. Tuned for fast typists:
 // 200 ms is short enough that the dropdown feels live, long enough
@@ -306,14 +307,16 @@ export function GlobalSearch(
                 <span className="global-search__hit-type">{hit.type}</span>
                 <span className="global-search__hit-title">{hit.title}</span>
                 {hit.excerpt_html && (
-                  <span
+                  // ExcerptHTML is server-sanitised by
+                  // packages/go/search/highlight.go — only <mark>
+                  // tags pass through, everything else is
+                  // HTML-escaped. <SafeHTML> additionally routes the
+                  // string through the gn-admin Trusted Types policy
+                  // (DOMPurify), defense-in-depth for #59/#90.
+                  <SafeHTML
+                    as="span"
                     className="global-search__hit-excerpt"
-                    // ExcerptHTML is server-sanitised by
-                    // packages/go/search/highlight.go — only
-                    // <mark> tags pass through, everything else
-                    // is HTML-escaped. See that file's safety
-                    // contract.
-                    dangerouslySetInnerHTML={{ __html: hit.excerpt_html }}
+                    html={hit.excerpt_html}
                   />
                 )}
               </Link>

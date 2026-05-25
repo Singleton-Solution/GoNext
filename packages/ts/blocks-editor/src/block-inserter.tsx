@@ -16,9 +16,10 @@
  *    `widgets`, `theme`, `embed`, `custom`). Tabs whose category has zero
  *    matching blocks are still rendered (so the layout stays stable) but
  *    appear disabled.
- *  - Each tile is a `<button>` carrying the block icon (rendered with
- *    `dangerouslySetInnerHTML` when the icon is an inline SVG string) plus
- *    the title. Clicking calls `onInsert` with a fresh block shape:
+ *  - Each tile is a `<button>` carrying the block icon (routed through
+ *    the `gn-editor` Trusted Types policy via `sanitizeBlockIcon`
+ *    when the icon is an inline SVG string) plus the title. Clicking
+ *    calls `onInsert` with a fresh block shape:
  *    `{ type, attributes: {}, innerBlocks: [] }`.
  *  - When a `patternRegistry` prop is passed, a **"Patterns"** tab is
  *    appended after the block-category tabs. Activating it swaps the
@@ -62,6 +63,7 @@ import type {
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import type { Pattern, PatternRegistry } from './pattern-types.ts';
 import { clonePatternBlocks } from './pattern-clone.ts';
+import { sanitizeBlockIcon } from './trusted-types.ts';
 
 /**
  * The set of categories the inserter renders tabs for, in display order.
@@ -643,8 +645,11 @@ interface BlockTileProps {
  * Single tile. Icon resolution priority (preserved from before this
  * restyle, plus the new brand-glyph fallback):
  *
- *   1. The registered `icon` is inline SVG → render it via
- *      `dangerouslySetInnerHTML`.
+ *   1. The registered `icon` is inline SVG → sanitize through the
+ *      gn-editor Trusted Types policy (DOMPurify svg profile) and
+ *      render via `dangerouslySetInnerHTML`. The policy strips
+ *      `<script>` / `<foreignObject>` payloads from plugin-supplied
+ *      SVG.
  *   2. The registered `icon` is a non-SVG string (e.g.
  *      `'lucide:dollar-sign'`) → render the string as text. Keeps the
  *      legacy "id stays visible until icon resolution lands" contract
@@ -667,9 +672,14 @@ function BlockTile({ def, onSelect }: BlockTileProps) {
       ? pickLucideGlyph(def)
       : undefined;
 
+  // Inline SVG icons route through the gn-editor Trusted Types policy
+  // (DOMPurify + SVG profile) so the admin's strict CSP doesn't reject
+  // the innerHTML assignment. The wrapper around dangerouslySetInnerHTML
+  // is the only sanctioned use of that prop in the editor — see
+  // .eslintrc.json for the rule that excludes sanitizeBlockIcon calls.
   const iconProps: React.HTMLAttributes<HTMLSpanElement> =
     iconHtml !== undefined
-      ? { dangerouslySetInnerHTML: { __html: iconHtml } }
+      ? { dangerouslySetInnerHTML: sanitizeBlockIcon(iconHtml) }
       : iconText !== undefined
         ? { children: iconText }
         : { children: lucideGlyph };
