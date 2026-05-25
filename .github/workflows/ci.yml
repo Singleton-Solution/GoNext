@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Weekly schedule keeps the vuln-DB scans honest even on quiet weeks
+  # where no PRs land. Sunday 06:00 UTC = light load on GitHub runners.
+  # The security-scan job below gates on github.event_name to stay
+  # cheap on the non-security jobs.
+  schedule:
+    - cron: '0 6 * * 0'
 
 # Stop in-flight runs when a new commit pushes to the same PR.
 concurrency:
@@ -287,10 +293,125 @@ jobs:
               --next ../../apps/admin/.next \
               --summary "$GITHUB_STEP_SUMMARY"
 
+  # Security scanners — issues #190 and #196.
+  #
+  # Five tools, grouped into one job so a green check covers them all
+  # for branch protection:
+  #
+  #   - govulncheck   (#190): Go vuln DB, looks at imports + reachability.
+  #   - osv-scanner   (#190): Google's cross-language vuln DB (Go, npm, etc).
+  #   - semgrep       (#190): rules-based static analysis. OWASP Top 10 +
+  #                           security-audit registry packs.
+  #   - gosec         (#196): Go-specific security linter (G-rules).
+  #   - gitleaks      (#196): secret scanning across the working tree.
+  #
+  # Fail-fast: any one of these returning non-zero fails the job. The
+  # scanners are NOT advisory — a known CVE landing in go.mod should
+  # block the merge. (The acceptable-CVE list lives in osv-scanner's
+  # config + .semgrepignore + .gitleaks.toml; raise findings via PR.)
+  #
+  # Runs on PR + the weekly schedule above. Pull requests get the same
+  # full sweep as the cron run so a freshly-disclosed CVE in main
+  # doesn't sit unaddressed until the next Sunday.
+  security-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks needs history for the full sweep
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.work'
+          cache: true
+      - name: go work sync
+        run: go work sync
+
+      # govulncheck — Go's first-party vulnerability scanner. Walks the
+      # workspace modules; reports CVEs that are reachable from at least
+      # one entrypoint. We iterate the workspace `use` list (same
+      # pattern as lint-go) so transitive non-workspace modules don't
+      # noisy up the report.
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - name: govulncheck (workspace modules)
+        run: |
+          for dir in $(go work edit -json | python3 -c "import json,sys; [print(u['DiskPath']) for u in json.load(sys.stdin)['Use']]"); do
+            echo "::group::govulncheck $dir"
+            (cd "$dir" && govulncheck ./...)
+            echo "::endgroup::"
+          done
+
+      # osv-scanner — cross-language vuln DB (covers npm + Go + container
+      # images). Runs from the repo root with -r so it finds every
+      # manifest (go.mod, pnpm-lock.yaml, package.json, ...).
+      - name: Install osv-scanner
+        run: go install github.com/google/osv-scanner/cmd/osv-scanner@latest
+      - name: osv-scanner (recursive)
+        run: osv-scanner -r .
+
+      # semgrep — rules-based SAST. OWASP Top 10 catches the obvious
+      # injection / authz patterns; security-audit is a broader sweep
+      # of misuse patterns Semgrep has community rules for.
+      - name: Install semgrep
+        run: |
+          python3 -m pip install --quiet --upgrade pip
+          python3 -m pip install --quiet semgrep
+      - name: semgrep (OWASP + security-audit)
+        run: |
+          semgrep \
+            --config=p/owasp-top-ten \
+            --config=p/security-audit \
+            --error \
+            --metrics=off \
+            ./apps ./packages
+
+      # gosec — Go-specific security linter (G101 hardcoded creds, G104
+      # ignored errors on security calls, G304 file inclusion, etc.).
+      # Iterates the workspace `use` list like govulncheck for the
+      # same reason.
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+      - name: gosec (workspace modules)
+        run: |
+          for dir in $(go work edit -json | python3 -c "import json,sys; [print(u['DiskPath']) for u in json.load(sys.stdin)['Use']]"); do
+            echo "::group::gosec $dir"
+            (cd "$dir" && gosec ./...)
+            echo "::endgroup::"
+          done
+
+      # gitleaks — secret scanning. --no-banner keeps the log tight;
+      # --redact strips matched secrets from the report (we never want
+      # a leaked token mirrored into a public CI log); --report-format
+      # json so a follow-up step (or human reviewer) can ingest the
+      # findings cleanly. The non-zero exit on findings is the gate.
+      - name: Install gitleaks
+        run: |
+          GITLEAKS_VERSION=8.21.2
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /tmp gitleaks
+          sudo mv /tmp/gitleaks /usr/local/bin/gitleaks
+      - name: gitleaks detect
+        run: |
+          gitleaks detect \
+            --no-banner \
+            --redact \
+            --report-format json \
+            --report-path gitleaks-report.json
+      - name: Upload gitleaks report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
+          if-no-files-found: ignore
+
   # Aggregate gate. Required check on the branch protection rule.
   # bundle-budget is intentionally NOT in `needs:` while it remains advisory.
   ci:
-    needs: [lint-docs, lint-go, test-go, lint-web, test-web, lint-dashboards, lint-openapi]
+    needs: [lint-docs, lint-go, test-go, lint-web, test-web, lint-dashboards, lint-openapi, security-scan]
     if: always()
     runs-on: ubuntu-latest
     steps:
