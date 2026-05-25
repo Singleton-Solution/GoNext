@@ -215,7 +215,7 @@ exports[`SetupWizard — snapshots per step > matches the Admin step 1`] = `
           </label>
           <input
             autocomplete="username"
-            class="flex h-10 w-full rounded-md border border-border bg-paper-3 px-3 py-2 font-sans text-sm text-ink placeholder:text-fg-faint transition-shadow duration-[160ms] ease-brand hover:border-border-strong focus-visible:outline-none focus-visible:border-emerald focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-ink"
+            class="flex h-9 w-full rounded-md border border-border bg-paper-3 px-3 py-1.5 font-sans text-sm leading-none text-ink placeholder:text-fg-faint transition-shadow duration-[160ms] ease-brand hover:border-border-strong focus-visible:outline-none focus-visible:border-emerald focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-ink"
             id="setup-email"
             name="admin_email"
             placeholder="you@example.com"
@@ -236,7 +236,7 @@ exports[`SetupWizard — snapshots per step > matches the Admin step 1`] = `
           <input
             aria-describedby="setup-password-strength"
             autocomplete="new-password"
-            class="flex h-10 w-full rounded-md border border-border bg-paper-3 px-3 py-2 font-sans text-sm text-ink placeholder:text-fg-faint transition-shadow duration-[160ms] ease-brand hover:border-border-strong focus-visible:outline-none focus-visible:border-emerald focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-ink"
+            class="flex h-9 w-full rounded-md border border-border bg-paper-3 px-3 py-1.5 font-sans text-sm leading-none text-ink placeholder:text-fg-faint transition-shadow duration-[160ms] ease-brand hover:border-border-strong focus-visible:outline-none focus-visible:border-emerald focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-ink"
             id="setup-password"
             minlength="12"
             name="admin_password"
@@ -1238,7 +1238,7 @@ exports[`SetupWizard — snapshots per step > matches the Site step 1`] = `
             Site name
           </label>
           <input
-            class="flex h-10 w-full rounded-md border border-border bg-paper-3 px-3 py-2 font-sans text-sm text-ink placeholder:text-fg-faint transition-shadow duration-[160ms] ease-brand hover:border-border-strong focus-visible:outline-none focus-visible:border-emerald focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-ink"
+            class="flex h-9 w-full rounded-md border border-border bg-paper-3 px-3 py-1.5 font-sans text-sm leading-none text-ink placeholder:text-fg-faint transition-shadow duration-[160ms] ease-brand hover:border-border-strong focus-visible:outline-none focus-visible:border-emerald focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-ink"
             id="setup-site-name"
             maxlength="200"
             name="site_name"
@@ -1258,7 +1258,7 @@ exports[`SetupWizard — snapshots per step > matches the Site step 1`] = `
             Site URL
           </label>
           <input
-            class="flex h-10 w-full rounded-md border border-border bg-paper-3 px-3 py-2 font-sans text-sm text-ink placeholder:text-fg-faint transition-shadow duration-[160ms] ease-brand hover:border-border-strong focus-visible:outline-none focus-visible:border-emerald focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-ink"
+            class="flex h-9 w-full rounded-md border border-border bg-paper-3 px-3 py-1.5 font-sans text-sm leading-none text-ink placeholder:text-fg-faint transition-shadow duration-[160ms] ease-brand hover:border-border-strong focus-visible:outline-none focus-visible:border-emerald focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-ink"
             id="setup-site-url"
             name="site_url"
             placeholder="https://example.com"
