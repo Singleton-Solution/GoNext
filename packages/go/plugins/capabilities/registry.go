@@ -207,6 +207,34 @@ func builtinCapabilityDefs() []CapabilityDef {
 			Action:      "fetch",
 			Sensitive:   true,
 		},
+		// http.serve grants the plugin permission to mount HTTP routes
+		// under /api/plugins/{slug}/.... The host owns the request
+		// surface; the plugin sees only a curated handler payload
+		// dispatched through the hook bus. Not flagged sensitive — the
+		// inbound traffic is already authenticated by the host's
+		// middleware chain, and the plugin's reply is mediated through
+		// the response header allowlist. Operators still see it in the
+		// install confirmation screen as a granted capability.
+		{
+			ID:          "http.serve",
+			Description: "Serve inbound HTTP routes under /api/plugins/{slug}/.",
+			Resource:    "http",
+			Action:      "serve",
+		},
+
+		// media.read is the read-only handle on the media library.
+		// Plugins receive metadata + a short-TTL signed URL; raw bytes
+		// are not exposed at this capability. Marked sensitive because
+		// media payloads frequently contain customer-uploaded content
+		// (avatars, attachments) the operator should think about before
+		// granting.
+		{
+			ID:          "media.read",
+			Description: "Read media library metadata + obtain signed URLs.",
+			Resource:    "media",
+			Action:      "read",
+			Sensitive:   true,
+		},
 
 		// KV — the per-plugin key-value namespace. Split read/write so
 		// a plugin can declare read-only access to its own state for a
