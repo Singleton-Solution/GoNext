@@ -28,6 +28,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	goredis "github.com/redis/go-redis/v9"
 
+	admincomments "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/comments"
 	adminmedia "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/media"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/customizer"
 	adminredirects "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/redirects"
@@ -446,6 +447,33 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 		)
 	}
 
+	// Comments admin moderation surface. Mounts the list/update/bulk/
+	// reply routes under /api/v1/admin/comments. The store is the
+	// Postgres-backed implementation against the comments table from
+	// migration 000006 — ltree threading, bulk transactions, and the
+	// joined post + author fields all live in pgx_store.go. Falls
+	// back to the in-memory store when the pool is nil so the dev
+	// loop keeps working without a database. Policy-gated by the
+	// moderate_comments capability check inside Mount.
+	var adminCommentsStore admincomments.Store
+	if pool != nil {
+		adminCommentsStore = admincomments.NewPgxStore(pool)
+	} else {
+		adminCommentsStore = admincomments.NewMemoryStore()
+		logger.Warn("admin/comments: pool nil; using in-memory store")
+	}
+	if err := admincomments.Mount(mux, "/api/v1/admin/comments", admincomments.Deps{
+		Store:  adminCommentsStore,
+		Policy: policy.NewBasicPolicy(policy.DefaultRoleCapabilities()),
+		Logger: logger,
+	}); err != nil {
+		logger.Warn("admin/comments: failed to mount routes", slog.Any("err", err))
+	} else {
+		logger.Info("admin/comments: routes mounted",
+			slog.String("base", "/api/v1/admin/comments"),
+		)
+	}
+
 	// Theme Customizer (issue #355). Operators GET the active theme +
 	// any persisted overrides and PUT a partial-override payload that
 	// the renderer merges at request time. The route prefix mirrors
@@ -502,14 +530,24 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 
 	// Public comments REST surface (this issue). Anonymous- and
 	// logged-in-friendly. Mounts at /api/v1/posts/{id}/comments. The
-	// store is the package's in-memory implementation for the same
-	// reasons the admin surface uses one — the Postgres backend
-	// lands in a follow-up that wires the wider DAO. CORS allows the
-	// Email.SiteURL origin (the canonical public-site URL today;
-	// promoted to a dedicated PublicSite.BaseURL once that field
-	// graduates from #190 to config.Config).
+	// store is the package's Postgres-backed implementation against
+	// the comments table from migration 000006 — the ltree path is
+	// materialised by the BEFORE-INSERT trigger so the application
+	// code just hands the row in. Falls back to the in-memory store
+	// when the pool is nil (no-DB development), preserving the
+	// existing dev-loop behaviour. CORS allows the Email.SiteURL
+	// origin (the canonical public-site URL today; promoted to a
+	// dedicated PublicSite.BaseURL once that field graduates from
+	// #190 to config.Config).
+	var commentsStore restcomments.Store
+	if pool != nil {
+		commentsStore = restcomments.NewPgxStore(pool)
+	} else {
+		commentsStore = restcomments.NewMemoryStore()
+		logger.Warn("rest/comments: pool nil; using in-memory store")
+	}
 	if err := restcomments.Mount(mux, "/api/v1/posts", restcomments.Deps{
-		Store:       restcomments.NewMemoryStore(),
+		Store:       commentsStore,
 		Logger:      logger,
 		AllowOrigin: cfg.Email.SiteURL,
 	}); err != nil {
