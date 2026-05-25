@@ -40,16 +40,48 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 /**
- * Names of the Trusted Types policies the admin allows. Mirror this
- * list with the Go middleware's `Options.RequireTrustedTypes` so the
- * dev path (Next.js alone) and prod path (reverse proxy) emit
- * identical headers.
+ * Names of the Trusted Types policies the admin allows. MUST mirror the
+ * `AdminStrictPolicy` preset in
+ * `packages/go/middleware/csp/preset.go::AdminStrictPolicy` so the dev
+ * path (Next.js alone) and prod path (Go reverse proxy) emit IDENTICAL
+ * headers — drift between the two is silently catastrophic, because
+ * every assignment to a DOM sink THROWS once the directive is in
+ * force.
+ *
+ * Policy names emitted (issue #59):
+ *
+ *   - `gn-admin`           — the admin chrome's setHTML/setURL helpers
+ *     in `apps/admin/src/lib/trusted-types.ts`. Used by the sidebar
+ *     search, comment moderation previews, and any other surface that
+ *     displays server-supplied HTML.
+ *
+ *   - `gn-editor`          — the block editor's icon and rich-content
+ *     sinks in `packages/ts/blocks-editor/src/trusted-types.ts`.
+ *
+ *   - `'allow-duplicates'` — the CSP keyword that permits the same
+ *     policy name to be registered twice without throwing. Required in
+ *     dev because Next.js Fast Refresh re-evaluates modules, and in
+ *     prod because the admin host and a plugin frontend may both
+ *     attempt to install `gn-editor` independently.
+ *
+ * Intentionally NOT listed:
+ *
+ *   - `nextjs#bundler` / `default` — the Next.js bundler's per-request
+ *     nonce + `'strict-dynamic'` chain (see `script-src` below) is the
+ *     modern strict pattern recommended by CSP3 §6.1. Listing a bundler
+ *     policy would defeat the point of strict-dynamic.
+ *
+ *   - `gn-plugin` — plugin-contributed JS loads through
+ *     `@gonext/plugin-frontend-host` on a separate surface that owns
+ *     its own CSP; the admin's strict policy intentionally rejects
+ *     plugin-minted HTML. Plugins that need to render rich content in
+ *     the admin must round-trip through the `gn-editor` policy
+ *     (DOMPurify-sanitized) instead.
  */
 const TRUSTED_TYPES_POLICIES = [
-  'default',
-  'nextjs#bundler', // Next.js's bundler emits DOM through this policy
-  'dompurify', // sanitization for first-party admin code
-  'gn-plugin', // plugin-contributed JS — see @gonext/plugin-frontend-host
+  'gn-admin',
+  'gn-editor',
+  "'allow-duplicates'",
 ] as const;
 
 /**
@@ -84,12 +116,13 @@ function generateNonce(): string {
 }
 
 /**
- * Builds the canonical admin CSP string with the supplied per-request
- * nonce folded into script-src and style-src. The output mirrors the
- * AdminPolicy preset in packages/go/middleware/csp/preset.go:
+ * Builds the strict admin CSP string with the supplied per-request
+ * nonce folded into script-src and style-src (issue #59). The output
+ * mirrors the AdminStrictPolicy preset in
+ * packages/go/middleware/csp/preset.go:
  *
  *   default-src 'self'
- *   script-src 'self' 'nonce-…'
+ *   script-src 'self' 'nonce-…' 'strict-dynamic'
  *   style-src 'self' 'nonce-…'
  *   img-src 'self' data: blob:
  *   font-src 'self' data:
@@ -104,13 +137,27 @@ function generateNonce(): string {
  *   manifest-src 'self'
  *   upgrade-insecure-requests
  *   require-trusted-types-for 'script'
- *   trusted-types default nextjs#bundler dompurify gn-plugin
+ *   trusted-types gn-admin gn-editor 'allow-duplicates'
+ *
+ * Why `'strict-dynamic'` — once the per-request nonce authorizes the
+ * Next.js root bundle, `'strict-dynamic'` extends that trust transitively
+ * to every script the bundle loads (App Router chunks, async boundaries,
+ * etc.) without us having to enumerate them. This closes the
+ * host-allowlist bypass class that older CSPs were vulnerable to.
+ *
+ * Why `'allow-duplicates'` in trusted-types — dev's Fast-Refresh reloads
+ * re-execute module-init code, which re-runs `installAdminPolicy()`.
+ * Without `'allow-duplicates'` the browser would throw on the second
+ * registration. In prod the keyword is harmless: each policy is still
+ * functionally identical to the first.
  */
 function buildCSP(nonce: string): string {
   const nonceSource = `'nonce-${nonce}'`;
   const directives: Array<[string, string[]] | string> = [
     ['default-src', ["'self'"]],
-    ['script-src', ["'self'", nonceSource]],
+    // 'strict-dynamic' transitively trusts scripts loaded by the nonced
+    // root bundle — see issue #59 acceptance criteria.
+    ['script-src', ["'self'", nonceSource, "'strict-dynamic'"]],
     ['style-src', ["'self'", nonceSource]],
     ['img-src', ["'self'", 'data:', 'blob:']],
     ['font-src', ["'self'", 'data:']],

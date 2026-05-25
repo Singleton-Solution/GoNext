@@ -77,10 +77,30 @@ describe('admin middleware — CSP', () => {
     expect(res.headers.get('Content-Security-Policy')).toBeTruthy();
   });
 
-  it('includes require-trusted-types-for and gn-plugin policy name', async () => {
+  it('includes require-trusted-types-for and gn-admin / gn-editor policy names', async () => {
+    // The AdminStrictPolicy preset
+    // (packages/go/middleware/csp/preset.go) lists exactly these two
+    // policies — gn-plugin / nextjs#bundler / default are intentionally
+    // OMITTED. Listing a bundler policy would defeat the point of
+    // `'strict-dynamic'`; plugin-minted HTML must round-trip through
+    // gn-editor (DOMPurify) instead.
     const csp = (await middleware(newAuthedRequest())).headers.get('Content-Security-Policy')!;
     expect(csp).toMatch(/require-trusted-types-for 'script'/);
-    expect(csp).toMatch(/trusted-types[^;]*\bgn-plugin\b/);
+    expect(csp).toMatch(/trusted-types[^;]*\bgn-admin\b/);
+    expect(csp).toMatch(/trusted-types[^;]*\bgn-editor\b/);
+    expect(csp).not.toMatch(/trusted-types[^;]*\bgn-plugin\b/);
+    expect(csp).not.toMatch(/trusted-types[^;]*\bnextjs#bundler\b/);
+  });
+
+  it("includes 'allow-duplicates' so Fast-Refresh re-registration doesn't throw", async () => {
+    const csp = (await middleware(newAuthedRequest())).headers.get('Content-Security-Policy')!;
+    expect(csp).toMatch(/trusted-types[^;]*'allow-duplicates'/);
+  });
+
+  it("script-src includes 'strict-dynamic' so the Next.js runtime is transitively trusted", async () => {
+    const csp = (await middleware(newAuthedRequest())).headers.get('Content-Security-Policy')!;
+    // 'strict-dynamic' must live in script-src, not anywhere else.
+    expect(csp).toMatch(/script-src[^;]*'strict-dynamic'/);
   });
 
   it('forbids framing the admin (frame-ancestors none)', async () => {

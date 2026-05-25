@@ -63,7 +63,7 @@ const EDITOR_SANITIZE_CONFIG = {
   FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
   ALLOW_DATA_ATTR: true,
   USE_PROFILES: { html: true, svg: true, svgFilters: true },
-} as const;
+};
 
 /**
  * Reads `window.trustedTypes` defensively. Returns null outside the
