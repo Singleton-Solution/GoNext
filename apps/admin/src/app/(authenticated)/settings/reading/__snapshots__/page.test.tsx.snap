@@ -1,0 +1,217 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ReadingSettingsPage > matches the brand snapshot 1`] = `
+<form
+  class="settings-form"
+  novalidate=""
+>
+  <section
+    class=""
+  >
+    <div
+      class="settings-form__fields"
+    >
+      <div
+        class="form-field"
+      >
+        <label
+          class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          for="setting-core-reading-homepage_type"
+        >
+          Homepage shows
+        </label>
+        <select
+          aria-describedby="setting-core-reading-homepage_type-help"
+          id="setting-core-reading-homepage_type"
+        >
+          <option
+            disabled=""
+            value=""
+          >
+            Select…
+          </option>
+          <option
+            value="latest_posts"
+          >
+            Latest posts
+          </option>
+          <option
+            value="static_page"
+          >
+            A static page
+          </option>
+        </select>
+        <p
+          class="form-field__help"
+          id="setting-core-reading-homepage_type-help"
+        >
+          Pick whether the homepage is the blog index or a designated page.
+        </p>
+      </div>
+      <div
+        class="form-field"
+      >
+        <label
+          class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          for="setting-core-reading-homepage_page_id"
+        >
+          Static homepage slug
+        </label>
+        <input
+          aria-describedby="setting-core-reading-homepage_page_id-help"
+          class="flex h-9 w-full rounded-md border border-border bg-paper-3 px-3 py-1.5 font-sans text-sm leading-none text-ink placeholder:text-fg-faint transition-shadow duration-[160ms] ease-brand hover:border-border-strong focus-visible:outline-none focus-visible:border-emerald focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-ink"
+          id="setting-core-reading-homepage_page_id"
+          placeholder="welcome"
+          type="text"
+          value=""
+        />
+        <p
+          class="form-field__help"
+          id="setting-core-reading-homepage_page_id-help"
+        >
+          Only used when “A static page” is selected above.
+        </p>
+      </div>
+      <div
+        class="form-field"
+      >
+        <label
+          class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          for="setting-core-reading-posts_per_page"
+        >
+          Posts per page
+        </label>
+        <input
+          aria-describedby="setting-core-reading-posts_per_page-help"
+          class="flex h-9 w-full rounded-md border border-border bg-paper-3 px-3 py-1.5 font-sans text-sm leading-none text-ink placeholder:text-fg-faint transition-shadow duration-[160ms] ease-brand hover:border-border-strong focus-visible:outline-none focus-visible:border-emerald focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-ink"
+          id="setting-core-reading-posts_per_page"
+          placeholder="10"
+          type="number"
+          value="10"
+        />
+        <p
+          class="form-field__help"
+          id="setting-core-reading-posts_per_page-help"
+        >
+          Number of posts shown on the blog index and feed.
+        </p>
+      </div>
+      <div
+        class="form-field"
+      >
+        <label
+          class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          for="setting-core-reading-show_summary"
+        >
+          Show post summary
+        </label>
+        <label
+          class="form-field__toggle"
+        >
+          <input
+            aria-describedby="setting-core-reading-show_summary-help"
+            checked=""
+            id="setting-core-reading-show_summary"
+            type="checkbox"
+          />
+          <span>
+            Enabled
+          </span>
+        </label>
+        <p
+          class="form-field__help"
+          id="setting-core-reading-show_summary-help"
+        >
+          When enabled, archive pages show an excerpt instead of the full post.
+        </p>
+      </div>
+      <div
+        class="form-field"
+      >
+        <label
+          class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          for="setting-core-reading-rss_items"
+        >
+          Items in RSS feed
+        </label>
+        <input
+          aria-describedby="setting-core-reading-rss_items-help"
+          class="flex h-9 w-full rounded-md border border-border bg-paper-3 px-3 py-1.5 font-sans text-sm leading-none text-ink placeholder:text-fg-faint transition-shadow duration-[160ms] ease-brand hover:border-border-strong focus-visible:outline-none focus-visible:border-emerald focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-ink"
+          id="setting-core-reading-rss_items"
+          placeholder="10"
+          type="number"
+          value="10"
+        />
+        <p
+          class="form-field__help"
+          id="setting-core-reading-rss_items-help"
+        >
+          Number of entries served at /feed/.
+        </p>
+      </div>
+      <div
+        class="form-field"
+      >
+        <label
+          class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          for="setting-core-reading-rss_full_text"
+        >
+          Include full text in RSS
+        </label>
+        <label
+          class="form-field__toggle"
+        >
+          <input
+            aria-describedby="setting-core-reading-rss_full_text-help"
+            checked=""
+            id="setting-core-reading-rss_full_text"
+            type="checkbox"
+          />
+          <span>
+            Enabled
+          </span>
+        </label>
+        <p
+          class="form-field__help"
+          id="setting-core-reading-rss_full_text-help"
+        >
+          Disable to serve excerpts only — useful if your full posts are long.
+        </p>
+      </div>
+      <div
+        class="form-field"
+      >
+        <label
+          class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          for="setting-core-site-tagline"
+        >
+          Tagline
+        </label>
+        <input
+          aria-describedby="setting-core-site-tagline-help"
+          class="flex h-9 w-full rounded-md border border-border bg-paper-3 px-3 py-1.5 font-sans text-sm leading-none text-ink placeholder:text-fg-faint transition-shadow duration-[160ms] ease-brand hover:border-border-strong focus-visible:outline-none focus-visible:border-emerald focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-ink"
+          id="setting-core-site-tagline"
+          type="text"
+          value="A tagline"
+        />
+        <p
+          class="form-field__help"
+          id="setting-core-site-tagline-help"
+        >
+          Re-used from General — appears below the title in feeds and themes.
+        </p>
+      </div>
+    </div>
+  </section>
+  <div
+    class="settings-form__actions"
+  >
+    <button
+      class="inline-flex items-center justify-center gap-[6px] whitespace-nowrap rounded-md font-display font-bold transition-shadow duration-[160ms] ease-brand focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 bg-emerald text-emerald-ink border border-emerald shadow-xs hover:bg-emerald-deep hover:text-paper hover:border-emerald-deep px-5 py-3 text-base btn-primary"
+      type="submit"
+    >
+      Save changes
+    </button>
+  </div>
+</form>
+`;
