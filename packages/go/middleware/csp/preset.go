@@ -235,6 +235,71 @@ func AdminPolicy(opts PolicyOptions) *Policy {
 	return p
 }
 
+// AdminStrictPolicy returns the **admin-strict** CSP shape used by the
+// GoNext admin Next.js app (issue #59). It tightens AdminPolicy in three
+// security-meaningful ways while remaining permissive enough for the
+// real-world admin chrome to load:
+//
+//   - script-src includes 'strict-dynamic' so the per-request nonce
+//     transitively authorizes the Next.js runtime's dynamically-loaded
+//     chunks WITHOUT a per-host allowlist. This is the modern strict
+//     shape recommended by CSP3 §6.1 and is the only way the
+//     'unsafe-inline' / host-allowlist trap is fully closed.
+//   - require-trusted-types-for 'script' is forced ON; Trusted Types
+//     enforcement is non-negotiable for the admin.
+//   - trusted-types lists exactly the policies the admin/editor minted:
+//     gn-admin (the global helper in apps/admin/src/lib/trusted-types.ts),
+//     gn-editor (the block editor's policy), plus 'allow-duplicates' so
+//     dev/Fast-Refresh paths that re-install the policy do not throw.
+//
+// Other directives mirror AdminPolicy: frame-ancestors 'none',
+// object-src 'none', base-uri 'self', etc. Use AdminStrictPolicy when
+// wiring the admin Next.js host; use AdminPolicy when shipping the
+// looser "admin-style" policy to an embedded surface that has not yet
+// converted to Trusted Types.
+//
+// The returned Policy is intended to be passed through Middleware so
+// the per-request nonce is folded in via WithNonce. Do not mutate the
+// returned value across requests.
+func AdminStrictPolicy(opts PolicyOptions) *Policy {
+	p := AdminPolicy(opts)
+
+	// strict-dynamic: forced ON for admin-strict. AdminPolicy defaults
+	// to OFF; we override here so callers cannot accidentally disable
+	// it by leaving IncludeStrictDynamic nil. Callers can still
+	// explicitly suppress it via IncludeStrictDynamic = &false (e.g.
+	// browser-compat testing), which AdminPolicy honored above.
+	if opts.IncludeStrictDynamic == nil {
+		hasStrictDynamic := false
+		for _, s := range p.ScriptSrc {
+			if s.kind == srcStrictDynamic {
+				hasStrictDynamic = true
+				break
+			}
+		}
+		if !hasStrictDynamic {
+			p.ScriptSrc = append(p.ScriptSrc, StrictDynamic())
+		}
+	}
+
+	// trusted-types: only override if the caller did not pass
+	// TrustedTypePolicies. The admin-strict policy names — gn-admin
+	// for the global setHTML/setURL helpers and gn-editor for the
+	// block editor's icon and rich-content sinks — plus the
+	// 'allow-duplicates' permission keyword so dev Fast-Refresh
+	// reloads don't error.
+	if len(opts.TrustedTypePolicies) == 0 {
+		p.TrustedTypes = []string{"gn-admin", "gn-editor", "'allow-duplicates'"}
+	}
+
+	// require-trusted-types-for: forced ON.
+	if len(p.RequireTrustedTypesFor) == 0 {
+		p.RequireTrustedTypesFor = []string{"script"}
+	}
+
+	return p
+}
+
 // hostsToSources lifts a slice of host strings to SourceExpr values
 // using Host(). Empty / whitespace-only entries are skipped so callers
 // can freely concatenate optional lists.
