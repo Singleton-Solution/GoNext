@@ -49,6 +49,9 @@ import {
   type BlockContextMap,
 } from './block-context.tsx';
 import { BlockTransformToolbar } from './block-transform-toolbar.tsx';
+import { BlockLockIndicator } from './block-lock-indicator.tsx';
+import { isLocked, isMoveLocked, isRemoveLocked } from './locks.ts';
+import { warnDeprecatedBlocks } from './deprecation.ts';
 import type {
   Transform,
   TransformRegistry,
@@ -191,6 +194,12 @@ export function BlockEditCanvas({
   // doesn't opt into context still sees `{}`, matching the WordPress
   // Gutenberg consumer-opt-in contract.
   const rootContext = (context ?? {}) as BlockContextMap;
+
+  // Dev-mode audit: surfaces any block whose attribute shape would be
+  // upgraded by `runDeprecations`. Production drops the call (the
+  // helper itself checks NODE_ENV) so the cost is paid only during
+  // development.
+  warnDeprecatedBlocks(blocks, registry);
   return (
     <div
       className="gonext-block-edit-canvas"
@@ -324,17 +333,35 @@ function BlockNode({
       childrenNode
     );
 
+  // Lock state surfaces as DOM data attributes so drag-and-drop
+  // libraries (and the future native HTML5 drag wiring) can refuse
+  // to move locked blocks without re-reading the React tree. The
+  // canvas itself doesn't drive drag yet, but the contract is in
+  // place — every consumer reads the same data-lock-* flags.
+  const lockedMove = isMoveLocked(block);
+  const lockedRemove = isRemoveLocked(block);
+  const anyLocked = isLocked(block);
+
   return (
     <div
       className={
         'gonext-block-edit-canvas__node' +
-        (isSelected ? ' gonext-block-edit-canvas__node--selected' : '')
+        (isSelected ? ' gonext-block-edit-canvas__node--selected' : '') +
+        (anyLocked ? ' gonext-block-edit-canvas__node--locked' : '')
       }
       data-block-type={block.type}
       data-selected={isSelected ? 'true' : 'false'}
+      data-lock-move={lockedMove ? 'true' : 'false'}
+      data-lock-remove={lockedRemove ? 'true' : 'false'}
       data-testid={`block-edit-canvas-node-${block.type}`}
+      // HTML5 draggable attribute reflects move-lock state — the
+      // browser will refuse to start a drag on `draggable="false"`,
+      // which is the cheapest way to enforce the lock without a
+      // listener.
+      draggable={!lockedMove}
       style={isSelected ? selectedNodeStyle : nodeStyle}
     >
+      {anyLocked ? <BlockLockIndicator block={block} /> : null}
       {showToolbar ? (
         <BlockTransformToolbar
           block={block}

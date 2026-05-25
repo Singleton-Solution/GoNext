@@ -14,8 +14,11 @@ exports[`<BlockEditCanvas> > matches the canvas snapshot for a single-paragraph 
     <div
       class="gonext-block-edit-canvas__node"
       data-block-type="core/paragraph"
+      data-lock-move="false"
+      data-lock-remove="false"
       data-selected="false"
       data-testid="block-edit-canvas-node-core/paragraph"
+      draggable="true"
       style="position: relative; padding: 4px 0px; transition: box-shadow var(--dur, 160ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1)), padding var(--dur, 160ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1));"
     >
       <p
