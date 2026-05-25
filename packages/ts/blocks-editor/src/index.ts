@@ -93,3 +93,15 @@ export {
   type DetectedPaste,
   type PasteSource,
 } from './paste-handler.ts';
+
+export {
+  handleSelectionClick,
+  SelectionProvider,
+  SortableBlockList,
+  useSelection,
+  type SelectionActions,
+  type SelectionContextValue,
+  type SelectionProviderProps,
+  type SelectionState,
+  type SortableBlockListProps,
+} from './dnd/index.ts';
