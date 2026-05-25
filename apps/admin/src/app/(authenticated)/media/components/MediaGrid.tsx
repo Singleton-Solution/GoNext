@@ -33,6 +33,7 @@
  *    on a real prod-scale library.
  */
 import Link from 'next/link';
+import { ImagePlus } from 'lucide-react';
 import {
   Pencil,
   Trash2,
@@ -50,6 +51,7 @@ import {
   type MouseEvent,
   type ReactElement,
 } from 'react';
+import { EmptyState, LoadingState } from '@/components/states';
 import { deleteMedia, listMedia } from '../actions';
 import type {
   MediaAsset,
@@ -291,14 +293,39 @@ export function MediaGrid(props: MediaGridProps): ReactElement {
       )}
 
       {!hasItems && !loading && (
-        <div
+        // Brand state surface — see `src/components/states/README.md`.
+        // We render the filter-aware copy here: if a chip is active
+        // but yielded nothing, switch to the search variant so the
+        // mood (and the icon tile) reflects "your filter narrowed
+        // nothing" instead of "first run, go for it".
+        <EmptyState
           data-testid="empty-state"
-          className="rounded-lg border border-dashed border-border bg-paper-2 px-6 py-9 text-center"
-        >
-          <p className="font-sans text-sm text-fg-muted m-0">
-            No media yet. Drop a file above to get started.
-          </p>
-        </div>
+          variant={filter === 'all' ? 'default' : 'search'}
+          icon={ImagePlus}
+          title={
+            filter === 'all' ? (
+              <>
+                No media <em>yet</em>.
+              </>
+            ) : (
+              <>
+                Nothing in <em>this filter</em>.
+              </>
+            )
+          }
+          body={
+            filter === 'all'
+              ? 'Drop a file above to start your library. Images, documents, and video all live here.'
+              : `Try switching back to All, or upload a new ${filter} above.`
+          }
+        />
+      )}
+
+      {loading && !hasItems && (
+        // Inline spinner — the grid only shows the heavy SkeletonCard
+        // on a top-level Suspense boundary; an in-grid refresh after
+        // a chip click is a smaller moment.
+        <LoadingState label="Reading the library…" />
       )}
 
       {hasItems && (
@@ -327,13 +354,11 @@ export function MediaGrid(props: MediaGridProps): ReactElement {
         className="h-px"
         aria-hidden="true"
       />
-      {loading && (
-        <p
-          className="font-sans text-xs text-fg-subtle m-0"
-          data-testid="grid-loading"
-        >
-          Loading…
-        </p>
+      {loading && hasItems && (
+        // Pagination spinner — small inline label, not a full
+        // SkeletonCard, because the user already sees rendered tiles
+        // above and we don't want to push them off-screen.
+        <LoadingState label="Loading more…" data-testid="grid-loading" />
       )}
     </section>
   );
