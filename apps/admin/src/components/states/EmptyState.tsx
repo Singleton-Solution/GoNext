@@ -37,7 +37,10 @@ import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface EmptyStateProps
-  extends React.HTMLAttributes<HTMLDivElement> {
+  // Omit `title` from the native HTMLAttributes — we accept JSX so the
+  // italic-accent rule can compose, but HTMLElement.title is
+  // string-only.
+  extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
   /**
    * Lucide icon component to render at 26×26 inside the emerald-soft
    * tile. We accept the component reference (not a rendered element)
