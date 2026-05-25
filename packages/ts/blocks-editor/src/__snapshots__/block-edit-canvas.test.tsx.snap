@@ -1,0 +1,29 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<BlockEditCanvas> > matches the canvas snapshot for a single-paragraph tree 1`] = `
+<div
+  class="gonext-block-edit-canvas"
+  data-testid="block-edit-canvas"
+  style="background: var(--paper, #F5F2EA); padding: 40px 56px 200px; min-height: 100%; font-family: var(--font-sans, 'Geist', -apple-system, system-ui, sans-serif); color: var(--ink-soft, #1F2D26);"
+>
+  <div
+    class="gonext-block-edit-canvas__doc"
+    data-testid="block-edit-canvas-doc"
+    style="max-width: 720px; margin: 0px auto; background: var(--paper-2, #EFEBE0); border: 1px solid var(--border, #D9D2C0); border-radius: var(--r-lg, 12px); padding: var(--s-7, 32px) var(--s-7, 32px) var(--s-8, 48px); box-shadow: var(--sh-md, 0 6px 14px -4px rgba(14, 26, 20, 0.08), 0 2px 6px -2px rgba(14, 26, 20, 0.04));"
+  >
+    <div
+      class="gonext-block-edit-canvas__node"
+      data-block-type="core/paragraph"
+      data-selected="false"
+      data-testid="block-edit-canvas-node-core/paragraph"
+      style="position: relative; padding: 4px 0px; transition: box-shadow var(--dur, 160ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1)), padding var(--dur, 160ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1));"
+    >
+      <p
+        data-block="core/paragraph"
+      >
+        Snapshot.
+      </p>
+    </div>
+  </div>
+</div>
+`;
