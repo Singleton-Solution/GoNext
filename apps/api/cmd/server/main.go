@@ -23,6 +23,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -31,6 +32,7 @@ import (
 
 	admincomments "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/comments"
 	adminmedia "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/media"
+	restimg "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/img"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/customizer"
 	adminredirects "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/redirects"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/rum"
@@ -57,6 +59,8 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/jobs/cron"
 	"github.com/Singleton-Solution/GoNext/packages/go/jobs/taskspec"
 	"github.com/Singleton-Solution/GoNext/packages/go/log"
+	"github.com/Singleton-Solution/GoNext/packages/go/media"
+	"github.com/Singleton-Solution/GoNext/packages/go/media/imgproxy"
 	gonextmetrics "github.com/Singleton-Solution/GoNext/packages/go/metrics"
 	authmw "github.com/Singleton-Solution/GoNext/packages/go/middleware/auth"
 	"github.com/Singleton-Solution/GoNext/packages/go/middleware/earlyhints"
@@ -473,9 +477,16 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 	// the public variant proxy. The in-memory wiring keeps the admin UI
 	// functional end-to-end for smoke tests without requiring a MinIO
 	// container for `make dev`.
+	//
+	// The store + putter are constructed here (rather than inline in
+	// adminmedia.Mount) so the public /img proxy below can read from
+	// the same in-memory state — the upload writes to mediaPutter; the
+	// proxy reads from it.
+	mediaStore := adminmedia.NewMemoryStore(nil, nil)
+	mediaPutter := adminmedia.NewMemoryPutter()
 	if err := adminmedia.Mount(mux, "/api/v1/admin/media", adminmedia.Deps{
-		Store:  adminmedia.NewMemoryStore(nil, nil),
-		Putter: adminmedia.NewMemoryPutter(),
+		Store:  mediaStore,
+		Putter: mediaPutter,
 		Policy: policy.NewBasicPolicy(policy.DefaultRoleCapabilities()),
 		Logger: logger,
 	}); err != nil {
@@ -483,6 +494,36 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 	} else {
 		logger.Info("admin/media: routes mounted",
 			slog.String("base", "/api/v1/admin/media"),
+		)
+	}
+
+	// Public image proxy (#37). The route GET /img/{id}/{spec} parses
+	// the spec, looks up the asset by ID, fetches the source bytes
+	// from the storage backend, and produces a rendered variant via
+	// the imgproxy.Transformer. Concurrent hits on the same (id, spec)
+	// collapse to one render via mediaCoalescer; rendered bytes are
+	// cached on local disk under <media-root>/cache.
+	//
+	// Eagerly initialise the package-level Default transformer so the
+	// boot log captures the backend selection (govips vs stdlib).
+	imgproxy.Default()
+	mediaCoalescer := media.NewCoalescer(media.CoalescerOptions{
+		Logger: logger,
+	})
+	imgCache := imgproxy.NewCache(filepath.Join(os.TempDir(), "gonext-img-cache"))
+	if err := restimg.Mount(mux, "/img", restimg.Deps{
+		Lookup:    mediaLookupAdapter{store: mediaStore},
+		Source:    mediaSourceAdapter{putter: mediaPutter},
+		Cache:     imgCache,
+		Coalescer: mediaCoalescer,
+		Logger:    logger,
+	}); err != nil {
+		logger.Warn("img: failed to mount routes", slog.Any("err", err))
+	} else {
+		logger.Info("img: routes mounted",
+			slog.String("base", "/img"),
+			slog.String("cache_root", imgCache.Root()),
+			slog.String("backend", string(imgproxy.DefaultBackend())),
 		)
 	}
 
