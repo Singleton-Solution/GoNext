@@ -176,6 +176,30 @@ export interface BlockTypeDefinition<
   save?: () => Promise<{ default: SaveComponent<A> }>;
   /** Dynamic-block render directive: "<plugin-slug>/<handler-name>". */
   render?: { handler: string };
+  /**
+   * Block context — keys this block exposes to its descendants.
+   *
+   * The editor and the Go server-side walker each maintain a context
+   * map keyed by these names. By default, each key resolves to the
+   * value at the matching attribute on the block instance (e.g. a
+   * Query block that lists `["postId"]` exposes whichever `postId`
+   * attribute the current iteration carries).
+   *
+   * Descendants opt into reading these values via `usesContext`. The
+   * editor's `useBlockContext(key)` hook (in `@gonext/blocks-editor`)
+   * reads from the same map.
+   */
+  providesContext?: string[];
+  /**
+   * Block context — keys this block reads from its ancestors.
+   *
+   * The editor canvas filters the ancestor context map down to these
+   * keys before passing it to the Edit component on the `context`
+   * prop. The Go walker does the same when invoking the registered
+   * server-side renderer. Listing a key here that no ancestor
+   * provides is non-fatal: the value is `undefined`.
+   */
+  usesContext?: string[];
   /** Schema migrations, ordered newest → oldest. */
   deprecated?: BlockDeprecation<BlockAttributes, A>[];
 }

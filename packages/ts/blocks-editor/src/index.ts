@@ -50,6 +50,17 @@ export {
 } from './block-edit-canvas.tsx';
 
 export {
+  BlockContextProvider,
+  EMPTY_BLOCK_CONTEXT,
+  filterConsumedContext,
+  resolveProvidedContext,
+  useBlockContext,
+  useBlockContextMap,
+  type BlockContextMap,
+  type BlockContextProviderProps,
+} from './block-context.tsx';
+
+export {
   defaultCoreBlocks,
   headingBlock,
   paragraphBlock,

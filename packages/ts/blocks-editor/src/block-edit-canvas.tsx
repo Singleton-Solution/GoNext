@@ -41,6 +41,13 @@ import type {
   EditComponent,
 } from '@gonext/blocks-sdk';
 import { createElement, Suspense, use, type CSSProperties } from 'react';
+import {
+  BlockContextProvider,
+  filterConsumedContext,
+  resolveProvidedContext,
+  useBlockContextMap,
+  type BlockContextMap,
+} from './block-context.tsx';
 import { BlockTransformToolbar } from './block-transform-toolbar.tsx';
 import type {
   Transform,
@@ -175,6 +182,15 @@ export function BlockEditCanvas({
       />
     );
   }
+  // Seed the block-context tree with whatever the host passed via
+  // `context`. Inside the tree, container blocks layer their
+  // `providesContext` values on top via `BlockContextProvider` (see
+  // BlockNode below). The `context` prop on `BlockEditProps` is
+  // computed per-block from the inherited map filtered through that
+  // block's `usesContext` declaration — so an Edit component that
+  // doesn't opt into context still sees `{}`, matching the WordPress
+  // Gutenberg consumer-opt-in contract.
+  const rootContext = (context ?? {}) as BlockContextMap;
   return (
     <div
       className="gonext-block-edit-canvas"
@@ -187,18 +203,19 @@ export function BlockEditCanvas({
         style={docChipStyle}
       >
         <Suspense fallback={loadingFallback}>
-          {blocks.map((block, index) => (
-            <BlockNode
-              key={block.clientId ?? `${block.type}-${index}`}
-              block={block}
-              registry={registry}
-              context={context ?? {}}
-              indexPath={[index]}
-              transformRegistry={transformRegistry}
-              onApplyTransform={onApplyTransform}
-              selectedClientId={selectedClientId}
-            />
-          ))}
+          <BlockContextProvider values={rootContext}>
+            {blocks.map((block, index) => (
+              <BlockNode
+                key={block.clientId ?? `${block.type}-${index}`}
+                block={block}
+                registry={registry}
+                indexPath={[index]}
+                transformRegistry={transformRegistry}
+                onApplyTransform={onApplyTransform}
+                selectedClientId={selectedClientId}
+              />
+            ))}
+          </BlockContextProvider>
         </Suspense>
       </div>
     </div>
@@ -208,7 +225,6 @@ export function BlockEditCanvas({
 interface BlockNodeProps {
   block: Block;
   registry: BlockRegistry;
-  context: Record<string, unknown>;
   indexPath: number[];
   transformRegistry?: TransformRegistry;
   onApplyTransform?: (
@@ -222,12 +238,17 @@ interface BlockNodeProps {
 function BlockNode({
   block,
   registry,
-  context,
   indexPath,
   transformRegistry,
   onApplyTransform,
   selectedClientId,
 }: BlockNodeProps): React.ReactNode {
+  // Read the inherited block context here so any ancestor's
+  // `providesContext` values surface to this node. The Edit
+  // component receives only the subset it opts into via
+  // `usesContext`; children rendered below see the merged map.
+  const inheritedContext = useBlockContextMap();
+
   const def = registry.get(block.type);
   if (def === undefined) {
     return <UnknownBlock type={block.type} path={indexPath} />;
@@ -243,12 +264,17 @@ function BlockNode({
   const isSelected =
     selectedClientId !== undefined && selectedClientId === resolvedClientId;
 
+  // Per-block consumed context. A block that lists no `usesContext`
+  // gets the shared empty frozen reference — React.memo descendants
+  // won't see a churning prop on every render.
+  const consumed = filterConsumedContext(inheritedContext, def);
+
   const props: BlockEditProps = {
     attributes: block.attributes,
     setAttributes: noopSetAttributes,
     isSelected,
     clientId: resolvedClientId,
-    context,
+    context: consumed as Record<string, unknown>,
   };
 
   // Use `createElement` so React owns the mount lifecycle. Calling `Edit`
@@ -264,6 +290,39 @@ function BlockNode({
   // shape — preserving the test contract from before this issue.
   const showToolbar =
     transformRegistry !== undefined && onApplyTransform !== undefined;
+
+  // Resolve the values this block exposes to its descendants. When
+  // there's nothing to provide we skip the provider wrapper entirely
+  // so the React tree stays shallow for the common (leaf) case.
+  const provided = resolveProvidedContext(block, def);
+  const hasChildren =
+    block.innerBlocks !== undefined && block.innerBlocks.length > 0;
+
+  const childrenNode = hasChildren ? (
+    <div
+      className="gonext-block-edit-canvas__children"
+      style={childrenStyle}
+    >
+      {block.innerBlocks!.map((child, childIndex) => (
+        <BlockNode
+          key={child.clientId ?? `${child.type}-${childIndex}`}
+          block={child}
+          registry={registry}
+          indexPath={[...indexPath, childIndex]}
+          transformRegistry={transformRegistry}
+          onApplyTransform={onApplyTransform}
+          selectedClientId={selectedClientId}
+        />
+      ))}
+    </div>
+  ) : null;
+
+  const wrappedChildren =
+    hasChildren && Object.keys(provided).length > 0 ? (
+      <BlockContextProvider values={provided}>{childrenNode}</BlockContextProvider>
+    ) : (
+      childrenNode
+    );
 
   return (
     <div
@@ -286,25 +345,7 @@ function BlockNode({
         />
       ) : null}
       {rendered}
-      {block.innerBlocks && block.innerBlocks.length > 0 ? (
-        <div
-          className="gonext-block-edit-canvas__children"
-          style={childrenStyle}
-        >
-          {block.innerBlocks.map((child, childIndex) => (
-            <BlockNode
-              key={child.clientId ?? `${child.type}-${childIndex}`}
-              block={child}
-              registry={registry}
-              context={context}
-              indexPath={[...indexPath, childIndex]}
-              transformRegistry={transformRegistry}
-              onApplyTransform={onApplyTransform}
-              selectedClientId={selectedClientId}
-            />
-          ))}
-        </div>
-      ) : null}
+      {wrappedChildren}
     </div>
   );
 }
