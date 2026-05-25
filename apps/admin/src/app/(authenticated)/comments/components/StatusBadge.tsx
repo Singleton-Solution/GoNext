@@ -5,10 +5,18 @@
  * Kept as its own component (rather than inlined into the list
  * row) because the comment detail surface needs the same badge,
  * and the future "thread view" will also render it.
+ *
+ * Brand tokens (mirrored from docs/design/colors_and_type.css):
+ *   pending  → lavender-soft (in-review, awaiting attention)
+ *   approved → emerald-soft (active, healthy)
+ *   spam     → warning-soft (suspicious, needs caution)
+ *   trash    → paper-3 (archived, neutral)
  */
 import type { ReactElement } from 'react';
+
+import { cn } from '@/lib/utils';
+
 import type { CommentStatus } from '../types';
-import styles from '../comments.module.css';
 
 function labelFor(status: CommentStatus): string {
   switch (status) {
@@ -23,30 +31,27 @@ function labelFor(status: CommentStatus): string {
   }
 }
 
-function classFor(status: CommentStatus): string {
-  // CSS module lookups return string | undefined under
-  // `noUncheckedIndexedAccess`. A switch keeps the strict-typed
-  // expression while staying readable.
-  switch (status) {
-    case 'pending':
-      return styles.badgePending ?? '';
-    case 'approved':
-      return styles.badgeApproved ?? '';
-    case 'spam':
-      return styles.badgeSpam ?? '';
-    case 'trash':
-      return styles.badgeTrash ?? '';
-  }
-}
+const STATUS_CLASS: Record<CommentStatus, string> = {
+  pending: 'bg-lavender-soft text-lavender-deep border-lavender/30',
+  approved: 'bg-emerald-soft text-emerald-deep border-emerald/30',
+  spam: 'bg-warning-soft text-warning border-warning/30',
+  trash: 'bg-paper-3 text-fg-subtle border-border',
+};
 
 export function StatusBadge({ status }: { status: CommentStatus }): ReactElement {
   const label = labelFor(status);
-  const klass = classFor(status);
   return (
     <span
-      className={`${styles.badge ?? ''} ${klass}`}
       aria-label={`Status: ${label}`}
+      className={cn(
+        'inline-flex items-center gap-[6px] rounded-pill border px-2 py-[2px] font-mono text-[10px] font-semibold uppercase tracking-wide',
+        STATUS_CLASS[status],
+      )}
     >
+      <span
+        aria-hidden="true"
+        className="h-[5px] w-[5px] rounded-pill bg-current"
+      />
       {label}
     </span>
   );
