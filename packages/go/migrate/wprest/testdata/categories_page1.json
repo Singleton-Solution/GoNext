@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "count": 5,
+    "description": "Default category",
+    "link": "https://example.com/category/uncategorized",
+    "name": "Uncategorized",
+    "slug": "uncategorized",
+    "taxonomy": "category",
+    "parent": 0
+  },
+  {
+    "id": 2,
+    "count": 2,
+    "description": "Tech writing",
+    "link": "https://example.com/category/tech",
+    "name": "Tech",
+    "slug": "tech",
+    "taxonomy": "category",
+    "parent": 0
+  },
+  {
+    "id": 3,
+    "count": 1,
+    "description": "Sub of Tech",
+    "link": "https://example.com/category/tech/golang",
+    "name": "Golang",
+    "slug": "golang",
+    "taxonomy": "category",
+    "parent": 2
+  }
+]

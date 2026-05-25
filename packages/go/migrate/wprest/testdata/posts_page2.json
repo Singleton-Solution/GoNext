@@ -1,0 +1,17 @@
+[
+  {
+    "id": 102,
+    "date": "2024-03-16T09:00:00",
+    "date_gmt": "2024-03-16T09:00:00",
+    "guid": {"rendered": "https://example.com/?p=102"},
+    "slug": "third",
+    "status": "publish",
+    "type": "post",
+    "link": "https://example.com/third/",
+    "title": {"rendered": "Third", "raw": "Third"},
+    "content": {"rendered": "<p>Page 2 post.</p>", "raw": "<p>Page 2 post.</p>"},
+    "author": 1,
+    "categories": [1],
+    "tags": [10]
+  }
+]

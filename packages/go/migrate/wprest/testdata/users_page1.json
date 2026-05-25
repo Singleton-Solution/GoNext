@@ -1,0 +1,27 @@
+[
+  {
+    "id": 1,
+    "username": "admin",
+    "name": "Site Admin",
+    "first_name": "Site",
+    "last_name": "Admin",
+    "email": "admin@example.com",
+    "url": "https://example.com",
+    "description": "",
+    "link": "https://example.com/author/admin",
+    "locale": "en_US",
+    "nickname": "admin",
+    "slug": "admin",
+    "roles": ["administrator"]
+  },
+  {
+    "id": 2,
+    "username": "editor",
+    "name": "Edna Editor",
+    "first_name": "Edna",
+    "last_name": "Editor",
+    "email": "edna@example.com",
+    "slug": "edna-editor",
+    "roles": ["editor"]
+  }
+]

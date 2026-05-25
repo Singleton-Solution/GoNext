@@ -1,0 +1,19 @@
+[
+  {
+    "id": 200,
+    "date": "2024-03-13T10:00:00",
+    "date_gmt": "2024-03-13T10:00:00",
+    "slug": "photo-200",
+    "status": "inherit",
+    "type": "attachment",
+    "link": "https://example.com/photo-200",
+    "title": {"rendered": "photo", "raw": "photo"},
+    "author": 1,
+    "parent": 100,
+    "source_url": "https://example.com/wp-content/uploads/2024/03/photo.jpg",
+    "mime_type": "image/jpeg",
+    "media_type": "image",
+    "alt_text": "A photo",
+    "caption": {"rendered": "<p>Caption</p>", "raw": "Caption"}
+  }
+]
