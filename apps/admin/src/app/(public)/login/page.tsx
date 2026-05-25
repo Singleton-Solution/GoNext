@@ -23,15 +23,53 @@
  * must run on the client (React requires event handlers in Client
  * Components).
  */
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Headline } from '@/components/ui/headline';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ApiError, api } from '@/lib/api-client';
+
+type MagicLinkState =
+  | { status: 'idle' }
+  | { status: 'submitting' }
+  | { status: 'sent' }
+  | { status: 'error'; message: string };
 
 export default function LoginPage(): ReactElement {
+  const [email, setEmail] = useState('');
+  const [magicLink, setMagicLink] = useState<MagicLinkState>({ status: 'idle' });
+
+  async function handleSendMagicLink(): Promise<void> {
+    if (email === '') {
+      setMagicLink({
+        status: 'error',
+        message: 'Enter your email above first, then we can send the link.',
+      });
+      return;
+    }
+    setMagicLink({ status: 'submitting' });
+    try {
+      await api.post('/api/v1/auth/magic-link/request', { email });
+      setMagicLink({ status: 'sent' });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 429) {
+        setMagicLink({
+          status: 'error',
+          message:
+            'Too many attempts. Please wait a few minutes and try again.',
+        });
+        return;
+      }
+      setMagicLink({
+        status: 'error',
+        message: 'We could not send the link. Please try again.',
+      });
+    }
+  }
+
   return (
     <section
       className="login-card relative mx-auto w-full max-w-[420px]"
@@ -91,6 +129,8 @@ export default function LoginPage(): ReactElement {
                 type="email"
                 autoComplete="username"
                 placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
               />
             </div>
@@ -110,8 +150,51 @@ export default function LoginPage(): ReactElement {
             </Button>
           </form>
 
+          {/* Passwordless alternative — send a one-time sign-in link to
+              the email entered above. Lives below the primary form so
+              the password path stays the dominant affordance, but is
+              one click away for users who don't remember the password. */}
+          <div className="mt-4">
+            {magicLink.status === 'sent' ? (
+              <div
+                role="status"
+                className="rounded-lg bg-paper-1 px-4 py-3 font-sans text-sm text-fg-default"
+              >
+                If an account exists for that address, a sign-in link is on
+                the way. The link expires in 15 minutes.
+              </div>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  className="w-full"
+                  onClick={handleSendMagicLink}
+                  disabled={magicLink.status === 'submitting'}
+                >
+                  {magicLink.status === 'submitting'
+                    ? 'Sending…'
+                    : 'Send me a sign-in link'}
+                </Button>
+                {magicLink.status === 'error' && (
+                  <p
+                    role="alert"
+                    className="mt-2 font-sans text-sm text-red-600"
+                  >
+                    {magicLink.message}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+
           <div className="mt-6 border-t border-border pt-4 text-center font-sans text-xs text-fg-subtle">
-            Trouble signing in? <a className="text-emerald-deep" href="#">Reset your password</a>.
+            Trouble signing in?{' '}
+            <a className="text-emerald-deep" href="/forgot-password">
+              Reset your password
+            </a>
+            .
           </div>
         </CardContent>
       </Card>
