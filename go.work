@@ -5,5 +5,7 @@ use (
 	./apps/worker
 	./cli/gonext
 	./examples/plugins/seo
+	./examples/plugins/sdk-go-hello
 	./packages/go
+	./packages/go/sdk
 )
