@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>GoNext — Posts · Brick &amp; Mortar Coffee</title>
+<link rel="stylesheet" href="../../colors_and_type.css">
+<link rel="icon" href="../../assets/favicon.svg">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  body { background: var(--paper); display: flex; height: 100vh; overflow: hidden; }
+
+  /* ───────────── SIDEBAR — deep forest ───────────── */
+  aside.sidebar {
+    width: 248px; flex-shrink: 0;
+    background: var(--forest); color: var(--fg-on-forest);
+    display: flex; flex-direction: column;
+    border-right: 1px solid var(--forest-border);
+  }
+
+  .org-switch {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--forest-border);
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease);
+  }
+  .org-switch:hover { background: var(--forest-2); }
+  .org-switch .mark { width: 30px; height: 30px; border-radius: var(--r-sm); flex-shrink: 0; }
+  .org-switch .info { flex: 1; min-width: 0; }
+  .org-switch .org { font-size: var(--t-sm); font-weight: 600; color: var(--fg-on-forest); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .org-switch .plan { font-size: var(--t-2xs); color: var(--fg-on-forest-muted); display: flex; align-items: center; gap: 4px; margin-top: 1px; }
+  .org-switch .plan::before { content: ''; width: 5px; height: 5px; border-radius: 999px; background: var(--emerald-bright); }
+  .org-switch > i { color: var(--fg-on-forest-muted); width: 14px; height: 14px; }
+
+  nav.side {
+    padding: 12px 8px; flex: 1; overflow: auto;
+    display: flex; flex-direction: column; gap: 1px;
+  }
+  nav.side .head {
+    padding: 16px 10px 6px;
+    font-size: var(--t-2xs); font-weight: 500;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--fg-on-forest-muted); opacity: 0.6;
+  }
+  nav.side a {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 10px;
+    font-size: var(--t-sm); color: var(--fg-on-forest-muted);
+    text-decoration: none;
+    border-radius: var(--r-sm);
+    transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  }
+  nav.side a:hover { background: var(--forest-2); color: var(--fg-on-forest); }
+  nav.side a.active {
+    background: var(--forest-2); color: var(--fg-on-forest); font-weight: 500;
+    box-shadow: inset 2px 0 0 var(--emerald-bright);
+  }
+  nav.side a.active i { color: var(--emerald-bright); }
+  nav.side a i { width: 15px; height: 15px; color: var(--fg-on-forest-muted); opacity: 0.85; flex-shrink: 0; }
+  nav.side a .count {
+    margin-left: auto;
+    font-size: var(--t-2xs); color: var(--fg-on-forest-muted); opacity: 0.7;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* upgrade card */
+  .upgrade {
+    margin: 8px;
+    padding: 14px;
+    border-radius: var(--r-md);
+    background: linear-gradient(135deg, var(--forest-2) 0%, var(--forest-3) 100%);
+    border: 1px solid var(--forest-border);
+    position: relative; overflow: hidden;
+  }
+  .upgrade::before {
+    content: ''; position: absolute; top: -20px; right: -20px;
+    width: 80px; height: 80px; border-radius: 999px;
+    background: radial-gradient(circle, rgba(52, 211, 153, 0.20) 0%, transparent 70%);
+  }
+  .upgrade .t { font-size: var(--t-sm); font-weight: 600; color: var(--fg-on-forest); position: relative; }
+  .upgrade .t em { font-family: var(--font-serif); font-weight: 400; color: var(--emerald-bright); font-size: 1.1em; }
+  .upgrade .d { font-size: var(--t-xs); color: var(--fg-on-forest-muted); margin: 4px 0 10px; line-height: 1.4; position: relative; }
+  .upgrade .b { background: var(--emerald); color: var(--emerald-ink); border-color: var(--emerald); width: 100%; box-shadow: none; }
+  .upgrade .b:hover { background: var(--emerald-bright); border-color: var(--emerald-bright); }
+
+  .side-foot {
+    padding: 10px 12px;
+    border-top: 1px solid var(--forest-border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .avatar {
+    width: 28px; height: 28px; border-radius: var(--r-pill);
+    background: var(--emerald); color: var(--emerald-ink);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-size: 11px; font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .side-foot .who { flex: 1; min-width: 0; }
+  .side-foot .who .name { font-size: var(--t-sm); font-weight: 500; color: var(--fg-on-forest); line-height: 1.3; }
+  .side-foot .who .email { font-size: var(--t-2xs); color: var(--fg-on-forest-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .side-foot button.icon-btn {
+    background: transparent; border: none; padding: 6px;
+    color: var(--fg-on-forest-muted); cursor: pointer; border-radius: var(--r-sm);
+  }
+  .side-foot button.icon-btn:hover { background: var(--forest-2); color: var(--fg-on-forest); }
+  .side-foot button.icon-btn i { width: 14px; height: 14px; }
+
+  /* ───────────── MAIN ───────────── */
+  main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--paper); }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 28px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--border);
+    height: 54px;
+  }
+  .crumbs { display: flex; align-items: center; gap: 8px; font-size: var(--t-sm); color: var(--fg-subtle); }
+  .crumbs .sep { color: var(--fg-faint); width: 13px; height: 13px; }
+  .crumbs .here { color: var(--ink); font-weight: 500; }
+  .crumbs a { color: inherit; text-decoration: none; }
+  .crumbs a:hover { color: var(--ink); }
+
+  .top-actions { display: flex; align-items: center; gap: 8px; }
+  .search {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px;
+    background: var(--paper-2);
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    width: 320px;
+    transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+  }
+  .search:hover { background: var(--paper); border-color: var(--border); }
+  .search:focus-within { background: var(--paper); border-color: var(--emerald); box-shadow: var(--sh-focus); }
+  .search input { flex: 1; border: none; outline: none; background: transparent; font: inherit; font-size: var(--t-sm); color: var(--ink); }
+  .search input::placeholder { color: var(--fg-faint); }
+  .search > i { width: 14px; height: 14px; color: var(--fg-subtle); }
+
+  .icon-btn-top { background: transparent; border: 1px solid transparent; padding: 6px; border-radius: var(--r-sm); cursor: pointer; color: var(--fg-muted); position: relative; }
+  .icon-btn-top:hover { background: var(--paper-2); color: var(--ink); }
+  .icon-btn-top i { width: 16px; height: 16px; }
+  .icon-btn-top .badge { position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 999px; background: var(--emerald); border: 1.5px solid var(--paper); }
+
+  /* ───────────── CONTENT ───────────── */
+  .content { padding: 32px 36px 48px; flex: 1; overflow: auto; }
+
+  .page-head {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    margin-bottom: 32px; gap: 24px;
+    padding-bottom: 24px; border-bottom: 1px solid var(--border);
+  }
+  .page-head h1 {
+    font-family: var(--font-display); font-weight: 800;
+    font-size: var(--t-4xl); letter-spacing: var(--track-tight); line-height: 1.0;
+    color: var(--ink);
+  }
+  .page-head h1 em {
+    font-family: var(--font-serif); font-weight: 400; font-style: italic;
+    font-size: 1.05em; color: var(--emerald-deep); letter-spacing: -0.01em;
+  }
+  .page-head p.sub { font-size: var(--t-sm); color: var(--fg-muted); margin-top: 10px; max-width: 480px; }
+  .page-head .actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+  /* ─── Stat tiles ─── */
+  .stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+    margin-bottom: 28px;
+  }
+  .stat-tile {
+    background: var(--paper-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 18px 20px;
+    position: relative; overflow: hidden;
+    transition: border-color var(--dur) var(--ease);
+  }
+  .stat-tile:hover { border-color: var(--border-strong); }
+  .stat-tile .lbl {
+    display: flex; align-items: center; gap: 6px;
+    font-size: var(--t-xs); font-weight: 500; color: var(--fg-muted);
+  }
+  .stat-tile .lbl i { width: 13px; height: 13px; color: var(--fg-subtle); }
+  .stat-tile .val {
+    font-family: var(--font-display); font-weight: 700;
+    font-size: var(--t-4xl); letter-spacing: var(--track-tight);
+    line-height: 1.0; margin-top: 12px;
+    color: var(--ink); font-variant-numeric: tabular-nums;
+  }
+  .stat-tile .val .unit {
+    font-family: var(--font-serif); font-weight: 400; font-style: italic;
+    font-size: 0.5em; color: var(--fg-subtle); margin-left: 2px; letter-spacing: 0;
+  }
+  .stat-tile .trend {
+    display: flex; align-items: center; gap: 6px; margin-top: 10px;
+    font-size: var(--t-xs);
+  }
+  .stat-tile .delta { display: inline-flex; align-items: center; gap: 2px; font-weight: 600; padding: 1px 6px; border-radius: var(--r-xs); }
+  .stat-tile .delta i { width: 11px; height: 11px; }
+  .stat-tile .delta.up   { background: var(--emerald-soft); color: var(--emerald-deep); }
+  .stat-tile .delta.down { background: var(--danger-soft); color: var(--danger); }
+  .stat-tile .vs { color: var(--fg-subtle); }
+
+  /* sparkline */
+  .spark { display: flex; align-items: flex-end; gap: 3px; height: 32px; margin-top: 14px; }
+  .spark span { flex: 1; background: var(--paper-4); border-radius: 1px; }
+  .spark span.peak { background: var(--emerald); }
+  .spark.lavender span.peak { background: var(--lavender); }
+
+  /* ─── Living chart strip (organic gradient feel) ─── */
+  .pulse-card {
+    grid-column: span 4;
+    background: var(--forest);
+    border-radius: var(--r-lg);
+    padding: 20px 24px;
+    color: var(--fg-on-forest);
+    position: relative; overflow: hidden;
+    display: grid; grid-template-columns: 280px 1fr 240px; gap: 24px; align-items: center;
+    margin-bottom: 28px;
+  }
+  .pulse-card::before {
+    content: ''; position: absolute; top: -40%; right: -10%;
+    width: 480px; height: 480px;
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.18) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .pulse-card .l { font-size: var(--t-xs); font-weight: 500; color: var(--emerald-bright); letter-spacing: 0.12em; text-transform: uppercase; }
+  .pulse-card .t {
+    font-family: var(--font-display); font-weight: 700;
+    font-size: 26px; letter-spacing: var(--track-tight); line-height: 1.1;
+    color: var(--fg-on-forest); margin-top: 6px;
+  }
+  .pulse-card .t em {
+    font-family: var(--font-serif); font-weight: 400; font-style: italic;
+    color: var(--emerald-bright); font-size: 1.1em;
+  }
+  .pulse-card .chart { position: relative; height: 80px; }
+  .pulse-card .chart svg { width: 100%; height: 100%; }
+  .pulse-card .meta { display: flex; flex-direction: column; gap: 8px; position: relative; }
+  .pulse-card .meta .row { display: flex; justify-content: space-between; font-size: var(--t-xs); }
+  .pulse-card .meta .row .k { color: var(--fg-on-forest-muted); }
+  .pulse-card .meta .row .v { color: var(--fg-on-forest); font-variant-numeric: tabular-nums; font-weight: 500; }
+
+  /* ─── Panel ─── */
+  .panel {
+    background: var(--paper-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+  }
+  .panel__head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--paper-2);
+  }
+  .panel__title { display: flex; align-items: center; gap: 10px; }
+  .panel__title h3 { font-family: var(--font-sans); font-size: var(--t-md); font-weight: 600; color: var(--ink); }
+  .panel__title .count { font-size: var(--t-xs); color: var(--fg-subtle); padding: 2px 8px; background: var(--paper-3); border-radius: var(--r-pill); font-variant-numeric: tabular-nums; }
+  .panel__tools { display: flex; align-items: center; gap: 8px; }
+
+  /* Segmented */
+  .segmented {
+    display: inline-flex; align-items: center; gap: 2px;
+    padding: 2px;
+    background: var(--paper-3);
+    border-radius: var(--r-md);
+  }
+  .segmented button {
+    padding: 5px 12px;
+    font: inherit; font-size: var(--t-xs); font-weight: 500;
+    color: var(--fg-muted);
+    background: transparent; border: none;
+    border-radius: var(--r-sm); cursor: pointer;
+  }
+  .segmented button:hover { color: var(--ink); }
+  .segmented button.on { background: var(--paper); color: var(--ink); box-shadow: var(--sh-xs); }
+
+  /* Table */
+  table.posts { width: 100%; border-collapse: collapse; background: var(--paper); }
+  table.posts th, table.posts td {
+    padding: 13px 18px; text-align: left;
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: var(--t-sm); vertical-align: middle;
+  }
+  table.posts th {
+    font-size: var(--t-xs); font-weight: 500; color: var(--fg-subtle);
+    background: var(--paper-2);
+    letter-spacing: 0;
+  }
+  table.posts tbody tr:last-child td { border-bottom: none; }
+  table.posts tbody tr { transition: background var(--dur-fast) var(--ease); }
+  table.posts tbody tr:hover { background: var(--paper-2); }
+
+  table.posts .title-cell { display: flex; align-items: center; gap: 12px; }
+  table.posts .title-cell .ico { width: 32px; height: 32px; border-radius: var(--r-sm); background: var(--paper-3); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  table.posts .title-cell .ico i { width: 15px; height: 15px; color: var(--fg-muted); }
+  table.posts .title { font-weight: 500; color: var(--ink); }
+  table.posts .slug { font-family: var(--font-mono); font-size: var(--t-2xs); color: var(--fg-subtle); margin-top: 2px; }
+  table.posts .author { display: flex; align-items: center; gap: 8px; color: var(--fg-muted); }
+  table.posts .author .ava { width: 22px; height: 22px; border-radius: 999px; background: var(--paper-3); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: var(--t-2xs); font-weight: 600; color: var(--fg-muted); }
+  table.posts .author .ava.em { background: var(--emerald-soft); color: var(--emerald-deep); border-color: transparent; }
+  table.posts .author .ava.lv { background: var(--lavender-soft); color: var(--lavender-deep); border-color: transparent; }
+  table.posts .views { font-variant-numeric: tabular-nums; color: var(--ink-soft); font-weight: 500; }
+  table.posts .updated { color: var(--fg-subtle); }
+
+  .row-tools { display: flex; gap: 2px; opacity: 0; transition: opacity var(--dur-fast) var(--ease); }
+  table.posts tr:hover .row-tools { opacity: 1; }
+  .row-tools button {
+    width: 28px; height: 28px; padding: 0;
+    background: transparent; border: 1px solid transparent; border-radius: var(--r-sm);
+    color: var(--fg-subtle); cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .row-tools button:hover { background: var(--paper-3); color: var(--ink); border-color: var(--border); }
+  .row-tools button i { width: 14px; height: 14px; }
+
+  .pagination {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 18px;
+    background: var(--paper-2);
+    border-top: 1px solid var(--border);
+  }
+  .pagination .info { font-size: var(--t-xs); color: var(--fg-subtle); }
+  .pagination .pages { display: flex; gap: 4px; }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="org-switch">
+    <img class="mark" src="../../assets/logo-mark.svg" alt="">
+    <div class="info">
+      <div class="org">Brick &amp; Mortar Coffee</div>
+      <div class="plan">Studio plan · live</div>
+    </div>
+    <i data-lucide="chevrons-up-down"></i>
+  </div>
+
+  <nav class="side">
+    <div class="head">Workspace</div>
+    <a href="#"><i data-lucide="layout-dashboard"></i>Overview</a>
+    <a href="#"><i data-lucide="activity"></i>Pulse<span class="count">live</span></a>
+
+    <div class="head">Content</div>
+    <a href="#" class="active"><i data-lucide="file-text"></i>Posts<span class="count">142</span></a>
+    <a href="#"><i data-lucide="layout"></i>Pages<span class="count">12</span></a>
+    <a href="#"><i data-lucide="image"></i>Media<span class="count">1.2k</span></a>
+    <a href="#"><i data-lucide="tags"></i>Taxonomies</a>
+
+    <div class="head">Commerce</div>
+    <a href="#"><i data-lucide="shopping-bag"></i>Products<span class="count">38</span></a>
+    <a href="#"><i data-lucide="receipt"></i>Orders<span class="count">7</span></a>
+    <a href="#"><i data-lucide="users"></i>Customers</a>
+
+    <div class="head">Studio</div>
+    <a href="#"><i data-lucide="palette"></i>Theme</a>
+    <a href="#"><i data-lucide="puzzle"></i>Extensions</a>
+    <a href="#"><i data-lucide="globe"></i>Domains</a>
+    <a href="#"><i data-lucide="settings"></i>Settings</a>
+  </nav>
+
+  <div class="upgrade">
+    <div class="t">Grow to <em>Agency</em></div>
+    <div class="d">Unlimited sites, SSO, audit logs, and a lower commerce fee.</div>
+    <button class="btn btn--sm b">Compare plans</button>
+  </div>
+
+  <div class="side-foot">
+    <div class="avatar">MW</div>
+    <div class="who">
+      <div class="name">Mara Wills</div>
+      <div class="email">mara@brickmortar.co</div>
+    </div>
+    <button class="icon-btn"><i data-lucide="log-out"></i></button>
+  </div>
+</aside>
+
+<main>
+  <div class="topbar">
+    <div class="crumbs">
+      <a href="#">Content</a>
+      <i data-lucide="chevron-right" class="sep"></i>
+      <span class="here">Posts</span>
+    </div>
+    <div class="top-actions">
+      <div class="search">
+        <i data-lucide="search"></i>
+        <input placeholder="Search posts, pages, products…">
+        <span class="kbd">⌘K</span>
+      </div>
+      <button class="icon-btn-top" aria-label="Help"><i data-lucide="circle-help"></i></button>
+      <button class="icon-btn-top" aria-label="Notifications"><i data-lucide="bell"></i><span class="badge"></span></button>
+      <a class="btn btn--ghost btn--sm" href="#"><i data-lucide="external-link" style="width: 13px; height: 13px;"></i>View site</a>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <div class="page-head">
+      <div>
+        <h1>Posts, <em>living</em>.</h1>
+        <p class="sub">Drafts, scheduled, and published content for Brick &amp; Mortar Coffee. Updated in real time as readers arrive.</p>
+      </div>
+      <div class="actions">
+        <button class="btn"><i data-lucide="download" style="width: 14px; height: 14px;"></i>Import</button>
+        <button class="btn btn--primary"><i data-lucide="plus" style="width: 14px; height: 14px;"></i>New post</button>
+      </div>
+    </div>
+
+    <!-- pulse card -->
+    <div class="pulse-card">
+      <div>
+        <div class="l">Live · Last 5 minutes</div>
+        <div class="t">142 readers, <em>now</em>.</div>
+      </div>
+      <div class="chart">
+        <svg viewBox="0 0 600 80" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="pulseFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#34D399" stop-opacity="0.4"/>
+              <stop offset="100%" stop-color="#34D399" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M 0 50 Q 40 30, 60 40 T 120 35 T 180 50 T 240 30 T 300 38 T 360 25 T 420 32 T 480 18 T 540 28 T 600 20 L 600 80 L 0 80 Z" fill="url(#pulseFill)"/>
+          <path d="M 0 50 Q 40 30, 60 40 T 120 35 T 180 50 T 240 30 T 300 38 T 360 25 T 420 32 T 480 18 T 540 28 T 600 20" fill="none" stroke="#34D399" stroke-width="1.5"/>
+          <circle cx="600" cy="20" r="4" fill="#34D399"/>
+          <circle cx="600" cy="20" r="8" fill="#34D399" opacity="0.3"/>
+        </svg>
+      </div>
+      <div class="meta">
+        <div class="row"><span class="k">Top post</span><span class="v">Drip vs. pour-over</span></div>
+        <div class="row"><span class="k">Avg. session</span><span class="v">2m 47s</span></div>
+        <div class="row"><span class="k">p50 TTFB</span><span class="v">38ms</span></div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat-tile">
+        <div class="lbl"><i data-lucide="file-check-2"></i>Published, 30d</div>
+        <div class="val">24</div>
+        <div class="trend"><span class="delta up"><i data-lucide="trending-up"></i>+8</span><span class="vs">vs. previous 30d</span></div>
+      </div>
+      <div class="stat-tile">
+        <div class="lbl"><i data-lucide="eye"></i>Views, 30d</div>
+        <div class="val">48,247</div>
+        <div class="trend"><span class="delta up"><i data-lucide="trending-up"></i>12.4%</span><span class="vs">vs. previous 30d</span></div>
+        <div class="spark">
+          <span style="height: 40%;"></span><span style="height: 55%;"></span><span style="height: 48%;"></span><span style="height: 72%;"></span>
+          <span style="height: 65%;"></span><span style="height: 80%;"></span><span style="height: 70%;"></span><span class="peak" style="height: 100%;"></span>
+        </div>
+      </div>
+      <div class="stat-tile">
+        <div class="lbl"><i data-lucide="clock"></i>Avg. read time</div>
+        <div class="val">3:14<span class="unit"> /reader</span></div>
+        <div class="trend"><span class="delta down"><i data-lucide="trending-down"></i>−8s</span><span class="vs">vs. previous 30d</span></div>
+      </div>
+      <div class="stat-tile">
+        <div class="lbl"><i data-lucide="pen-line"></i>Drafts in progress</div>
+        <div class="val">7</div>
+        <div class="trend"><span class="vs">3 scheduled this week</span></div>
+        <div class="spark lavender">
+          <span style="height: 30%;"></span><span style="height: 60%;"></span><span style="height: 45%;" class="peak"></span><span style="height: 70%;" class="peak"></span>
+          <span style="height: 50%;"></span><span style="height: 80%;" class="peak"></span><span style="height: 40%;"></span><span style="height: 55%;"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel__head">
+        <div class="panel__title">
+          <h3>All posts</h3>
+          <span class="count">142</span>
+        </div>
+        <div class="panel__tools">
+          <div class="segmented">
+            <button class="on">All</button>
+            <button>Published</button>
+            <button>Draft</button>
+            <button>Scheduled</button>
+          </div>
+          <button class="btn btn--sm"><i data-lucide="filter" style="width: 13px; height: 13px;"></i>Filter</button>
+          <button class="btn btn--sm"><i data-lucide="arrow-up-down" style="width: 13px; height: 13px;"></i>Sort</button>
+        </div>
+      </div>
+
+      <table class="posts">
+        <thead><tr>
+          <th style="width: 42%;">Title</th>
+          <th style="width: 12%;">Status</th>
+          <th style="width: 18%;">Author</th>
+          <th style="width: 10%;">Views</th>
+          <th style="width: 14%;">Updated</th>
+          <th style="width: 80px;"></th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td>
+              <div class="title-cell">
+                <div class="ico"><i data-lucide="file-text"></i></div>
+                <div>
+                  <div class="title">How we source single-origin beans</div>
+                  <div class="slug">/blog/single-origin-2026</div>
+                </div>
+              </div>
+            </td>
+            <td><span class="tag tag--success tag--dot">Published</span></td>
+            <td><div class="author"><span class="ava em">MW</span>Mara Wills</div></td>
+            <td class="views">4,218</td>
+            <td class="updated">2 days ago</td>
+            <td><div class="row-tools"><button><i data-lucide="pencil"></i></button><button><i data-lucide="copy"></i></button><button><i data-lucide="more-horizontal"></i></button></div></td>
+          </tr>
+          <tr>
+            <td>
+              <div class="title-cell">
+                <div class="ico"><i data-lucide="file-text"></i></div>
+                <div>
+                  <div class="title">Drip vs. pour-over: a 5-year case study</div>
+                  <div class="slug">/blog/drip-vs-pourover</div>
+                </div>
+              </div>
+            </td>
+            <td><span class="tag tag--success tag--dot">Published</span></td>
+            <td><div class="author"><span class="ava lv">JA</span>Jules Akande</div></td>
+            <td class="views">2,847</td>
+            <td class="updated">5 days ago</td>
+            <td><div class="row-tools"><button><i data-lucide="pencil"></i></button><button><i data-lucide="copy"></i></button><button><i data-lucide="more-horizontal"></i></button></div></td>
+          </tr>
+          <tr>
+            <td>
+              <div class="title-cell">
+                <div class="ico"><i data-lucide="file-text"></i></div>
+                <div>
+                  <div class="title">A field guide to the espresso machine you bought</div>
+                  <div class="slug">/blog/espresso-field-guide</div>
+                </div>
+              </div>
+            </td>
+            <td><span class="tag tag--dot">Draft</span></td>
+            <td><div class="author"><span class="ava em">MW</span>Mara Wills</div></td>
+            <td class="views">—</td>
+            <td class="updated">1 hour ago</td>
+            <td><div class="row-tools"><button><i data-lucide="pencil"></i></button><button><i data-lucide="copy"></i></button><button><i data-lucide="more-horizontal"></i></button></div></td>
+          </tr>
+          <tr>
+            <td>
+              <div class="title-cell">
+                <div class="ico"><i data-lucide="file-text"></i></div>
+                <div>
+                  <div class="title">Holiday hours, closures, and bean clearance</div>
+                  <div class="slug">/blog/holiday-2026</div>
+                </div>
+              </div>
+            </td>
+            <td><span class="tag tag--lavender tag--dot">Scheduled</span></td>
+            <td><div class="author"><span class="ava em">MW</span>Mara Wills</div></td>
+            <td class="views">—</td>
+            <td class="updated">Dec 20, 09:00</td>
+            <td><div class="row-tools"><button><i data-lucide="pencil"></i></button><button><i data-lucide="copy"></i></button><button><i data-lucide="more-horizontal"></i></button></div></td>
+          </tr>
+          <tr>
+            <td>
+              <div class="title-cell">
+                <div class="ico"><i data-lucide="file-text"></i></div>
+                <div>
+                  <div class="title">Why we stopped selling oat milk for a month</div>
+                  <div class="slug">/blog/oat-milk-pause</div>
+                </div>
+              </div>
+            </td>
+            <td><span class="tag tag--success tag--dot">Published</span></td>
+            <td><div class="author"><span class="ava lv">JA</span>Jules Akande</div></td>
+            <td class="views">12,409</td>
+            <td class="updated">2 weeks ago</td>
+            <td><div class="row-tools"><button><i data-lucide="pencil"></i></button><button><i data-lucide="copy"></i></button><button><i data-lucide="more-horizontal"></i></button></div></td>
+          </tr>
+          <tr>
+            <td>
+              <div class="title-cell">
+                <div class="ico"><i data-lucide="file-text"></i></div>
+                <div>
+                  <div class="title">Meet the team: our new head roaster</div>
+                  <div class="slug">/blog/meet-jules</div>
+                </div>
+              </div>
+            </td>
+            <td><span class="tag tag--success tag--dot">Published</span></td>
+            <td><div class="author"><span class="ava em">MW</span>Mara Wills</div></td>
+            <td class="views">1,840</td>
+            <td class="updated">3 weeks ago</td>
+            <td><div class="row-tools"><button><i data-lucide="pencil"></i></button><button><i data-lucide="copy"></i></button><button><i data-lucide="more-horizontal"></i></button></div></td>
+          </tr>
+          <tr>
+            <td>
+              <div class="title-cell">
+                <div class="ico"><i data-lucide="file-text"></i></div>
+                <div>
+                  <div class="title">The five grinders we actually recommend</div>
+                  <div class="slug">/blog/grinders-2026</div>
+                </div>
+              </div>
+            </td>
+            <td><span class="tag tag--dot">Draft</span></td>
+            <td><div class="author"><span class="ava lv">JA</span>Jules Akande</div></td>
+            <td class="views">—</td>
+            <td class="updated">Yesterday</td>
+            <td><div class="row-tools"><button><i data-lucide="pencil"></i></button><button><i data-lucide="copy"></i></button><button><i data-lucide="more-horizontal"></i></button></div></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="pagination">
+        <span class="info">Showing 1–7 of 142</span>
+        <div class="pages">
+          <button class="btn btn--sm" disabled><i data-lucide="chevron-left" style="width: 13px; height: 13px;"></i>Previous</button>
+          <button class="btn btn--sm">Next<i data-lucide="chevron-right" style="width: 13px; height: 13px;"></i></button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

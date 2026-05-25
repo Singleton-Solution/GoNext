@@ -1,0 +1,33 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>Cards</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<link rel="stylesheet" href="_card.css">
+<style>
+  body { padding: 22px; }
+  .row { gap: 14px; align-items: stretch; }
+  .demo-card { flex: 1; background: var(--paper-2); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 18px; min-height: 150px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; }
+  .demo-card.featured { background: var(--forest); color: var(--fg-on-forest); border-color: var(--forest); }
+  .demo-card.featured::before { content: ''; position: absolute; top: -40%; right: -30%; width: 200px; height: 200px; background: radial-gradient(circle, rgba(16, 185, 129, 0.22) 0%, transparent 60%); }
+  .demo-card.em { background: var(--emerald-soft); border-color: transparent; }
+  .demo-card h4 { font-family: var(--font-display); font-weight: 800; font-size: 24px; letter-spacing: -0.025em; line-height: 1; margin: 8px 0 0; position: relative; }
+  .demo-card h4 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-deep); }
+  .demo-card.featured h4 em { color: var(--emerald-bright); }
+  .demo-card p { font-size: 13px; color: var(--fg-muted); margin: 8px 0 0; position: relative; }
+  .demo-card.featured p { color: var(--fg-on-forest-muted); }
+</style></head><body>
+  <span class="eyebrow" style="display: block; margin-bottom: 12px;">Cards — resting · featured (dark) · emerald</span>
+  <div class="row">
+    <div class="demo-card">
+      <span class="eyebrow">Post</span>
+      <div><h4>Brick &amp; <em>Mortar</em></h4><p>Published 2 days ago · 1.2k views</p></div>
+    </div>
+    <div class="demo-card featured">
+      <span class="eyebrow" style="color: var(--emerald-bright);">Featured</span>
+      <div><h4>Pulse, <em>live</em></h4><p>142 readers, right now.</p></div>
+    </div>
+    <div class="demo-card em">
+      <span class="eyebrow">Stat</span>
+      <div><h4>38<em>ms</em></h4><p>p50 TTFB · 24 regions</p></div>
+    </div>
+  </div>
+</body></html>

@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>GoNext — Docs · Installation</title>
+<link rel="stylesheet" href="../../colors_and_type.css">
+<link rel="icon" href="../../assets/favicon.svg">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  body { background: var(--paper); }
+  .wrap { max-width: 1380px; margin: 0 auto; }
+
+  /* topbar */
+  .topbar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 32px;
+    background: rgba(245, 242, 234, 0.85); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar .left { display: flex; align-items: center; gap: 28px; }
+  .brand { display: flex; align-items: center; gap: 9px; text-decoration: none; }
+  .brand img { width: 26px; height: 26px; }
+  .brand .wm-go { font-family: var(--font-display); font-weight: 800; font-size: 18px; letter-spacing: -0.03em; color: var(--ink); }
+  .brand .wm-next { font-family: var(--font-serif); font-weight: 400; font-style: italic; font-size: 20px; color: var(--ink); margin-left: 1px; }
+  .brand .docs-lbl { margin-left: 8px; padding-left: 12px; border-left: 1px solid var(--border); font-size: var(--t-xs); color: var(--fg-subtle); letter-spacing: 0.06em; text-transform: uppercase; font-weight: 500; }
+
+  .top-nav { display: flex; gap: 22px; }
+  .top-nav a { font-size: var(--t-sm); color: var(--fg-muted); text-decoration: none; font-weight: 500; }
+  .top-nav a:hover { color: var(--ink); }
+  .top-nav a.on { color: var(--emerald-deep); }
+
+  .top-right { display: flex; align-items: center; gap: 10px; }
+  .search-mini { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--paper-2); border: 1px solid transparent; border-radius: var(--r-md); width: 280px; }
+  .search-mini:hover { background: var(--paper); border-color: var(--border); }
+  .search-mini input { flex: 1; border: none; outline: none; background: transparent; font: inherit; font-size: var(--t-sm); }
+  .search-mini i { width: 14px; height: 14px; color: var(--fg-subtle); }
+  .version-pill { font-family: var(--font-mono); font-size: 11px; padding: 4px 10px; background: var(--emerald-soft); color: var(--emerald-deep); border-radius: var(--r-pill); font-weight: 500; }
+
+  /* layout */
+  .layout { display: grid; grid-template-columns: 240px 1fr 220px; gap: 0; }
+
+  /* sidenav */
+  .sidenav { padding: 28px 24px 80px; border-right: 1px solid var(--border); position: sticky; top: 65px; align-self: start; height: calc(100vh - 65px); overflow: auto; }
+  .sidenav .group { margin-bottom: 24px; }
+  .sidenav h5 { font-size: var(--t-xs); font-weight: 600; color: var(--ink); margin: 0 0 10px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .sidenav a { display: block; padding: 4px 0; font-size: var(--t-sm); color: var(--fg-muted); text-decoration: none; line-height: 1.5; }
+  .sidenav a:hover { color: var(--ink); }
+  .sidenav a.on { color: var(--ink); font-weight: 600; border-left: 2px solid var(--emerald); padding-left: 10px; margin-left: -12px; }
+
+  /* content */
+  main { padding: 40px 56px 96px; max-width: 760px; }
+  main .crumbs { display: flex; align-items: center; gap: 8px; font-size: var(--t-xs); color: var(--fg-subtle); margin-bottom: 16px; }
+  main .crumbs .sep { width: 12px; height: 12px; }
+  main .crumbs .here { color: var(--ink); font-weight: 500; }
+
+  main h1 {
+    font-family: var(--font-display); font-weight: 800;
+    font-size: 56px; letter-spacing: -0.03em; line-height: 1;
+    margin: 8px 0 16px; color: var(--ink);
+  }
+  main h1 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-deep); }
+  main .lead { font-size: 19px; line-height: 1.55; color: var(--fg-muted); margin: 0 0 36px; max-width: 620px; }
+
+  main h2 {
+    font-family: var(--font-display); font-weight: 800;
+    font-size: 30px; letter-spacing: -0.025em; line-height: 1.1;
+    margin: 56px 0 14px; color: var(--ink);
+    counter-increment: h2-counter;
+  }
+  main h2::before {
+    content: counter(h2-counter, decimal-leading-zero) '. ';
+    font-family: var(--font-serif); font-weight: 400; font-style: italic;
+    font-size: 0.7em; color: var(--emerald-deep); margin-right: 4px;
+  }
+  main { counter-reset: h2-counter; }
+  main h2 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-deep); }
+  main h3 { font-family: var(--font-sans); font-weight: 600; font-size: 19px; margin: 32px 0 10px; color: var(--ink); }
+  main p { font-size: 16px; line-height: 1.7; margin: 0 0 16px; color: var(--ink-soft); }
+  main p code, main li code { font-family: var(--font-mono); font-size: 13px; background: var(--paper-3); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; color: var(--ink); }
+  main a { color: var(--emerald-deep); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  main ul, main ol { padding-left: 22px; margin: 0 0 16px; }
+  main ul li, main ol li { font-size: 16px; line-height: 1.65; margin-bottom: 6px; color: var(--ink-soft); }
+
+  /* code blocks */
+  pre.code {
+    background: var(--forest); color: var(--fg-on-forest);
+    border-radius: var(--r-md); margin: 18px 0 24px;
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.65;
+    overflow: hidden;
+    border: 1px solid var(--forest-border);
+  }
+  pre.code .ph { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: var(--forest-2); border-bottom: 1px solid var(--forest-border); font-size: var(--t-xs); color: var(--fg-on-forest-muted); letter-spacing: 0.04em; }
+  pre.code .ph .lang { color: var(--emerald-bright); font-weight: 500; }
+  pre.code .ph .copy { background: transparent; border: 1px solid var(--forest-border); border-radius: var(--r-sm); padding: 2px 8px; color: var(--fg-on-forest); font: inherit; cursor: pointer; font-size: 11px; }
+  pre.code .body { padding: 16px 18px; overflow-x: auto; }
+  pre.code .body .c { color: var(--fg-on-forest-muted); }
+  pre.code .body .k { color: var(--emerald-bright); }
+  pre.code .body .s { color: #FFD173; }
+  pre.code .body .v { color: var(--lavender); }
+
+  /* callouts */
+  .callout {
+    padding: 16px 18px; margin: 18px 0 24px;
+    background: var(--emerald-soft);
+    border-radius: var(--r-md);
+    border-left: 3px solid var(--emerald);
+  }
+  .callout .l { font-size: var(--t-xs); font-weight: 600; color: var(--emerald-deep); margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .callout p { margin: 0; color: var(--ink-soft); font-size: var(--t-sm); }
+  .callout.warn { background: var(--warning-soft); border-left-color: var(--warning); }
+  .callout.warn .l { color: var(--warning); }
+
+  /* TOC */
+  .toc { padding: 40px 24px; position: sticky; top: 65px; align-self: start; height: calc(100vh - 65px); overflow: auto; }
+  .toc h5 { font-size: var(--t-xs); font-weight: 600; color: var(--ink); margin: 0 0 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .toc a { display: block; padding: 4px 0 4px 12px; font-size: var(--t-sm); color: var(--fg-muted); text-decoration: none; line-height: 1.4; border-left: 1px solid var(--border); margin-left: -1px; }
+  .toc a.on { color: var(--ink); font-weight: 500; border-left-color: var(--emerald); }
+  .toc a:hover { color: var(--ink); }
+  .toc .meta-card { margin-top: 28px; padding: 14px; background: var(--paper-2); border: 1px solid var(--border); border-radius: var(--r-md); }
+  .toc .meta-card .l { font-size: var(--t-xs); color: var(--fg-subtle); margin-bottom: 4px; }
+  .toc .meta-card a.edit { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: var(--t-xs); color: var(--ink); border: none; padding: 0; }
+  .toc .meta-card a.edit i { width: 13px; height: 13px; }
+
+  /* pager */
+  .pager { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .pager a { display: block; padding: 16px 18px; background: var(--paper-2); border: 1px solid var(--border); border-radius: var(--r-md); text-decoration: none; color: var(--ink); transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease); }
+  .pager a:hover { background: var(--paper-3); border-color: var(--border-strong); }
+  .pager a .l { font-size: var(--t-xs); color: var(--fg-subtle); display: flex; align-items: center; gap: 6px; }
+  .pager a .l i { width: 12px; height: 12px; }
+  .pager a .t { font-family: var(--font-display); font-weight: 700; font-size: var(--t-lg); letter-spacing: -0.02em; margin-top: 4px; }
+  .pager a .t em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-deep); }
+  .pager a.next { text-align: right; }
+  .pager a.next .l { justify-content: flex-end; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="left">
+    <a class="brand" href="../marketing/index.html">
+      <img src="../../assets/logo-mark.svg" alt="">
+      <span class="wm-go">Go</span><span class="wm-next">Next</span>
+      <span class="docs-lbl">Docs</span>
+    </a>
+    <nav class="top-nav">
+      <a class="on" href="#">Guides</a>
+      <a href="#">Reference</a>
+      <a href="#">CLI</a>
+      <a href="#">Themes API</a>
+      <a href="#">Changelog</a>
+    </nav>
+  </div>
+  <div class="top-right">
+    <div class="search-mini">
+      <i data-lucide="search"></i>
+      <input placeholder="Search docs…">
+      <span class="kbd">⌘K</span>
+    </div>
+    <span class="version-pill">v1.0</span>
+    <a class="btn btn--sm" href="#"><i data-lucide="github" style="width: 13px; height: 13px;"></i>GitHub</a>
+  </div>
+</div>
+
+<div class="wrap layout">
+
+  <aside class="sidenav">
+    <div class="group">
+      <h5>Quickstart</h5>
+      <a href="#">Introduction</a>
+      <a class="on" href="#">Installation</a>
+      <a href="#">Your first site</a>
+      <a href="#">Importing from WordPress</a>
+    </div>
+    <div class="group">
+      <h5>Content</h5>
+      <a href="#">Posts &amp; pages</a>
+      <a href="#">Block editor</a>
+      <a href="#">Media library</a>
+      <a href="#">Taxonomies</a>
+      <a href="#">Custom fields</a>
+    </div>
+    <div class="group">
+      <h5>Commerce</h5>
+      <a href="#">Products</a>
+      <a href="#">Checkout</a>
+      <a href="#">Subscriptions</a>
+      <a href="#">Taxes &amp; regions</a>
+    </div>
+    <div class="group">
+      <h5>Hosting</h5>
+      <a href="#">Domains &amp; SSL</a>
+      <a href="#">Edge cache</a>
+      <a href="#">Environments</a>
+    </div>
+    <div class="group">
+      <h5>Theming</h5>
+      <a href="#">Theme anatomy</a>
+      <a href="#">Block primitives</a>
+      <a href="#">Server components</a>
+    </div>
+  </aside>
+
+  <main>
+    <div class="crumbs">
+      <span>Docs</span>
+      <i data-lucide="chevron-right" class="sep"></i>
+      <span>Quickstart</span>
+      <i data-lucide="chevron-right" class="sep"></i>
+      <span class="here">Installation</span>
+    </div>
+
+    <h1>Install<em>ation</em>.</h1>
+    <p class="lead">Three ways to get GoNext running — cloud, CLI, or self-hosted. The cloud option takes about ninety seconds.</p>
+
+    <h2 id="cloud">Cloud (recommended).</h2>
+    <p>The fastest path. Go to <a href="#">gonext.app</a>, sign in, and pick a starting template. We provision a Postgres database, an S3 bucket, and a Next.js edge runtime — all on the free tier.</p>
+    <p>You'll get a <code>yoursite.gonext.app</code> subdomain immediately. Add a custom domain whenever you're ready.</p>
+
+    <div class="callout">
+      <div class="l">Free tier limits</div>
+      <p>10k monthly visits, 5 GB media, one site. No credit card. Upgrade lifts the visit cap and unlocks custom domains.</p>
+    </div>
+
+    <h2 id="cli">Command line.</h2>
+    <p>Prefer the terminal? Install the CLI and run <code>gonext init</code>. Requires Go 1.22+ (we'll install Next.js for you).</p>
+
+    <pre class="code">
+<span class="ph"><span class="lang">bash</span><button class="copy">copy</button></span>
+<span class="body"><span class="c"># macOS / Linux</span>
+brew install gonext/tap/gonext
+
+<span class="c"># or via Go</span>
+go install <span class="s">github.com/gonext/gonext@latest</span>
+
+<span class="c"># scaffold a new site</span>
+gonext init <span class="v">my-site</span> --template=<span class="s">"broadsheet"</span>
+cd <span class="v">my-site</span>
+gonext dev    <span class="c"># http://localhost:3000</span></span>
+    </pre>
+
+    <h3>What the CLI sets up</h3>
+    <ul>
+      <li>A <code>gonext.toml</code> config at the project root</li>
+      <li>A Postgres-shaped SQLite db for local dev (no Docker required)</li>
+      <li>Next.js 15 with the GoNext runtime preinstalled</li>
+      <li>A <code>themes/</code> directory you can fork and customize</li>
+    </ul>
+
+    <h2 id="self-host">Self-host.</h2>
+    <p>One binary, one container, one Postgres database. We publish a Helm chart for Kubernetes and a Compose file for everyone else.</p>
+
+    <pre class="code">
+<span class="ph"><span class="lang">yaml · docker-compose.yml</span><button class="copy">copy</button></span>
+<span class="body"><span class="k">services:</span>
+  <span class="k">gonext:</span>
+    <span class="k">image:</span> ghcr.io/gonext/gonext:<span class="s">1.0</span>
+    <span class="k">ports:</span> [<span class="s">"3000:3000"</span>]
+    <span class="k">environment:</span>
+      <span class="k">DATABASE_URL:</span> <span class="s">postgres://...</span>
+      <span class="k">STORAGE_URL:</span>  <span class="s">s3://my-bucket</span></span>
+    </pre>
+
+    <div class="callout warn">
+      <div class="l">Heads up — Postgres version</div>
+      <p>GoNext requires Postgres 14 or higher. Older versions will boot but full-text search will silently degrade.</p>
+    </div>
+
+    <h2 id="next">What's next.</h2>
+    <p>Once GoNext is running, the most-asked next steps are:</p>
+    <ul>
+      <li><a href="#">Write your first post</a> in the block editor</li>
+      <li><a href="#">Import an existing WordPress site</a> via the WXR importer</li>
+      <li><a href="#">Connect a custom domain</a> (Cloud) or set up TLS (Self-host)</li>
+    </ul>
+
+    <div class="pager">
+      <a href="#"><div class="l"><i data-lucide="arrow-left"></i>Previous</div><div class="t">Introduction</div></a>
+      <a class="next" href="#"><div class="l">Next<i data-lucide="arrow-right"></i></div><div class="t">Your first <em>site</em></div></a>
+    </div>
+  </main>
+
+  <aside class="toc">
+    <h5>On this page</h5>
+    <a class="on" href="#cloud">Cloud (recommended)</a>
+    <a href="#cli">Command line</a>
+    <a href="#self-host">Self-host</a>
+    <a href="#next">What's next</a>
+
+    <div class="meta-card">
+      <div class="l">Last updated 3 days ago</div>
+      <a class="edit" href="#"><i data-lucide="github"></i> Edit on GitHub<i data-lucide="arrow-right" style="margin-left: auto;"></i></a>
+    </div>
+  </aside>
+
+</div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

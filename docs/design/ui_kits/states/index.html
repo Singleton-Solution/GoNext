@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>GoNext — UI states</title>
+<link rel="stylesheet" href="../../colors_and_type.css">
+<link rel="icon" href="../../assets/favicon.svg">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  body { background: var(--paper); padding: 40px 48px 80px; }
+  .wrap { max-width: 1340px; margin: 0 auto; }
+
+  .page-head { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 24px; border-bottom: 1px solid var(--border); margin-bottom: 36px; }
+  .page-head h1 { font-family: var(--font-display); font-weight: 800; font-size: 48px; letter-spacing: -0.03em; line-height: 1; }
+  .page-head h1 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-deep); }
+  .page-head p { font-size: var(--t-md); color: var(--fg-muted); margin-top: 12px; max-width: 580px; line-height: 1.55; }
+
+  /* section wrapper */
+  .section { margin-bottom: 56px; }
+  .section .section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .section .section-head h2 { font-family: var(--font-display); font-weight: 700; font-size: 24px; letter-spacing: -0.02em; color: var(--ink); }
+  .section .section-head h2 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-deep); }
+  .section .section-head .note { font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-subtle); }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+  /* state container */
+  .state {
+    background: var(--paper-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .state .state-meta { padding: 8px 14px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .state .state-meta .lbl { font-family: var(--font-mono); font-size: var(--t-2xs); color: var(--fg-subtle); letter-spacing: 0.08em; text-transform: uppercase; }
+  .state .state-body { padding: 36px 24px; flex: 1; display: flex; align-items: center; justify-content: center; background: var(--paper); min-height: 280px; }
+
+  /* ─── EMPTY STATE: posts ─── */
+  .empty {
+    text-align: center; max-width: 360px;
+  }
+  .empty .ico {
+    width: 56px; height: 56px; margin: 0 auto 18px;
+    border-radius: var(--r-md);
+    background: var(--emerald-soft);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .empty .ico i { width: 26px; height: 26px; color: var(--emerald-deep); }
+  .empty .ico::after, .empty .ico::before {
+    content: ''; position: absolute; border-radius: var(--r-md); border: 1px solid var(--emerald-soft); pointer-events: none;
+  }
+  .empty .ico::after { inset: -8px; opacity: 0.5; }
+  .empty .ico::before { inset: -16px; opacity: 0.25; }
+  .empty h3 { font-family: var(--font-display); font-weight: 800; font-size: 28px; letter-spacing: -0.025em; line-height: 1.05; }
+  .empty h3 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-deep); }
+  .empty p { font-size: var(--t-sm); color: var(--fg-muted); margin: 12px 0 22px; line-height: 1.55; }
+  .empty .actions { display: inline-flex; gap: 8px; }
+
+  /* ─── EMPTY STATE: search ─── */
+  .empty.search .ico { background: var(--paper-3); }
+  .empty.search .ico i { color: var(--fg-muted); }
+
+  /* ─── LOADING ─── */
+  .loading {
+    width: 100%; max-width: 480px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .skel { background: linear-gradient(90deg, var(--paper-3) 0%, var(--paper-4) 50%, var(--paper-3) 100%); background-size: 200% 100%; animation: shimmer 1.6s infinite linear; border-radius: var(--r-sm); }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  .skel.title { height: 36px; width: 60%; border-radius: var(--r-md); }
+  .skel.line { height: 12px; }
+  .skel.line.full { width: 100%; }
+  .skel.line.mid { width: 78%; }
+  .skel.line.short { width: 44%; }
+  .skel.box { height: 80px; border-radius: var(--r-md); margin-top: 10px; }
+  .loading .status { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: var(--t-sm); color: var(--fg-muted); }
+  .loading .status .spinner { width: 14px; height: 14px; border: 2px solid var(--paper-3); border-top-color: var(--emerald); border-radius: 999px; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ─── PULSE STATE (live data loading) ─── */
+  .pulse-load { display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center; }
+  .pulse-load .blob {
+    width: 80px; height: 80px;
+    border-radius: 999px;
+    background: radial-gradient(circle, var(--emerald) 0%, var(--emerald-deep) 60%, transparent 100%);
+    position: relative;
+    box-shadow: 0 0 60px 20px rgba(16, 185, 129, 0.25);
+  }
+  .pulse-load .blob::before, .pulse-load .blob::after {
+    content: ''; position: absolute; inset: 0;
+    border-radius: 999px;
+    border: 2px solid var(--emerald);
+    animation: pulse-ring 2.4s var(--ease) infinite;
+  }
+  .pulse-load .blob::after { animation-delay: 1.2s; }
+  @keyframes pulse-ring { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(2); opacity: 0; } }
+  .pulse-load h3 { font-family: var(--font-display); font-weight: 800; font-size: 24px; letter-spacing: -0.025em; }
+  .pulse-load h3 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-deep); }
+  .pulse-load p { font-size: var(--t-sm); color: var(--fg-muted); }
+
+  /* ─── ERROR STATE ─── */
+  .error {
+    text-align: center; max-width: 380px;
+  }
+  .error .ico { width: 56px; height: 56px; margin: 0 auto 18px; border-radius: var(--r-md); background: var(--danger-soft); display: flex; align-items: center; justify-content: center; }
+  .error .ico i { width: 26px; height: 26px; color: var(--danger); }
+  .error h3 { font-family: var(--font-display); font-weight: 800; font-size: 24px; letter-spacing: -0.025em; line-height: 1.1; }
+  .error h3 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--danger); }
+  .error p { font-size: var(--t-sm); color: var(--fg-muted); margin: 10px 0 18px; line-height: 1.55; }
+  .error .code { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: var(--t-xs); padding: 4px 10px; background: var(--danger-soft); color: var(--danger); border-radius: var(--r-pill); margin-bottom: 14px; }
+  .error .actions { display: inline-flex; gap: 8px; }
+
+  /* ─── SUCCESS TOAST ─── */
+  .toasts { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 380px; }
+  .toast {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 14px 16px;
+    background: var(--ink); color: var(--paper);
+    border-radius: var(--r-md);
+    box-shadow: var(--sh-lg);
+  }
+  .toast .t-ico { width: 22px; height: 22px; border-radius: 999px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .toast .t-ico i { width: 13px; height: 13px; }
+  .toast.success .t-ico { background: var(--emerald); color: var(--emerald-ink); }
+  .toast.info .t-ico { background: var(--lavender); color: var(--ink); }
+  .toast.danger .t-ico { background: var(--danger); color: var(--paper); }
+  .toast .t-text { flex: 1; }
+  .toast .t-text .tt { font-size: var(--t-sm); font-weight: 600; }
+  .toast .t-text .tt em { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--emerald-bright); }
+  .toast .t-text .td { font-size: var(--t-xs); color: var(--fg-on-forest-muted); margin-top: 2px; }
+  .toast .t-action { font-size: var(--t-xs); color: var(--emerald-bright); cursor: pointer; font-weight: 500; margin-left: 8px; }
+  .toast .t-close { background: transparent; border: none; padding: 2px; color: var(--fg-on-forest-muted); cursor: pointer; }
+  .toast .t-close i { width: 12px; height: 12px; }
+
+  /* ─── MODAL ─── */
+  .modal-wrap {
+    background: rgba(14, 26, 20, 0.55); backdrop-filter: blur(4px);
+    border-radius: var(--r-md);
+    width: 100%; height: 100%;
+    min-height: 320px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .modal {
+    background: var(--paper); border-radius: var(--r-lg);
+    padding: 28px; width: 100%; max-width: 420px;
+    box-shadow: var(--sh-lg);
+    border: 1px solid var(--border);
+  }
+  .modal .m-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .modal .m-head .ico { width: 36px; height: 36px; border-radius: var(--r-md); background: var(--danger-soft); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .modal .m-head .ico i { width: 18px; height: 18px; color: var(--danger); }
+  .modal h3 { font-family: var(--font-display); font-weight: 800; font-size: 22px; letter-spacing: -0.025em; line-height: 1.1; }
+  .modal h3 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--danger); }
+  .modal p { font-size: var(--t-sm); color: var(--fg-muted); line-height: 1.55; margin-bottom: 18px; }
+  .modal p strong { font-weight: 600; color: var(--ink); }
+  .modal .actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .modal .btn-danger { background: var(--danger); color: var(--paper); border-color: var(--danger); }
+  .modal .btn-danger:hover { background: var(--danger-deep, #B91C1C); border-color: var(--danger-deep, #B91C1C); }
+
+  /* ─── DROPDOWN ─── */
+  .dropdown {
+    background: var(--paper); border: 1px solid var(--border); border-radius: var(--r-md);
+    padding: 6px; width: 240px; box-shadow: var(--sh-lg);
+  }
+  .dropdown .dd-head { padding: 6px 10px 4px; font-size: var(--t-2xs); color: var(--fg-subtle); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; }
+  .dropdown .item { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: var(--r-sm); cursor: pointer; font-size: var(--t-sm); color: var(--ink); }
+  .dropdown .item:hover { background: var(--paper-3); }
+  .dropdown .item i { width: 14px; height: 14px; color: var(--fg-muted); }
+  .dropdown .item .kbd { margin-left: auto; }
+  .dropdown .item.danger { color: var(--danger); }
+  .dropdown .item.danger i { color: var(--danger); }
+  .dropdown .sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+  /* ─── COMMAND PALETTE ─── */
+  .palette-w {
+    background: var(--paper); border: 1px solid var(--border); border-radius: var(--r-lg);
+    width: 100%; max-width: 440px; overflow: hidden;
+    box-shadow: var(--sh-lg);
+  }
+  .palette-w .p-search { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .palette-w .p-search i { width: 15px; height: 15px; color: var(--fg-muted); }
+  .palette-w .p-search input { flex: 1; border: none; outline: none; background: transparent; font: inherit; font-size: var(--t-md); color: var(--ink); }
+  .palette-w .p-search input::placeholder { color: var(--fg-faint); }
+  .palette-w .p-results { padding: 6px; }
+  .palette-w .p-head { padding: 8px 10px 4px; font-size: var(--t-2xs); color: var(--fg-subtle); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; }
+  .palette-w .p-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--r-sm); font-size: var(--t-sm); color: var(--ink); cursor: pointer; }
+  .palette-w .p-item:hover, .palette-w .p-item.on { background: var(--paper-3); }
+  .palette-w .p-item.on { background: var(--emerald-soft); }
+  .palette-w .p-item.on i { color: var(--emerald-deep); }
+  .palette-w .p-item i { width: 14px; height: 14px; color: var(--fg-muted); flex-shrink: 0; }
+  .palette-w .p-item .meta { margin-left: auto; font-family: var(--font-mono); font-size: var(--t-2xs); color: var(--fg-subtle); }
+  .palette-w .p-foot { padding: 8px 14px; border-top: 1px solid var(--border); display: flex; gap: 14px; font-size: var(--t-2xs); color: var(--fg-subtle); }
+  .palette-w .p-foot span { display: inline-flex; align-items: center; gap: 4px; }
+
+  /* center-aligned helpers */
+  .center-state { display: flex; align-items: center; justify-content: center; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="page-head">
+    <div>
+      <span class="eyebrow">Foundations — states</span>
+      <h1 style="margin-top: 14px;">Every state, considered<em>.</em></h1>
+      <p>Empty, loading, error, success, modal, dropdown, command palette. The states between actions are where the product feels alive — or doesn't.</p>
+    </div>
+  </div>
+
+  <!-- ─── EMPTY ─── -->
+  <div class="section">
+    <div class="section-head">
+      <h2>Empty <em>states</em></h2>
+      <span class="note">First-visit, zero-data, no-results</span>
+    </div>
+    <div class="grid-3">
+
+      <div class="state">
+        <div class="state-meta"><span class="lbl">empty · first run</span></div>
+        <div class="state-body">
+          <div class="empty">
+            <div class="ico"><i data-lucide="pen-line"></i></div>
+            <h3>Write your <em>first</em> post.</h3>
+            <p>An empty page is the best one. Start with a thought, an outline, or a single sentence — the rest comes from there.</p>
+            <div class="actions">
+              <button class="btn btn--primary"><i data-lucide="plus" style="width: 13px; height: 13px;"></i>New post</button>
+              <button class="btn">Import from WordPress</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="state">
+        <div class="state-meta"><span class="lbl">empty · no products</span></div>
+        <div class="state-body">
+          <div class="empty">
+            <div class="ico"><i data-lucide="package"></i></div>
+            <h3>No products <em>yet</em>.</h3>
+            <p>Add a product to start selling. We'll set up Stripe, tax regions, and inventory in the same flow.</p>
+            <div class="actions">
+              <button class="btn btn--emerald"><i data-lucide="plus" style="width: 13px; height: 13px;"></i>Add product</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="state">
+        <div class="state-meta"><span class="lbl">empty · search</span></div>
+        <div class="state-body">
+          <div class="empty search">
+            <div class="ico"><i data-lucide="search-x"></i></div>
+            <h3>Nothing matched <em>“pour-over”</em>.</h3>
+            <p>Try a shorter query, check your filters, or browse all 142 posts.</p>
+            <div class="actions">
+              <button class="btn">Clear filters</button>
+              <button class="btn btn--ghost">Browse all</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ─── LOADING ─── -->
+  <div class="section">
+    <div class="section-head">
+      <h2>Loading <em>states</em></h2>
+      <span class="note">Skeleton + spinner + live pulse</span>
+    </div>
+    <div class="grid-2">
+
+      <div class="state">
+        <div class="state-meta"><span class="lbl">loading · content skeleton</span></div>
+        <div class="state-body">
+          <div class="loading">
+            <span class="skel title"></span>
+            <span class="skel line full"></span>
+            <span class="skel line mid"></span>
+            <span class="skel line short"></span>
+            <span class="skel box"></span>
+            <div class="status"><span class="spinner"></span>Fetching post · 142 of 142</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="state">
+        <div class="state-meta"><span class="lbl">loading · live data</span></div>
+        <div class="state-body center-state">
+          <div class="pulse-load">
+            <div class="blob"></div>
+            <div>
+              <h3>Reading the <em>pulse</em>…</h3>
+              <p>Streaming reader activity from 24 edge regions.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ─── ERROR ─── -->
+  <div class="section">
+    <div class="section-head">
+      <h2>Error &amp; <em>recovery</em></h2>
+      <span class="note">Honest, specific, and never blame the user</span>
+    </div>
+    <div class="grid-2">
+
+      <div class="state">
+        <div class="state-meta"><span class="lbl">error · 500</span></div>
+        <div class="state-body">
+          <div class="error">
+            <div class="ico"><i data-lucide="zap-off"></i></div>
+            <span class="code"><i data-lucide="alert-triangle" style="width: 11px; height: 11px;"></i>err.503 · us-east-1</span>
+            <h3>Something didn't <em>respond</em>.</h3>
+            <p>Our edge in us-east-1 is having a moment. Your draft is saved — try again in a few seconds.</p>
+            <div class="actions">
+              <button class="btn btn--primary"><i data-lucide="refresh-cw" style="width: 13px; height: 13px;"></i>Retry</button>
+              <button class="btn">Status page</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="state">
+        <div class="state-meta"><span class="lbl">danger · destructive</span></div>
+        <div class="state-body" style="padding: 0;">
+          <div class="modal-wrap">
+            <div class="modal">
+              <div class="m-head">
+                <div class="ico"><i data-lucide="trash-2"></i></div>
+                <h3>Delete <em>“single-origin-2026”</em>?</h3>
+              </div>
+              <p>This post has <strong>4,218 views in the last 30 days</strong> and is linked from 3 other pages. Deleted posts are recoverable for 30 days.</p>
+              <div class="actions">
+                <button class="btn">Cancel</button>
+                <button class="btn btn-danger">Delete post</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ─── TOASTS + DROPDOWN + COMMAND PALETTE ─── -->
+  <div class="section">
+    <div class="section-head">
+      <h2>Floating <em>surfaces</em></h2>
+      <span class="note">Toasts, menus, command palette</span>
+    </div>
+    <div class="grid-3">
+
+      <div class="state">
+        <div class="state-meta"><span class="lbl">toast · stack</span></div>
+        <div class="state-body center-state">
+          <div class="toasts">
+            <div class="toast success">
+              <div class="t-ico"><i data-lucide="check"></i></div>
+              <div class="t-text">
+                <div class="tt">Published <em>Single-origin</em></div>
+                <div class="td">Live in 14 routes · TTFB unchanged</div>
+              </div>
+              <span class="t-action">View</span>
+              <button class="t-close"><i data-lucide="x"></i></button>
+            </div>
+            <div class="toast info">
+              <div class="t-ico"><i data-lucide="user-plus"></i></div>
+              <div class="t-text">
+                <div class="tt">3 new subscribers</div>
+                <div class="td">From /blog/meet-jules in the last hour</div>
+              </div>
+              <button class="t-close"><i data-lucide="x"></i></button>
+            </div>
+            <div class="toast danger">
+              <div class="t-ico"><i data-lucide="alert-triangle"></i></div>
+              <div class="t-text">
+                <div class="tt">Stripe webhook failed</div>
+                <div class="td">Last attempt 4m ago · retrying</div>
+              </div>
+              <span class="t-action">Logs</span>
+              <button class="t-close"><i data-lucide="x"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="state">
+        <div class="state-meta"><span class="lbl">dropdown · row menu</span></div>
+        <div class="state-body center-state">
+          <div class="dropdown">
+            <div class="dd-head">Actions</div>
+            <div class="item"><i data-lucide="pencil"></i>Edit post<span class="kbd">⌘E</span></div>
+            <div class="item"><i data-lucide="copy"></i>Duplicate</div>
+            <div class="item"><i data-lucide="link"></i>Copy share link</div>
+            <div class="item"><i data-lucide="archive"></i>Archive</div>
+            <div class="sep"></div>
+            <div class="dd-head">Publish</div>
+            <div class="item"><i data-lucide="calendar"></i>Schedule…</div>
+            <div class="item"><i data-lucide="globe"></i>Publish now</div>
+            <div class="sep"></div>
+            <div class="item danger"><i data-lucide="trash-2"></i>Delete post</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="state">
+        <div class="state-meta"><span class="lbl">cmd-k · command palette</span></div>
+        <div class="state-body center-state">
+          <div class="palette-w">
+            <div class="p-search">
+              <i data-lucide="search"></i>
+              <input placeholder="Search posts, pages, products, actions…" value="oat">
+              <span class="kbd">⌘K</span>
+            </div>
+            <div class="p-results">
+              <div class="p-head">Posts</div>
+              <div class="p-item on"><i data-lucide="file-text"></i>Why we stopped selling <strong style="color: var(--emerald-deep);">oat</strong> milk for a month<span class="meta">/blog</span></div>
+              <div class="p-item"><i data-lucide="file-text"></i>Meet the team: our new head roaster<span class="meta">/blog</span></div>
+              <div class="p-head">Actions</div>
+              <div class="p-item"><i data-lucide="plus"></i>New post<span class="meta">⌘N</span></div>
+              <div class="p-item"><i data-lucide="palette"></i>Open theme studio<span class="meta">⌘⇧T</span></div>
+            </div>
+            <div class="p-foot">
+              <span><span class="kbd">↑↓</span>Navigate</span>
+              <span><span class="kbd">↵</span>Open</span>
+              <span><span class="kbd">esc</span>Close</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

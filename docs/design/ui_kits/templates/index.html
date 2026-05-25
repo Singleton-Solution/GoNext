@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>GoNext — Templates · Start at 80%</title>
+<link rel="stylesheet" href="../../colors_and_type.css">
+<link rel="icon" href="../../assets/favicon.svg">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  body { background: var(--paper); }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 0 32px; }
+
+  /* ─── NAV ─── */
+  nav.top { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; border-bottom: 1px solid var(--border); }
+  .brand { display: flex; align-items: center; gap: 9px; text-decoration: none; color: var(--ink); }
+  .brand img { width: 28px; height: 28px; }
+  .brand .wm-go { font-family: var(--font-display); font-weight: 800; font-size: 19px; letter-spacing: -0.03em; color: var(--ink); }
+  .brand .wm-next { font-family: var(--font-serif); font-weight: 400; font-style: italic; font-size: 21px; color: var(--ink); margin-left: 1px; }
+  .breadcrumb { font-size: var(--t-sm); color: var(--fg-subtle); }
+  .breadcrumb .here { color: var(--ink); font-weight: 500; }
+  .nav-cta { display: flex; gap: 10px; }
+
+  /* ─── HERO ─── */
+  .hero { padding: 80px 0 56px; }
+  .hero-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 80px; align-items: end; }
+  .hero h1 {
+    font-family: var(--font-display); font-weight: 800;
+    font-size: clamp(56px, 8vw, 104px);
+    line-height: 0.92; letter-spacing: var(--track-tight);
+    color: var(--ink); margin-top: 20px;
+  }
+  .hero h1 em {
+    font-family: var(--font-serif); font-weight: 400; font-style: italic;
+    color: var(--emerald-deep); letter-spacing: -0.01em; font-size: 1.02em;
+  }
+  .meta-list { display: flex; flex-direction: column; gap: 0; }
+  .meta-list .row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 14px 0; border-bottom: 1px solid var(--border);
+  }
+  .meta-list .lbl { font-size: var(--t-xs); color: var(--fg-subtle); letter-spacing: 0.08em; text-transform: uppercase; }
+  .meta-list .val { font-family: var(--font-display); font-weight: 600; font-size: var(--t-lg); color: var(--ink); letter-spacing: var(--track-tight); }
+  .meta-list .val em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-deep); }
+
+  /* ─── FILTERBAR ─── */
+  .filterbar { padding: 18px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .filterbar-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pill {
+    padding: 6px 14px;
+    background: var(--paper-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-pill);
+    font-size: var(--t-xs); font-weight: 500;
+    color: var(--fg-muted);
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+  }
+  .pill:hover { background: var(--paper-3); color: var(--ink); }
+  .pill.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .pill.on--em { background: var(--emerald); color: var(--emerald-ink); border-color: var(--emerald); }
+  .sort { display: flex; align-items: center; gap: 8px; font-size: var(--t-xs); color: var(--fg-subtle); }
+  .sort select { font: inherit; font-size: var(--t-xs); background: var(--paper-2); border: 1px solid var(--border); padding: 6px 10px; border-radius: var(--r-md); color: var(--ink); }
+
+  /* ─── FEATURED ROW ─── */
+  .featured-row {
+    padding: 36px 0;
+    display: grid; grid-template-columns: 1.6fr 1fr; gap: 20px;
+  }
+  .featured-card {
+    background: var(--forest); color: var(--fg-on-forest);
+    border-radius: var(--r-xl);
+    padding: 36px;
+    position: relative; overflow: hidden;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: end;
+    min-height: 360px;
+    text-decoration: none;
+  }
+  .featured-card::before {
+    content: ''; position: absolute; top: -40%; right: -20%;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.18) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .featured-card .text { position: relative; }
+  .featured-card .eyebrow { color: var(--emerald-bright); }
+  .featured-card h2 {
+    font-family: var(--font-display); font-weight: 800;
+    font-size: 48px; line-height: 0.95; letter-spacing: var(--track-tight);
+    color: var(--fg-on-forest); margin: 12px 0 14px;
+  }
+  .featured-card h2 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-bright); font-size: 1.05em; }
+  .featured-card p { font-size: var(--t-md); color: var(--fg-on-forest-muted); line-height: 1.55; max-width: 360px; }
+  .featured-card .cta { display: inline-flex; align-items: center; gap: 8px; margin-top: 22px; padding: 10px 16px; background: var(--emerald); color: var(--emerald-ink); border-radius: var(--r-md); font-weight: 500; font-size: var(--t-sm); }
+
+  .featured-card .demo { position: relative; aspect-ratio: 4/3; background: var(--paper); border-radius: var(--r-lg); overflow: hidden; box-shadow: var(--sh-lg); }
+  .featured-card .demo .demo-inner { padding: 18px; height: 100%; display: flex; flex-direction: column; gap: 8px; }
+  .featured-card .demo .eb { font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--emerald-deep); font-weight: 500; }
+  .featured-card .demo .hd { font-family: var(--font-display); font-weight: 800; font-size: 26px; line-height: 1; letter-spacing: -0.025em; color: var(--ink); margin-top: 2px; }
+  .featured-card .demo .hd em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-deep); }
+  .featured-card .demo .sub { font-size: 10px; color: var(--fg-muted); line-height: 1.5; max-width: 80%; margin-top: 2px; }
+  .featured-card .demo .img-block {
+    flex: 1; margin-top: 10px; border-radius: var(--r-sm); position: relative; overflow: hidden;
+    background: radial-gradient(circle at 30% 40%, #2D5C42 0%, #0E1A14 70%);
+  }
+  .featured-card .demo .img-block::after {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(52, 211, 153, 0.4) 0%, transparent 25%),
+      radial-gradient(circle at 70% 60%, rgba(167, 139, 250, 0.3) 0%, transparent 30%),
+      radial-gradient(circle at 50% 80%, rgba(52, 211, 153, 0.2) 0%, transparent 35%);
+  }
+
+  /* compact featured next to the big one */
+  .small-featured { display: flex; flex-direction: column; gap: 14px; }
+  .small-feat {
+    flex: 1;
+    background: var(--paper-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-xl);
+    padding: 22px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    text-decoration: none; color: var(--ink);
+    transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+  }
+  .small-feat:hover { background: var(--paper-3); border-color: var(--border-strong); }
+  .small-feat .eyebrow { color: var(--lavender-deep); }
+  .small-feat h3 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter-spacing: var(--track-tight); line-height: 1; margin-top: 8px; }
+  .small-feat h3 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--lavender-deep); }
+  .small-feat p { font-size: var(--t-sm); color: var(--fg-muted); margin-top: 10px; }
+  .small-feat .arr { display: inline-flex; align-items: center; gap: 4px; margin-top: 18px; font-size: var(--t-sm); color: var(--ink); font-weight: 500; }
+
+  /* ─── GALLERY ─── */
+  .gallery { padding: 56px 0 96px; }
+  .gallery-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 28px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+  .gallery-head h2 {
+    font-family: var(--font-display); font-weight: 800;
+    font-size: 40px; letter-spacing: var(--track-tight); line-height: 1;
+    color: var(--ink);
+  }
+  .gallery-head h2 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-deep); }
+  .gallery-head .count { font-size: var(--t-sm); color: var(--fg-subtle); font-variant-numeric: tabular-nums; }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+
+  .tmpl {
+    background: var(--paper-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    text-decoration: none; color: var(--ink);
+    transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+  }
+  .tmpl:hover { border-color: var(--border-strong); transform: translateY(-2px); box-shadow: var(--sh-md); }
+  .tmpl .preview { aspect-ratio: 4/3; border-bottom: 1px solid var(--border); position: relative; overflow: hidden; background: var(--paper); }
+  .tmpl .meta { padding: 18px; }
+  .tmpl .meta .top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .tmpl .meta h3 { font-family: var(--font-sans); font-weight: 600; font-size: var(--t-lg); letter-spacing: var(--track-normal); color: var(--ink); }
+  .tmpl .meta .cat { font-size: var(--t-xs); color: var(--fg-subtle); letter-spacing: 0.06em; text-transform: uppercase; font-weight: 500; }
+  .tmpl .meta p { font-size: var(--t-sm); color: var(--fg-muted); line-height: 1.5; margin-bottom: 14px; }
+  .tmpl .foot { display: flex; justify-content: space-between; align-items: center; padding-top: 14px; border-top: 1px solid var(--border); }
+  .tmpl .tags { display: flex; gap: 4px; }
+  .tmpl .use { display: inline-flex; align-items: center; gap: 4px; font-size: var(--t-xs); font-weight: 500; color: var(--emerald-deep); letter-spacing: 0.04em; }
+  .tmpl .badge { position: absolute; top: 14px; left: 14px; z-index: 2; }
+
+  /* ─── PREVIEW STYLES ─── */
+  /* Tiny browser chrome wrapping each preview */
+  .browser { position: absolute; inset: 12px; border-radius: var(--r-sm); overflow: hidden; box-shadow: var(--sh-sm); border: 1px solid var(--border); display: flex; flex-direction: column; }
+  .browser .bar { display: flex; gap: 4px; padding: 6px 8px; background: var(--paper-3); border-bottom: 1px solid var(--border); }
+  .browser .bar .b { width: 6px; height: 6px; border-radius: 999px; background: var(--fg-faint); opacity: 0.6; }
+  .browser .frame { flex: 1; overflow: hidden; }
+
+  /* editorial (broadsheet) */
+  .frame.editorial { background: var(--paper); padding: 14px; }
+  .frame.editorial .eb { font-size: 8px; color: var(--emerald-deep); font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; }
+  .frame.editorial .hd { font-family: var(--font-display); font-weight: 800; font-size: 18px; line-height: 1; letter-spacing: -0.025em; color: var(--ink); margin-top: 4px; }
+  .frame.editorial .hd em { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--emerald-deep); }
+  .frame.editorial .deck { font-size: 8px; color: var(--fg-muted); line-height: 1.5; margin: 6px 0 8px; }
+  .frame.editorial .img { height: 36px; border-radius: 3px; background: linear-gradient(135deg, #1F2D26 0%, #0E1A14 100%); position: relative; overflow: hidden; }
+  .frame.editorial .img::after { content: ''; position: absolute; inset: 0; background-image: radial-gradient(circle at 30% 60%, rgba(52, 211, 153, 0.4) 0%, transparent 40%), radial-gradient(circle at 70% 20%, rgba(167, 139, 250, 0.3) 0%, transparent 40%); }
+  .frame.editorial .line { height: 5px; background: var(--paper-3); border-radius: 2px; margin-top: 6px; }
+  .frame.editorial .line.short { width: 50%; }
+  .frame.editorial .line.mid { width: 80%; }
+
+  /* shop */
+  .frame.shop { background: var(--paper); padding: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-content: start; }
+  .frame.shop .hd { grid-column: 1 / -1; font-family: var(--font-display); font-weight: 800; font-size: 13px; letter-spacing: -0.025em; color: var(--ink); margin-bottom: 4px; }
+  .frame.shop .hd em { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--emerald-deep); }
+  .frame.shop .prod { background: var(--paper-2); border: 1px solid var(--border); border-radius: 4px; padding: 6px; display: flex; flex-direction: column; gap: 3px; }
+  .frame.shop .prod .img { background: var(--forest); height: 24px; border-radius: 2px; position: relative; overflow: hidden; }
+  .frame.shop .prod .img::after { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 60% 50%, rgba(52, 211, 153, 0.4) 0%, transparent 60%); }
+  .frame.shop .prod.feat .img::after { background: radial-gradient(circle at 60% 50%, rgba(167, 139, 250, 0.5) 0%, transparent 60%); }
+  .frame.shop .prod .n { font-size: 7px; font-weight: 600; color: var(--ink); }
+  .frame.shop .prod .p { font-family: var(--font-mono); font-size: 7px; color: var(--fg-muted); }
+
+  /* studio (dark) */
+  .frame.studio { background: var(--forest); padding: 14px; color: var(--fg-on-forest); position: relative; overflow: hidden; }
+  .frame.studio::before { content: ''; position: absolute; bottom: -50%; right: -30%; width: 200px; height: 200px; background: radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, transparent 60%); }
+  .frame.studio .eb { font-size: 8px; color: var(--emerald-bright); letter-spacing: 0.14em; text-transform: uppercase; font-weight: 500; position: relative; }
+  .frame.studio .hd { position: relative; font-family: var(--font-display); font-weight: 800; font-size: 19px; line-height: 1; letter-spacing: -0.025em; margin-top: 6px; }
+  .frame.studio .hd em { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--emerald-bright); }
+  .frame.studio .work { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin-top: 10px; }
+  .frame.studio .work span { aspect-ratio: 1; border-radius: 2px; background: var(--forest-2); }
+  .frame.studio .work span:nth-child(1) { background: var(--emerald); }
+  .frame.studio .work span:nth-child(5) { background: var(--lavender); }
+
+  /* docs */
+  .frame.docs { background: var(--paper); display: grid; grid-template-columns: 64px 1fr; padding: 0; }
+  .frame.docs .nav { background: var(--paper-2); border-right: 1px solid var(--border); padding: 8px 6px; display: flex; flex-direction: column; gap: 3px; }
+  .frame.docs .nav .it { padding: 3px 6px; font-size: 7px; color: var(--fg-muted); border-radius: 2px; }
+  .frame.docs .nav .it.on { background: var(--ink); color: var(--paper); font-weight: 500; }
+  .frame.docs .doc { padding: 10px; }
+  .frame.docs .doc .h { font-family: var(--font-display); font-weight: 800; font-size: 14px; letter-spacing: -0.025em; color: var(--ink); }
+  .frame.docs .doc .h em { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--emerald-deep); }
+  .frame.docs .doc p { font-size: 7px; color: var(--fg-muted); margin-top: 6px; line-height: 1.6; }
+
+  /* portfolio */
+  .frame.portfolio { background: var(--emerald-soft); padding: 14px; }
+  .frame.portfolio .name { font-family: var(--font-display); font-weight: 800; font-size: 17px; letter-spacing: -0.025em; color: var(--forest); line-height: 1; }
+  .frame.portfolio .name em { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--emerald-deep); }
+  .frame.portfolio .role { font-size: 8px; color: var(--emerald-deep); letter-spacing: 0.14em; text-transform: uppercase; margin-top: 6px; font-weight: 500; }
+  .frame.portfolio .list { margin-top: 12px; font-size: 8px; line-height: 1.7; color: var(--forest); }
+  .frame.portfolio .list span { display: block; }
+
+  /* menu */
+  .frame.menu { background: var(--paper); padding: 12px; }
+  .frame.menu .top { display: flex; justify-content: space-between; font-size: 7px; color: var(--fg-subtle); letter-spacing: 0.1em; text-transform: uppercase; }
+  .frame.menu .hr { font-family: var(--font-display); font-weight: 800; font-size: 16px; margin-top: 4px; letter-spacing: -0.025em; color: var(--ink); }
+  .frame.menu .hr em { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--emerald-deep); }
+  .frame.menu .it { display: flex; justify-content: space-between; font-size: 8px; margin-top: 6px; padding-bottom: 3px; border-bottom: 1px dotted var(--border); color: var(--ink-soft); }
+
+  /* landing */
+  .frame.landing { background: var(--paper); padding: 14px; display: flex; flex-direction: column; }
+  .frame.landing .hd { font-family: var(--font-display); font-weight: 800; font-size: 17px; line-height: 1; letter-spacing: -0.025em; color: var(--ink); }
+  .frame.landing .hd em { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--emerald-deep); }
+  .frame.landing .sub { font-size: 8px; color: var(--fg-muted); margin: 6px 0; line-height: 1.5; }
+  .frame.landing .cta { background: var(--ink); color: var(--paper); padding: 4px 8px; border-radius: 4px; font-size: 8px; display: inline-block; margin-top: auto; align-self: flex-start; }
+
+  /* zine */
+  .frame.zine { background: var(--paper); padding: 12px; }
+  .frame.zine .hd { font-family: var(--font-display); font-weight: 800; font-size: 22px; letter-spacing: -0.03em; line-height: 0.9; color: var(--ink); }
+  .frame.zine .hd::after { content: '.'; color: var(--emerald-deep); }
+  .frame.zine .sm { font-size: 7px; color: var(--fg-subtle); margin-top: 6px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .frame.zine .img { height: 30px; margin-top: 8px; border-radius: 3px; background: radial-gradient(circle at 30% 40%, #2D5C42 0%, #0E1A14 70%); }
+
+  /* studio2 */
+  .frame.studio2 { background: var(--paper-3); padding: 14px; }
+  .frame.studio2 .hd { font-family: var(--font-display); font-weight: 800; font-size: 16px; letter-spacing: -0.025em; line-height: 1; color: var(--ink); }
+  .frame.studio2 .hd em { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--emerald-deep); }
+  .frame.studio2 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 8px; }
+  .frame.studio2 .grid2 span { aspect-ratio: 4/3; border-radius: 3px; background: var(--forest); }
+  .frame.studio2 .grid2 span:nth-child(2) { background: var(--emerald); }
+  .frame.studio2 .grid2 span:nth-child(3) { background: var(--lavender); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <nav class="top">
+    <div style="display: flex; align-items: center; gap: 28px;">
+      <a class="brand" href="../marketing/index.html">
+        <img src="../../assets/logo-mark.svg" alt="">
+        <span class="wm-go">Go</span><span class="wm-next">Next</span>
+      </a>
+      <div class="breadcrumb"><span>GoNext</span> &nbsp;/&nbsp; <span class="here">Templates</span></div>
+    </div>
+    <div class="nav-cta">
+      <a class="btn btn--ghost btn--sm" href="#">Marketplace</a>
+      <a class="btn btn--primary btn--sm" href="#">Start blank<i data-lucide="arrow-right" style="width: 13px; height: 13px;"></i></a>
+    </div>
+  </nav>
+</div>
+
+<div class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow">Templates — 182 starting points</span>
+      <h1>Start at <em>eighty</em><br>percent.</h1>
+    </div>
+    <div class="meta-list">
+      <div class="row"><span class="lbl">Total</span><span class="val">182 templates</span></div>
+      <div class="row"><span class="lbl">Editable</span><span class="val">Every <em>block</em></span></div>
+      <div class="row"><span class="lbl">Commerce</span><span class="val">All plans</span></div>
+      <div class="row"><span class="lbl">Price</span><span class="val"><em>Free</em> with GoNext</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="filterbar">
+  <div class="wrap filterbar-row">
+    <div class="pills">
+      <span class="pill on">All · 182</span>
+      <span class="pill">Blog · 42</span>
+      <span class="pill">Shop · 38</span>
+      <span class="pill">Portfolio · 24</span>
+      <span class="pill">Landing · 31</span>
+      <span class="pill">Docs · 18</span>
+      <span class="pill">Restaurant · 12</span>
+      <span class="pill">Agency · 17</span>
+    </div>
+    <div class="pills">
+      <span class="pill on--em">↻ New this month</span>
+      <span class="pill">Popular</span>
+    </div>
+  </div>
+</div>
+
+<div class="featured-row wrap">
+  <a class="featured-card" href="#">
+    <div class="text">
+      <span class="eyebrow">Featured · This week</span>
+      <h2>For sites that <em>grow</em>.</h2>
+      <p>Broadsheet is an editorial-first publication template, designed for long-form writers and photo essayists who treat their archive as a living thing.</p>
+      <span class="cta">Use Broadsheet<i data-lucide="arrow-right" style="width: 13px; height: 13px;"></i></span>
+    </div>
+    <div class="demo">
+      <div class="demo-inner">
+        <span class="eb">// 02 — Sourcing</span>
+        <span class="hd">Single-<em>origin</em>.</span>
+        <span class="sub">Five years, eleven trips, a few thousand cups.</span>
+        <div class="img-block"></div>
+      </div>
+    </div>
+  </a>
+
+  <div class="small-featured">
+    <a class="small-feat" href="#">
+      <div>
+        <span class="eyebrow">New</span>
+        <h3><em>Studio</em> Mono</h3>
+        <p>High-contrast agency template. Case studies, services, calendar booking.</p>
+      </div>
+      <span class="arr">View template <i data-lucide="arrow-right" style="width: 13px; height: 13px;"></i></span>
+    </a>
+    <a class="small-feat" href="#">
+      <div>
+        <span class="eyebrow" style="color: var(--emerald-deep);">Popular</span>
+        <h3>Counter</h3>
+        <p>Single-product commerce theme with built-in configurator.</p>
+      </div>
+      <span class="arr">View template <i data-lucide="arrow-right" style="width: 13px; height: 13px;"></i></span>
+    </a>
+  </div>
+</div>
+
+<div class="gallery">
+  <div class="wrap">
+    <div class="gallery-head">
+      <h2>Browse the <em>library</em>.</h2>
+      <span class="count">182 templates · sorted by most installed</span>
+    </div>
+
+    <div class="grid">
+
+      <a class="tmpl" href="#">
+        <div class="preview"><span class="tag tag--emerald badge">New</span>
+          <div class="browser">
+            <div class="bar"><span class="b"></span><span class="b"></span><span class="b"></span></div>
+            <div class="frame editorial">
+              <span class="eb">// 02 — Sourcing</span>
+              <span class="hd">Single-<em>origin</em>.</span>
+              <span class="deck">Five years, eleven trips, a few thousand cups later.</span>
+              <div class="img"></div>
+              <div class="line mid"></div>
+              <div class="line short"></div>
+            </div>
+          </div>
+        </div>
+        <div class="meta">
+          <div class="top"><h3>Broadsheet</h3><span class="cat">Blog</span></div>
+          <p>Editorial-first long-form blog with photo essays and a paywall lane.</p>
+          <div class="foot"><div class="tags"><span class="tag">Editorial</span><span class="tag">Paywall</span></div><span class="use">Use<i data-lucide="arrow-right" style="width: 12px; height: 12px;"></i></span></div>
+        </div>
+      </a>
+
+      <a class="tmpl" href="#">
+        <div class="preview">
+          <div class="browser">
+            <div class="bar"><span class="b"></span><span class="b"></span><span class="b"></span></div>
+            <div class="frame shop">
+              <div class="hd">Brick &amp; <em>Mortar</em>.</div>
+              <div class="prod"><div class="img"></div><span class="n">Roaster v2</span><span class="p">$420</span></div>
+              <div class="prod feat"><div class="img"></div><span class="n">Burr Grinder</span><span class="p">$180</span></div>
+              <div class="prod"><div class="img"></div><span class="n">Bag · 250g</span><span class="p">$22</span></div>
+              <div class="prod"><div class="img"></div><span class="n">Subscription</span><span class="p">$18/mo</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="meta">
+          <div class="top"><h3>Counter</h3><span class="cat">Shop</span></div>
+          <p>Single-product or small catalog. Stripe, subscriptions, gift cards out of the box.</p>
+          <div class="foot"><div class="tags"><span class="tag">Commerce</span><span class="tag">Stripe</span></div><span class="use">Use<i data-lucide="arrow-right" style="width: 12px; height: 12px;"></i></span></div>
+        </div>
+      </a>
+
+      <a class="tmpl" href="#">
+        <div class="preview">
+          <div class="browser">
+            <div class="bar"><span class="b"></span><span class="b"></span><span class="b"></span></div>
+            <div class="frame studio">
+              <span class="eb">Studio — 2026</span>
+              <div class="hd">We build <em>good</em> websites.</div>
+              <div class="work"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            </div>
+          </div>
+        </div>
+        <div class="meta">
+          <div class="top"><h3>Studio Mono</h3><span class="cat">Agency</span></div>
+          <p>High-contrast agency template. Case studies, services, calendar booking.</p>
+          <div class="foot"><div class="tags"><span class="tag">Dark</span><span class="tag">Booking</span></div><span class="use">Use<i data-lucide="arrow-right" style="width: 12px; height: 12px;"></i></span></div>
+        </div>
+      </a>
+
+      <a class="tmpl" href="#">
+        <div class="preview">
+          <div class="browser">
+            <div class="bar"><span class="b"></span><span class="b"></span><span class="b"></span></div>
+            <div class="frame docs">
+              <div class="nav">
+                <span class="it">Quickstart</span>
+                <span class="it on">Install</span>
+                <span class="it">CLI</span>
+                <span class="it">Themes</span>
+                <span class="it">API</span>
+              </div>
+              <div class="doc">
+                <div class="h">Install<em>ation</em>.</div>
+                <p>Get GoNext running in three minutes via cloud, CLI, or self-host.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="meta">
+          <div class="top"><h3>Manual</h3><span class="cat">Docs</span></div>
+          <p>Documentation template with sidebar nav, search, versioning, MDX code blocks.</p>
+          <div class="foot"><div class="tags"><span class="tag">MDX</span><span class="tag">Search</span></div><span class="use">Use<i data-lucide="arrow-right" style="width: 12px; height: 12px;"></i></span></div>
+        </div>
+      </a>
+
+      <a class="tmpl" href="#">
+        <div class="preview">
+          <div class="browser">
+            <div class="bar"><span class="b"></span><span class="b"></span><span class="b"></span></div>
+            <div class="frame portfolio">
+              <div class="name">Jules <em>Akande</em>.</div>
+              <div class="role">Head Roaster · Bogotá</div>
+              <div class="list">
+                <span>01 — Field notes, Boyacá</span>
+                <span>02 — Cupping protocol</span>
+                <span>03 — Roast curves</span>
+                <span>04 — Contact</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="meta">
+          <div class="top"><h3>Card Index</h3><span class="cat">Portfolio</span></div>
+          <p>Single-page portfolio. List-driven, type-led, perfect for writers and operators.</p>
+          <div class="foot"><div class="tags"><span class="tag">Solo</span><span class="tag tag--emerald">Emerald</span></div><span class="use">Use<i data-lucide="arrow-right" style="width: 12px; height: 12px;"></i></span></div>
+        </div>
+      </a>
+
+      <a class="tmpl" href="#">
+        <div class="preview">
+          <div class="browser">
+            <div class="bar"><span class="b"></span><span class="b"></span><span class="b"></span></div>
+            <div class="frame menu">
+              <div class="top"><span>Menu · Week 21</span><span>Open 8–4</span></div>
+              <div class="hr">Brick &amp; <em>Mortar</em>.</div>
+              <div class="it"><span>Single-origin · cup</span><span>$4.50</span></div>
+              <div class="it"><span>Flat white</span><span>$5.00</span></div>
+              <div class="it"><span>Cold brew · pint</span><span>$6.00</span></div>
+              <div class="it"><span>250g bag · house</span><span>$22.00</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="meta">
+          <div class="top"><h3>Storefront</h3><span class="cat">Restaurant</span></div>
+          <p>Local business template: hours, location, menu, online ordering, weekly updates.</p>
+          <div class="foot"><div class="tags"><span class="tag">Local</span><span class="tag">Menu</span></div><span class="use">Use<i data-lucide="arrow-right" style="width: 12px; height: 12px;"></i></span></div>
+        </div>
+      </a>
+
+      <a class="tmpl" href="#">
+        <div class="preview"><span class="tag tag--ink badge">Pro</span>
+          <div class="browser">
+            <div class="bar"><span class="b"></span><span class="b"></span><span class="b"></span></div>
+            <div class="frame landing">
+              <div class="hd">Ship a <em>site</em> in a weekend.</div>
+              <div class="sub">All-in-one CMS, hosting, and commerce.</div>
+              <span class="cta">Start free →</span>
+            </div>
+          </div>
+        </div>
+        <div class="meta">
+          <div class="top"><h3>Launchpad</h3><span class="cat">Landing</span></div>
+          <p>SaaS-style landing page. Hero, features grid, pricing table, FAQ, footer.</p>
+          <div class="foot"><div class="tags"><span class="tag">SaaS</span><span class="tag">Pricing</span></div><span class="use">Use<i data-lucide="arrow-right" style="width: 12px; height: 12px;"></i></span></div>
+        </div>
+      </a>
+
+      <a class="tmpl" href="#">
+        <div class="preview">
+          <div class="browser">
+            <div class="bar"><span class="b"></span><span class="b"></span><span class="b"></span></div>
+            <div class="frame zine">
+              <div class="hd">Issue 04</div>
+              <div class="sm">May 24, 2026 · 12 pages</div>
+              <div class="img"></div>
+            </div>
+          </div>
+        </div>
+        <div class="meta">
+          <div class="top"><h3>Zine</h3><span class="cat">Publication</span></div>
+          <p>Issue-based publication template. Each issue is its own deeply-styled landing page.</p>
+          <div class="foot"><div class="tags"><span class="tag">Issues</span><span class="tag">Print-feel</span></div><span class="use">Use<i data-lucide="arrow-right" style="width: 12px; height: 12px;"></i></span></div>
+        </div>
+      </a>
+
+      <a class="tmpl" href="#">
+        <div class="preview">
+          <div class="browser">
+            <div class="bar"><span class="b"></span><span class="b"></span><span class="b"></span></div>
+            <div class="frame studio2">
+              <div class="hd"><em>Quiet</em> Studio.</div>
+              <div class="grid2"><span></span><span></span><span></span><span></span></div>
+            </div>
+          </div>
+        </div>
+        <div class="meta">
+          <div class="top"><h3>Quiet</h3><span class="cat">Portfolio</span></div>
+          <p>Photographer / designer portfolio with bold grid, slow loads, full-bleed image cases.</p>
+          <div class="foot"><div class="tags"><span class="tag">Visual</span><span class="tag tag--lavender">Lavender</span></div><span class="use">Use<i data-lucide="arrow-right" style="width: 12px; height: 12px;"></i></span></div>
+        </div>
+      </a>
+
+    </div>
+  </div>
+</div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

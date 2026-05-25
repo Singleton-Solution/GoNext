@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>GoNext — Single-origin · Editor</title>
+<link rel="stylesheet" href="../../colors_and_type.css">
+<link rel="icon" href="../../assets/favicon.svg">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  body { background: var(--paper); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* ───── TOPBAR ───── */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 52px; padding: 0 14px 0 16px;
+    background: var(--forest); color: var(--fg-on-forest);
+    border-bottom: 1px solid var(--forest-border);
+    flex-shrink: 0;
+  }
+  .topbar .left { display: flex; align-items: center; gap: 14px; }
+  .topbar .brand-mini { width: 26px; height: 26px; }
+  .topbar .crumbs { display: flex; align-items: center; gap: 8px; font-size: var(--t-sm); color: var(--fg-on-forest-muted); }
+  .topbar .crumbs .sep { width: 13px; height: 13px; opacity: 0.5; }
+  .topbar .crumbs .doc { color: var(--fg-on-forest); font-weight: 500; }
+  .topbar .crumbs .doc em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-bright); font-size: 1.05em; }
+
+  .topbar .center { display: flex; align-items: center; gap: 4px; padding: 3px; background: var(--forest-2); border-radius: var(--r-md); }
+  .topbar .center button { padding: 6px 14px; background: transparent; color: var(--fg-on-forest-muted); border: none; cursor: pointer; font: inherit; font-size: var(--t-xs); font-weight: 500; border-radius: var(--r-sm); }
+  .topbar .center button:hover { color: var(--fg-on-forest); }
+  .topbar .center button.on { background: var(--forest-3); color: var(--fg-on-forest); }
+
+  .topbar .right { display: flex; align-items: center; gap: 8px; }
+  .save-status { display: flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: var(--t-xs); color: var(--fg-on-forest-muted); background: var(--forest-2); border-radius: var(--r-pill); }
+  .save-status .dot { width: 6px; height: 6px; border-radius: 999px; background: var(--emerald-bright); animation: pulse 2s var(--ease) infinite; }
+  @keyframes pulse { 0%,100% {opacity:1} 50%{opacity:0.4} }
+  .topbar .btn-dark { background: var(--forest-3); color: var(--fg-on-forest); border-color: var(--forest-border); box-shadow: none; }
+  .topbar .btn-dark:hover { background: var(--forest-border); border-color: var(--forest-border); }
+  .topbar .btn-em { background: var(--emerald); color: var(--emerald-ink); border-color: var(--emerald); }
+  .topbar .btn-em:hover { background: var(--emerald-bright); border-color: var(--emerald-bright); }
+
+  /* ───── EDITOR LAYOUT ───── */
+  .editor { flex: 1; display: grid; grid-template-columns: 52px 1fr 320px; min-height: 0; }
+
+  /* left rail */
+  .rail {
+    background: var(--paper-2); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; align-items: center; padding: 10px 0; gap: 2px;
+  }
+  .rail button {
+    width: 36px; height: 36px; background: transparent;
+    border: 1px solid transparent; border-radius: var(--r-md);
+    color: var(--fg-muted); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .rail button:hover { background: var(--paper-3); color: var(--ink); }
+  .rail button.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .rail button i { width: 16px; height: 16px; }
+  .rail .sep { width: 22px; height: 1px; background: var(--border); margin: 6px 0; }
+
+  /* canvas */
+  .canvas { background: var(--paper); overflow: auto; padding: 40px 56px 200px; }
+  .doc { max-width: 720px; margin: 0 auto; }
+
+  .doc .meta-row { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; font-size: var(--t-xs); color: var(--fg-subtle); }
+  .doc .meta-row .cat { color: var(--emerald-deep); font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; }
+  .doc .meta-row .sep { color: var(--fg-faint); }
+
+  .doc h1.title {
+    font-family: var(--font-display); font-weight: 800;
+    font-size: 56px; letter-spacing: -0.03em; line-height: 0.95;
+    color: var(--ink); margin: 0 0 16px;
+  }
+  .doc h1.title em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-deep); }
+  .doc .deck {
+    font-family: var(--font-sans); font-size: 19px; line-height: 1.5;
+    color: var(--fg-muted); margin: 0 0 40px; max-width: 580px;
+  }
+
+  /* blocks */
+  .block { position: relative; padding: 4px 0; }
+  .block:hover .block-tools { opacity: 1; }
+  .block-tools { position: absolute; left: -52px; top: 6px; opacity: 0; display: flex; flex-direction: column; gap: 2px; transition: opacity var(--dur-fast) var(--ease); }
+  .block-tools button {
+    width: 22px; height: 22px; padding: 0;
+    border: 1px solid transparent; background: transparent;
+    border-radius: var(--r-sm); cursor: grab; color: var(--fg-subtle);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .block-tools button:hover { background: var(--paper-3); border-color: var(--border); color: var(--ink); }
+  .block-tools button i { width: 12px; height: 12px; }
+  .block.selected { box-shadow: -3px 0 0 var(--emerald); padding-left: 14px; margin-left: -14px; }
+
+  .block p {
+    font-family: var(--font-sans); font-size: 17px; line-height: 1.7;
+    color: var(--ink-soft); margin: 0 0 18px;
+  }
+  .block p .hl { background: var(--emerald-soft); padding: 0 4px; border-radius: 2px; color: var(--emerald-deep); }
+  .block h2 {
+    font-family: var(--font-display); font-weight: 800;
+    font-size: 34px; letter-spacing: -0.025em; line-height: 1.05;
+    margin: 40px 0 14px; color: var(--ink);
+  }
+  .block h2 em { font-family: var(--font-serif); font-weight: 400; font-style: italic; color: var(--emerald-deep); }
+
+  /* image block */
+  .img-block { margin: 32px 0; }
+  .img-frame {
+    background: radial-gradient(circle at 30% 40%, #2D5C42 0%, #0E1A14 70%);
+    border: 1px solid var(--forest-border);
+    border-radius: var(--r-md);
+    height: 280px;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+  }
+  .img-frame::after {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(52, 211, 153, 0.3) 0%, transparent 30%),
+      radial-gradient(circle at 70% 60%, rgba(167, 139, 250, 0.25) 0%, transparent 30%),
+      radial-gradient(circle at 50% 80%, rgba(52, 211, 153, 0.18) 0%, transparent 40%);
+  }
+  .img-frame .label { position: relative; font-size: var(--t-xs); color: var(--fg-on-forest); background: var(--forest-2); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--forest-border); display: inline-flex; align-items: center; gap: 6px; }
+  .img-frame .label i { width: 13px; height: 13px; color: var(--emerald-bright); }
+  .img-caption { font-size: var(--t-xs); color: var(--fg-subtle); margin-top: 10px; padding-left: 4px; letter-spacing: 0.04em; }
+  .img-caption em { font-family: var(--font-serif); font-style: italic; color: var(--emerald-deep); }
+
+  /* product block */
+  .product-block { margin: 28px 0; padding: 18px; background: var(--paper-2); border: 1px solid var(--border); border-radius: var(--r-md); display: grid; grid-template-columns: 84px 1fr auto; gap: 16px; align-items: center; }
+  .product-block .img { width: 84px; height: 84px; background: var(--forest); border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+  .product-block .img::after { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 60% 50%, rgba(52, 211, 153, 0.4) 0%, transparent 60%); }
+  .product-block .img i { width: 28px; height: 28px; color: var(--emerald-bright); position: relative; }
+  .product-block .info h4 { font-family: var(--font-sans); font-weight: 600; font-size: var(--t-md); margin: 4px 0; }
+  .product-block .info .price { font-family: var(--font-mono); font-size: var(--t-sm); color: var(--fg-muted); }
+
+  /* slash menu inline */
+  .slash-menu {
+    margin: 14px 0;
+    background: var(--paper-2); border: 1px solid var(--border); border-radius: var(--r-md);
+    padding: 6px; max-width: 320px;
+    display: flex; flex-direction: column; gap: 2px;
+    box-shadow: var(--sh-md);
+  }
+  .slash-menu .head { padding: 6px 10px 4px; font-size: var(--t-2xs); color: var(--fg-subtle); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; }
+  .slash-menu .item { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: var(--r-sm); cursor: pointer; }
+  .slash-menu .item:hover { background: var(--paper-3); }
+  .slash-menu .item.active { background: var(--emerald-soft); }
+  .slash-menu .item.active i { color: var(--emerald-deep); }
+  .slash-menu .item i { width: 14px; height: 14px; color: var(--fg-muted); }
+  .slash-menu .item .name { font-size: var(--t-sm); font-weight: 500; color: var(--ink); }
+  .slash-menu .item.active .name { color: var(--emerald-deep); }
+  .slash-menu .item .desc { font-family: var(--font-mono); font-size: 10px; color: var(--fg-subtle); margin-left: auto; }
+
+  /* ───── INSPECTOR ───── */
+  .inspector { background: var(--paper-2); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+  .insp-tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 6px; }
+  .insp-tabs button {
+    flex: 1; padding: 12px 6px; background: transparent; border: none;
+    border-bottom: 2px solid transparent; cursor: pointer;
+    font: inherit; font-size: var(--t-xs); font-weight: 500;
+    color: var(--fg-muted);
+  }
+  .insp-tabs button.on { color: var(--ink); border-bottom-color: var(--emerald); }
+  .insp-body { padding: 18px 18px 32px; flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 24px; }
+
+  .insp-section .head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .insp-section .head .l { font-size: var(--t-xs); font-weight: 600; color: var(--ink); letter-spacing: 0.04em; text-transform: uppercase; }
+  .insp-section .field { margin-bottom: 12px; }
+  .insp-section label { display: block; font-size: var(--t-xs); font-weight: 500; color: var(--ink); margin-bottom: 6px; }
+  .insp-section .help { font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-subtle); margin-top: 6px; }
+
+  .seg { display: inline-flex; align-items: center; gap: 2px; padding: 2px; background: var(--paper-3); border-radius: var(--r-md); }
+  .seg button { padding: 5px 12px; font: inherit; font-size: var(--t-xs); font-weight: 500; color: var(--fg-muted); background: transparent; border: none; border-radius: var(--r-sm); cursor: pointer; }
+  .seg button:hover { color: var(--ink); }
+  .seg button.on { background: var(--paper); color: var(--ink); box-shadow: var(--sh-xs); }
+
+  .tag-list { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .tag-add { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; font-size: var(--t-xs); color: var(--emerald-deep); cursor: pointer; }
+  .tag-add i { width: 12px; height: 12px; }
+
+  .check-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; font-size: var(--t-sm); color: var(--ink); }
+  .check-row .t { width: 32px; height: 18px; background: var(--emerald); border-radius: 999px; position: relative; cursor: pointer; flex-shrink: 0; }
+  .check-row .t::after { content: ''; position: absolute; top: 2px; left: 16px; width: 14px; height: 14px; background: var(--paper); border-radius: 999px; box-shadow: var(--sh-xs); }
+  .check-row .t.off { background: var(--paper-4); }
+  .check-row .t.off::after { left: 2px; background: var(--paper-2); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="left">
+    <img class="brand-mini" src="../../assets/logo-mark.svg" alt="">
+    <div class="crumbs">
+      <span>Brick &amp; Mortar</span>
+      <i data-lucide="chevron-right" class="sep"></i>
+      <span>Posts</span>
+      <i data-lucide="chevron-right" class="sep"></i>
+      <span class="doc">Single-<em>origin</em>.</span>
+    </div>
+  </div>
+
+  <div class="center">
+    <button class="on">Write</button>
+    <button>Preview</button>
+    <button>Diff</button>
+  </div>
+
+  <div class="right">
+    <span class="save-status"><span class="dot"></span>Saved · 12s ago</span>
+    <button class="btn btn--sm btn-dark">Schedule</button>
+    <button class="btn btn--sm btn-em">Publish<i data-lucide="arrow-right" style="width: 12px; height: 12px;"></i></button>
+  </div>
+</div>
+
+<div class="editor">
+
+  <div class="rail">
+    <button class="on" title="Add block"><i data-lucide="plus"></i></button>
+    <button title="Outline"><i data-lucide="list"></i></button>
+    <button title="Find"><i data-lucide="search"></i></button>
+    <div class="sep"></div>
+    <button title="Media"><i data-lucide="image"></i></button>
+    <button title="Product"><i data-lucide="shopping-bag"></i></button>
+    <button title="Embed"><i data-lucide="code-2"></i></button>
+    <div style="flex: 1;"></div>
+    <button title="History"><i data-lucide="history"></i></button>
+    <button title="Comments"><i data-lucide="message-square"></i></button>
+  </div>
+
+  <div class="canvas">
+    <div class="doc">
+      <div class="meta-row">
+        <span class="cat">Sourcing</span>
+        <span class="sep">·</span>
+        <span class="mono">single-origin-2026</span>
+        <span class="sep">·</span>
+        <span>Mara Wills</span>
+      </div>
+
+      <h1 class="title" contenteditable="true">How we source <em>single-origin</em> beans.</h1>
+      <p class="deck" contenteditable="true">Five years, eleven trips, and a few thousand cups later — here's how we decide what ends up in your cup.</p>
+
+      <div class="block">
+        <div class="block-tools"><button><i data-lucide="plus"></i></button><button><i data-lucide="grip-vertical"></i></button></div>
+        <p contenteditable="true">Single-origin doesn't mean what most cafés say it means. <span class="hl">It means traceable to a single farm, a single lot, a single harvest.</span> Anything else is a region, which is fine, but it's a different promise.</p>
+      </div>
+
+      <div class="block selected">
+        <div class="block-tools"><button><i data-lucide="plus"></i></button><button><i data-lucide="grip-vertical"></i></button></div>
+        <h2 contenteditable="true">What we <em>actually</em> look for.</h2>
+      </div>
+
+      <div class="block">
+        <div class="block-tools"><button><i data-lucide="plus"></i></button><button><i data-lucide="grip-vertical"></i></button></div>
+        <p contenteditable="true">Three things, in order: the farm's water access, the picker's wage, and the cup score. The first two are non-negotiable. The third is a starting point for conversation, not a final grade.</p>
+      </div>
+
+      <div class="block img-block">
+        <div class="block-tools"><button><i data-lucide="plus"></i></button><button><i data-lucide="grip-vertical"></i></button></div>
+        <div class="img-frame">
+          <span class="label"><i data-lucide="upload"></i>drop image · or paste URL</span>
+        </div>
+        <div class="img-caption"><em>Fig 01</em> — Wet mill, Finca La Esperanza, 2025</div>
+      </div>
+
+      <div class="block">
+        <div class="block-tools"><button><i data-lucide="plus"></i></button><button><i data-lucide="grip-vertical"></i></button></div>
+        <p contenteditable="true">This year's pick is from La Esperanza, a 14-hectare farm in Boyacá. We're roasting it light, brewing it like a Kenyan, and selling it while we still have it:</p>
+      </div>
+
+      <div class="block product-block">
+        <div class="block-tools"><button><i data-lucide="plus"></i></button><button><i data-lucide="grip-vertical"></i></button></div>
+        <div class="img"><i data-lucide="coffee"></i></div>
+        <div class="info">
+          <span class="eyebrow">Product · 250g bag</span>
+          <h4>La Esperanza — Boyacá</h4>
+          <div class="price">$22.00 · 14 in stock</div>
+        </div>
+        <button class="btn btn--emerald btn--sm">Add to post<i data-lucide="arrow-right" style="width: 12px; height: 12px;"></i></button>
+      </div>
+
+      <div class="block">
+        <div class="block-tools"><button><i data-lucide="plus"></i></button><button><i data-lucide="grip-vertical"></i></button></div>
+        <div class="slash-menu">
+          <div class="head">Add block</div>
+          <div class="item active"><i data-lucide="heading-2"></i><span class="name">Heading 2</span><span class="desc">/h2</span></div>
+          <div class="item"><i data-lucide="quote"></i><span class="name">Pull quote</span><span class="desc">/quote</span></div>
+          <div class="item"><i data-lucide="image"></i><span class="name">Image</span><span class="desc">/img</span></div>
+          <div class="item"><i data-lucide="shopping-bag"></i><span class="name">Product</span><span class="desc">/product</span></div>
+          <div class="item"><i data-lucide="code-2"></i><span class="name">Code block</span><span class="desc">/code</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <aside class="inspector">
+    <div class="insp-tabs">
+      <button class="on">Block</button>
+      <button>Document</button>
+      <button>SEO</button>
+    </div>
+
+    <div class="insp-body">
+      <div class="insp-section">
+        <div class="head">
+          <span class="l">Block</span>
+          <span class="tag tag--emerald">Heading 2</span>
+        </div>
+        <div class="field">
+          <label>Style</label>
+          <div class="seg">
+            <button class="on">H2</button>
+            <button>H3</button>
+            <button>H4</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Alignment</label>
+          <div class="seg">
+            <button class="on">Left</button>
+            <button>Center</button>
+            <button>Right</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Anchor</label>
+          <input class="input" value="what-we-look-for" />
+          <div class="help">/blog/single-origin-2026 #what-we-look-for</div>
+        </div>
+      </div>
+
+      <div class="insp-section">
+        <div class="head"><span class="l">Visibility</span></div>
+        <div class="check-row"><span>Show in table of contents</span><span class="t"></span></div>
+        <div class="check-row"><span>Include in RSS</span><span class="t"></span></div>
+        <div class="check-row"><span>Member-only</span><span class="t off"></span></div>
+      </div>
+
+      <div class="insp-section">
+        <div class="head"><span class="l">Metadata</span></div>
+        <div class="field">
+          <label>Tags</label>
+          <div class="tag-list">
+            <span class="tag">sourcing</span>
+            <span class="tag tag--emerald">colombia</span>
+            <span class="tag-add"><i data-lucide="plus"></i>Add tag</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Publish date</label>
+          <input class="input" value="2026-05-22 · 09:00" />
+        </div>
+      </div>
+    </div>
+  </aside>
+
+</div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

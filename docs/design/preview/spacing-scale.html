@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>Spacing scale</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<link rel="stylesheet" href="_card.css">
+<style>
+  body { padding: 24px; }
+  .ruler { display: flex; align-items: flex-end; gap: 14px; height: 130px; }
+  .tick { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .bar { background: var(--forest); width: 18px; border-radius: 2px 2px 0 0; }
+  .tok { font-family: var(--font-mono); font-size: 10px; color: var(--fg-subtle); }
+  .px { font-family: var(--font-mono); font-size: 10px; color: var(--ink); }
+</style></head><body>
+  <span class="eyebrow" style="display: block; margin-bottom: 12px;">Spacing — 4-base scale</span>
+  <div class="ruler">
+    <div class="tick"><div class="bar" style="height: 4px;"></div><div class="tok">s-1</div><div class="px">4</div></div>
+    <div class="tick"><div class="bar" style="height: 8px;"></div><div class="tok">s-2</div><div class="px">8</div></div>
+    <div class="tick"><div class="bar" style="height: 12px;"></div><div class="tok">s-3</div><div class="px">12</div></div>
+    <div class="tick"><div class="bar" style="height: 16px;"></div><div class="tok">s-4</div><div class="px">16</div></div>
+    <div class="tick"><div class="bar" style="height: 20px;"></div><div class="tok">s-5</div><div class="px">20</div></div>
+    <div class="tick"><div class="bar" style="height: 24px;"></div><div class="tok">s-6</div><div class="px">24</div></div>
+    <div class="tick"><div class="bar" style="height: 32px;"></div><div class="tok">s-7</div><div class="px">32</div></div>
+    <div class="tick"><div class="bar" style="height: 48px;"></div><div class="tok">s-8</div><div class="px">48</div></div>
+    <div class="tick"><div class="bar" style="height: 64px;"></div><div class="tok">s-9</div><div class="px">64</div></div>
+    <div class="tick"><div class="bar" style="height: 96px; background: var(--emerald);"></div><div class="tok">s-10</div><div class="px">96</div></div>
+  </div>
+</body></html>

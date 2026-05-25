@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>Inputs</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<link rel="stylesheet" href="_card.css">
+<style>
+  body { padding: 22px 28px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-family: var(--font-sans); font-size: 12px; font-weight: 500; color: var(--ink); margin-bottom: 6px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; }
+  .input--focused { border-color: var(--emerald); box-shadow: var(--sh-focus); }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-sans); font-size: 13px; color: var(--ink); }
+  .check { width: 36px; height: 20px; background: var(--emerald); border-radius: 999px; position: relative; }
+  .check::after { content: ''; position: absolute; top: 2px; left: 18px; width: 16px; height: 16px; background: var(--paper); border-radius: 999px; box-shadow: var(--sh-xs); }
+</style></head><body>
+  <span class="eyebrow" style="display: block; margin-bottom: 12px;">Inputs — emerald focus ring</span>
+  <div class="grid">
+    <div class="field">
+      <label>Site title</label>
+      <input class="input" value="Brick & Mortar Coffee" />
+    </div>
+    <div class="field">
+      <label>Slug · focused</label>
+      <input class="input input--focused" value="brick-and-mortar" />
+    </div>
+  </div>
+  <div class="toggle"><span class="check"></span> Public on the open web</div>
+</body></html>

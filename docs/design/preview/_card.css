@@ -1,0 +1,7 @@
+/* Shared base for design-system preview cards */
+html, body { background: var(--paper); }
+body { padding: 24px 28px; font-family: var(--font-sans); color: var(--ink); }
+.row { display: flex; align-items: center; gap: 16px; }
+.col { display: flex; flex-direction: column; }
+.grow { flex: 1; }
+.meta { font-family: var(--font-mono); font-size: 11px; color: var(--fg-subtle); letter-spacing: 0.04em; }
