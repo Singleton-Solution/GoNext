@@ -102,14 +102,14 @@ The single most common need is **remapping a published port** when
 something on your host is already on the same number. The dev stack
 publishes:
 
-| Service  | Container port | Host port |
-|----------|----------------|-----------|
-| postgres | 5432           | 5432      |
-| redis    | 6379           | 6379      |
+| Service  | Container port | Host port   |
+|----------|----------------|-------------|
+| postgres | 5432           | 5432        |
+| redis    | 6379           | 6379        |
 | minio    | 9000 / 9001    | 9000 / 9001 |
-| api      | 8080           | 8080      |
-| admin    | 3000           | 3001      |
-| web      | 3000           | 3000      |
+| api      | 8080           | 8080        |
+| admin    | 3000           | 3001        |
+| web      | 3000           | 3000        |
 
 If you already run a native Postgres on 5432, drop this into
 `docker-compose.override.yml`:

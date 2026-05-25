@@ -104,20 +104,20 @@ For a fuller list — Next.js prerender failures on `useSearchParams` missing `S
 ## What's where
 
 | Path | What lives there |
-|---|---|
-| `apps/api`     | Go HTTP server. `/healthz`, `/readyz`, `/openapi.json`, `/docs/`, every `/api/v1/*` route. |
-| `apps/worker`  | Asynq background-job consumer. Image processing, webhooks, cron leaders. |
-| `apps/admin`   | Next.js admin dashboard. Login, setup wizard, posts/pages CRUD, marketplace, customizer. |
-| `apps/web`     | Next.js public site. SSR/SSG/ISR, themes, sitemap, feeds. |
-| `apps/docs`    | Static documentation site (deploys separately from the app). |
-| `cli/gonext`   | The `gonext` administrative CLI. `init`, `migrate`, `theme`, `plugin`, `bench`, `config`. |
-| `packages/go`  | Shared Go packages — auth, config, log, db, cache, hooks, middleware, testutil, etc. |
-| `packages/ts`  | Shared TypeScript packages — UI primitives, block schemas, the plugin/theme SDKs. |
-| `migrations`   | `golang-migrate` SQL files. Applied by `gonext migrate up` or the Compose `migrate` one-shot. |
-| `themes`       | First-party theme bundles (the default theme is seeded by `migrate`). |
-| `plugins`      | First-party reference plugins (WASM bundles + manifests). |
-| `docs`         | The whole design corpus — architecture docs 00–19, ADRs, proposals, troubleshooting. |
-| `tools`        | One-off operator tooling: the compose smoke harness, the e2e Playwright suite. |
+| --- | --- |
+| `apps/api` | Go HTTP server. `/healthz`, `/readyz`, `/openapi.json`, `/docs/`, every `/api/v1/*` route. |
+| `apps/worker` | Asynq background-job consumer. Image processing, webhooks, cron leaders. |
+| `apps/admin` | Next.js admin dashboard. Login, setup wizard, posts/pages CRUD, marketplace, customizer. |
+| `apps/web` | Next.js public site. SSR/SSG/ISR, themes, sitemap, feeds. |
+| `apps/docs` | Static documentation site (deploys separately from the app). |
+| `cli/gonext` | The `gonext` administrative CLI. `init`, `migrate`, `theme`, `plugin`, `bench`, `config`. |
+| `packages/go` | Shared Go packages — auth, config, log, db, cache, hooks, middleware, testutil, etc. |
+| `packages/ts` | Shared TypeScript packages — UI primitives, block schemas, the plugin/theme SDKs. |
+| `migrations` | `golang-migrate` SQL files. Applied by `gonext migrate up` or the Compose `migrate` one-shot. |
+| `themes` | First-party theme bundles (the default theme is seeded by `migrate`). |
+| `plugins` | First-party reference plugins (WASM bundles + manifests). |
+| `docs` | The whole design corpus — architecture docs 00–19, ADRs, proposals, troubleshooting. |
+| `tools` | One-off operator tooling: the compose smoke harness, the e2e Playwright suite. |
 
 ---
 
@@ -126,7 +126,7 @@ For a fuller list — Next.js prerender failures on `useSearchParams` missing `S
 If you want the next layer down, read these in order.
 
 | Document | What it covers |
-|---|---|
+| --- | --- |
 | [`docs/00-architecture-overview.md`](docs/00-architecture-overview.md) | The shared foundation. Stack, the three hard problems, the topology, the phasing plan. **Read first.** |
 | [`docs/17-environment.md`](docs/17-environment.md) | Every env var the loader reads — type, default, redaction rules, K8s + systemd shapes. |
 | [`docs/18-local-development.md`](docs/18-local-development.md) | The dev-stack reference: Make targets, the override pattern, the smoke harness, troubleshooting. |

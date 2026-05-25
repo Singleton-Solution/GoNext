@@ -307,14 +307,14 @@ volumes are gone. The build cache survives unless you also prune.
 ## 6. Getting more diagnostics
 
 | Need | How |
-|---|---|
-| All service logs (live)    | `make logs`                                              |
-| One service's logs         | `docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f api`  |
-| API config (secrets masked) | `docker compose run --rm migrate gonext config dump`     |
-| psql shell                 | `make psql`                                              |
-| Redis shell                | `make redis-cli`                                         |
-| Full smoke probe           | `make smoke` (brings up, probes every healthz, tears down) |
-| Crank up API logs          | `GONEXT_LOG_LEVEL=DEBUG` and `GONEXT_LOG_ADDSRC=true` in `docker-compose.override.yml` |
+| --- | --- |
+| All service logs (live) | `make logs` |
+| One service's logs | `docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f api` |
+| API config (secrets masked) | `docker compose run --rm migrate gonext config dump` |
+| psql shell | `make psql` |
+| Redis shell | `make redis-cli` |
+| Full smoke probe | `make smoke` (brings up, probes every healthz, tears down) |
+| Crank up API logs | `GONEXT_LOG_LEVEL=DEBUG` and `GONEXT_LOG_ADDSRC=true` in `docker-compose.override.yml` |
 
 If you've ruled the symptom out as a known issue and the stack is
 still misbehaving, open a GitHub issue with the output of `make ps`,
