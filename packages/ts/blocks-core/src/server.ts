@@ -101,6 +101,10 @@ import {
   save as mediaTextSave,
   serverRender as mediaTextServerRender,
 } from './media-text/save.ts';
+import {
+  save as navigationSave,
+  serverRender as navigationServerRender,
+} from './navigation/save.ts';
 
 /**
  * Signature of a server-side render hint. Mirrors the
@@ -136,6 +140,7 @@ export const CORE_SERVER_RENDERERS: ReadonlyArray<
   ['core/file', fileServerRender as BlockServerRenderer],
   ['core/embed', embedServerRender as BlockServerRenderer],
   ['core/media-text', mediaTextServerRender as BlockServerRenderer],
+  ['core/navigation', navigationServerRender as BlockServerRenderer],
 ];
 
 /**
@@ -177,4 +182,6 @@ export {
   embedServerRender,
   mediaTextSave,
   mediaTextServerRender,
+  navigationSave,
+  navigationServerRender,
 };

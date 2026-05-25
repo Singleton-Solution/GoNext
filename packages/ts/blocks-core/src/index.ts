@@ -1,7 +1,7 @@
 /**
  * @gonext/blocks-core — public entry point.
  *
- * Ships the seventeen **core** blocks every GoNext install relies on:
+ * Ships the eighteen **core** blocks every GoNext install relies on:
  *
  *  - `core/paragraph`  — plain narrative text
  *  - `core/heading`    — h1..h6 with optional anchor
@@ -20,6 +20,7 @@
  *  - `core/file`       — downloadable file link + button
  *  - `core/embed`      — provider-aware oEmbed wrapper
  *  - `core/media-text` — two-column image + text with position toggle
+ *  - `core/navigation` — `<nav>` menu with optional mobile hamburger
  *
  * Every block exposes:
  *  - **`definition`** — `BlockTypeDefinition` for the registry
@@ -53,6 +54,7 @@ import { button } from './button/index.ts';
 import { file } from './file/index.ts';
 import { embed } from './embed/index.ts';
 import { mediaText } from './media-text/index.ts';
+import { navigation } from './navigation/index.ts';
 
 // Per-block re-exports so consumers can `import { paragraph } from
 // '@gonext/blocks-core'` and reach into `paragraph.definition`,
@@ -74,6 +76,7 @@ export { button } from './button/index.ts';
 export { file } from './file/index.ts';
 export { embed } from './embed/index.ts';
 export { mediaText } from './media-text/index.ts';
+export { navigation } from './navigation/index.ts';
 
 // Edit components are re-exported so app code that wants to mount a single
 // block in isolation (e.g. a focused review surface) can do so without
@@ -95,6 +98,7 @@ export { ButtonEdit } from './button/index.ts';
 export { FileEdit } from './file/index.ts';
 export { EmbedEdit } from './embed/index.ts';
 export { MediaTextEdit } from './media-text/index.ts';
+export { NavigationEdit } from './navigation/index.ts';
 
 // Per-block attribute types.
 export type { ParagraphAttributes } from './paragraph/index.ts';
@@ -114,6 +118,10 @@ export type { ButtonAttributes } from './button/index.ts';
 export type { FileAttributes } from './file/index.ts';
 export type { EmbedAttributes, EmbedProvider } from './embed/index.ts';
 export type { MediaTextAttributes } from './media-text/index.ts';
+export type {
+  NavigationAttributes,
+  NavigationItem,
+} from './navigation/index.ts';
 
 // Embed provider detection — exposed so the editor's URL-paste handler
 // can compute the slug before persisting it on the block.
@@ -149,6 +157,7 @@ export const CORE_BLOCKS = [
   file,
   embed,
   mediaText,
+  navigation,
 ] as const;
 
 /**
