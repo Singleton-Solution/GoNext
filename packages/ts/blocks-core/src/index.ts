@@ -1,24 +1,27 @@
 /**
  * @gonext/blocks-core — public entry point.
  *
- * Ships the sixteen **core** blocks every GoNext install relies on:
+ * Ships the nineteen **core** blocks every GoNext install relies on:
  *
- *  - `core/paragraph` — plain narrative text
- *  - `core/heading`   — h1..h6 with optional anchor
- *  - `core/list`      — ordered / unordered list
- *  - `core/image`     — figure / image / caption / link
- *  - `core/quote`     — blockquote with citation
- *  - `core/code`      — pre / code with optional language hint
- *  - `core/separator` — visual `<hr/>` divider
- *  - `core/spacer`    — vertical whitespace
- *  - `core/columns`   — N-column layout container
- *  - `core/group`     — generic wrapper container
- *  - `core/table`     — tabular data with optional thead/tfoot/caption
- *  - `core/gallery`   — image grid with reorder + crop
- *  - `core/video`     — `<figure><video/></figure>` with playback flags
- *  - `core/button`    — call-to-action link styled as a button
- *  - `core/file`      — downloadable file link + button
- *  - `core/embed`     — provider-aware oEmbed wrapper
+ *  - `core/paragraph`  — plain narrative text
+ *  - `core/heading`    — h1..h6 with optional anchor
+ *  - `core/list`       — ordered / unordered list
+ *  - `core/image`      — figure / image / caption / link
+ *  - `core/quote`      — blockquote with citation
+ *  - `core/code`       — pre / code with optional language hint
+ *  - `core/separator`  — visual `<hr/>` divider
+ *  - `core/spacer`     — vertical whitespace
+ *  - `core/columns`    — N-column layout container
+ *  - `core/group`      — generic wrapper container
+ *  - `core/table`      — tabular data with optional thead/tfoot/caption
+ *  - `core/gallery`    — image grid with reorder + crop
+ *  - `core/video`      — `<figure><video/></figure>` with playback flags
+ *  - `core/button`     — call-to-action link styled as a button
+ *  - `core/file`       — downloadable file link + button
+ *  - `core/embed`      — provider-aware oEmbed wrapper
+ *  - `core/media-text` — two-column image + text with position toggle
+ *  - `core/navigation` — `<nav>` menu with optional mobile hamburger
+ *  - `core/query`      — dynamic post loop driven by attribute filters
  *
  * Every block exposes:
  *  - **`definition`** — `BlockTypeDefinition` for the registry
@@ -51,6 +54,9 @@ import { video } from './video/index.ts';
 import { button } from './button/index.ts';
 import { file } from './file/index.ts';
 import { embed } from './embed/index.ts';
+import { mediaText } from './media-text/index.ts';
+import { navigation } from './navigation/index.ts';
+import { query } from './query/index.ts';
 
 // Per-block re-exports so consumers can `import { paragraph } from
 // '@gonext/blocks-core'` and reach into `paragraph.definition`,
@@ -71,6 +77,9 @@ export { video } from './video/index.ts';
 export { button } from './button/index.ts';
 export { file } from './file/index.ts';
 export { embed } from './embed/index.ts';
+export { mediaText } from './media-text/index.ts';
+export { navigation } from './navigation/index.ts';
+export { query } from './query/index.ts';
 
 // Edit components are re-exported so app code that wants to mount a single
 // block in isolation (e.g. a focused review surface) can do so without
@@ -91,6 +100,9 @@ export { VideoEdit } from './video/index.ts';
 export { ButtonEdit } from './button/index.ts';
 export { FileEdit } from './file/index.ts';
 export { EmbedEdit } from './embed/index.ts';
+export { MediaTextEdit } from './media-text/index.ts';
+export { NavigationEdit } from './navigation/index.ts';
+export { QueryEdit } from './query/index.ts';
 
 // Per-block attribute types.
 export type { ParagraphAttributes } from './paragraph/index.ts';
@@ -109,6 +121,16 @@ export type { VideoAttributes } from './video/index.ts';
 export type { ButtonAttributes } from './button/index.ts';
 export type { FileAttributes } from './file/index.ts';
 export type { EmbedAttributes, EmbedProvider } from './embed/index.ts';
+export type { MediaTextAttributes } from './media-text/index.ts';
+export type {
+  NavigationAttributes,
+  NavigationItem,
+} from './navigation/index.ts';
+export type {
+  QueryAttributes,
+  QueryOrder,
+  QueryOrderBy,
+} from './query/index.ts';
 
 // Embed provider detection — exposed so the editor's URL-paste handler
 // can compute the slug before persisting it on the block.
@@ -119,6 +141,8 @@ export { detectProvider, EMBED_PROVIDERS } from './embed/index.ts';
 // rendered children into the static save() output.
 export { COLUMNS_INNER_SENTINEL } from './columns/index.ts';
 export { GROUP_INNER_SENTINEL } from './group/index.ts';
+export { MEDIA_TEXT_INNER_SENTINEL } from './media-text/index.ts';
+export { QUERY_INNER_SENTINEL } from './query/index.ts';
 
 /**
  * The complete ordered list of every core block, in the order they appear
@@ -142,6 +166,9 @@ export const CORE_BLOCKS = [
   button,
   file,
   embed,
+  mediaText,
+  navigation,
+  query,
 ] as const;
 
 /**

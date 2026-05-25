@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`core/query > snapshot: default query 1`] = `"<ul class="wp-block-query gn-block-query is-order-by-date is-order-desc" data-gn-query-limit="10" data-gn-query-offset="0" data-gn-query-order="desc" data-gn-query-order-by="date"><!--gn-query-loop--></ul>"`;
+
+exports[`core/query > snapshot: filtered query with custom order 1`] = `"<ul class="wp-block-query gn-block-query is-order-by-title is-order-asc" data-gn-query-limit="5" data-gn-query-offset="0" data-gn-query-order="asc" data-gn-query-order-by="title" data-gn-query-author="jane" data-gn-query-category="news" data-gn-query-sticky="true"><!--gn-query-loop--></ul>"`;

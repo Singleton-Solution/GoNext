@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`core/media-text > snapshot: default media-text 1`] = `"<div class="gn-block-media-text is-media-on-the-left" style="grid-template-columns:50% 50%"><figure class="gn-block-media-text__media"><img src="https://x/a.png" alt="A"/></figure><div class="gn-block-media-text__content"><!--gn-inner-blocks--></div></div>"`;
+
+exports[`core/media-text > snapshot: media on the right with fill + center alignment 1`] = `"<div class="gn-block-media-text is-media-on-the-right is-vertically-aligned-center has-media-on-the-fill" style="grid-template-columns:60% 40%"><div class="gn-block-media-text__content"><!--gn-inner-blocks--></div><figure class="gn-block-media-text__media"><img src="https://x/a.png" alt="A"/></figure></div>"`;

@@ -97,6 +97,18 @@ import {
   save as embedSave,
   serverRender as embedServerRender,
 } from './embed/save.ts';
+import {
+  save as mediaTextSave,
+  serverRender as mediaTextServerRender,
+} from './media-text/save.ts';
+import {
+  save as navigationSave,
+  serverRender as navigationServerRender,
+} from './navigation/save.ts';
+import {
+  save as querySave,
+  serverRender as queryServerRender,
+} from './query/save.ts';
 
 /**
  * Signature of a server-side render hint. Mirrors the
@@ -131,6 +143,9 @@ export const CORE_SERVER_RENDERERS: ReadonlyArray<
   ['core/button', buttonServerRender as BlockServerRenderer],
   ['core/file', fileServerRender as BlockServerRenderer],
   ['core/embed', embedServerRender as BlockServerRenderer],
+  ['core/media-text', mediaTextServerRender as BlockServerRenderer],
+  ['core/navigation', navigationServerRender as BlockServerRenderer],
+  ['core/query', queryServerRender as BlockServerRenderer],
 ];
 
 /**
@@ -170,4 +185,10 @@ export {
   fileServerRender,
   embedSave,
   embedServerRender,
+  mediaTextSave,
+  mediaTextServerRender,
+  navigationSave,
+  navigationServerRender,
+  querySave,
+  queryServerRender,
 };

@@ -33,6 +33,9 @@ const EXPECTED_NAMES = [
   'core/button',
   'core/file',
   'core/embed',
+  'core/media-text',
+  'core/navigation',
+  'core/query',
 ] as const;
 
 describe('registerCoreBlocks', () => {
@@ -45,7 +48,7 @@ describe('registerCoreBlocks', () => {
     expect(r.list()).toHaveLength(EXPECTED_NAMES.length);
   });
 
-  it('CORE_BLOCKS is exactly the 16 expected entries, in the expected order', () => {
+  it('CORE_BLOCKS is exactly the 19 expected entries, in the expected order', () => {
     expect(CORE_BLOCKS.map((b) => b.definition.name)).toStrictEqual(
       EXPECTED_NAMES,
     );
@@ -120,6 +123,29 @@ describe('registerCoreBlocks', () => {
         attributes: { href: 'https://x/a.pdf', fileName: 'a.pdf' },
       },
       { type: 'core/embed', attributes: { url: 'https://youtu.be/abc' } },
+      {
+        type: 'core/media-text',
+        attributes: { mediaUrl: 'https://x/a.png', mediaAlt: 'A' },
+        innerBlocks: [
+          { type: 'core/paragraph', attributes: { content: 'side' } },
+        ],
+      },
+      {
+        type: 'core/navigation',
+        attributes: {
+          items: [
+            { label: 'Home', url: '/' },
+            { label: 'Blog', url: '/blog' },
+          ],
+        },
+      },
+      {
+        type: 'core/query',
+        attributes: { limit: 5 },
+        innerBlocks: [
+          { type: 'core/heading', attributes: { content: 'Post', level: 3 } },
+        ],
+      },
     ];
     const result = r.validate(tree);
     expect(result.errors).toStrictEqual([]);
