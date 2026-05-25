@@ -114,7 +114,7 @@ a:hover {
 .gn-site-main {
   max-width: var(--wp-preset--layout--content);
   margin: 0 auto;
-  padding: var(--s-7) var(--s-4);
+  padding: var(--s-10) var(--s-5);
 }
 
 .gn-site-header,
@@ -131,31 +131,276 @@ a:hover {
   font-size: var(--t-sm);
 }
 
+/* ---------------------------------------------------------------------------
+ * Single-post layout — Living-Systems editorial scale.
+ *
+ * The catch-all route hands a themed body to PublicShell; when the
+ * theme has no override the renderer's `fallbackSingularMain` emits
+ * the markup below. The CSS lives here so the same selectors stay
+ * predictable across themes that opt in by class name.
+ *
+ * Type rules per the handoff:
+ *  - Title is Archivo 800 at the page scale (clamp 40px → 64px).
+ *    The italic-accent rule inside the title fires for any <em>.
+ *  - Meta row is Geist Mono 12px, fg-subtle, uppercased eyebrow.
+ *  - Body is Geist 17px with line-height 1.65 — generous for long
+ *    editorial reads. Paragraph spacing scales from --s-4.
+ *  - Optional drop-cap on the first paragraph: Archivo 800, 4-line
+ *    initial, emerald-deep colour, sits on `.gn-post-content > p:first-of-type`.
+ * ------------------------------------------------------------------------- */
+.gn-post {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
 .gn-post-meta {
-  color: var(--fg-muted);
-  font-size: var(--t-sm);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3);
   margin-bottom: var(--s-5);
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--fg-subtle);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .gn-post-meta > * + *::before {
-  content: ' · ';
-  margin: 0 var(--s-1);
+  content: '·';
+  margin-right: var(--s-3);
+  color: var(--emerald-deep);
+}
+
+.gn-post-meta__author {
+  color: var(--fg-muted);
+}
+
+.gn-post-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(40px, 5.5vw, 64px);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--track-tight);
+  color: var(--ink);
+  margin: 0 0 var(--s-7);
+  text-wrap: balance;
+}
+
+.gn-post-title em {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-style: italic;
+  font-size: 1.05em;
+  color: var(--emerald-deep);
+  letter-spacing: -0.01em;
+}
+
+.gn-post-content {
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--ink-soft);
+}
+
+.gn-post-content > * + * {
+  margin-top: var(--s-4);
+}
+
+.gn-post-content > p {
+  text-wrap: pretty;
+}
+
+.gn-post-content h2 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--t-3xl);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--track-tight);
+  color: var(--ink);
+  margin-top: var(--s-8);
+  margin-bottom: var(--s-3);
+}
+
+.gn-post-content h2 em {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-style: italic;
+  color: var(--emerald-deep);
+}
+
+.gn-post-content h3 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: var(--t-xl);
+  line-height: var(--lh-snug);
+  color: var(--ink);
+  margin-top: var(--s-6);
+  margin-bottom: var(--s-2);
+}
+
+.gn-post-content a {
+  color: var(--emerald-deep);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  text-decoration-thickness: 1px;
+}
+
+.gn-post-content a:hover {
+  text-decoration-thickness: 2px;
+}
+
+.gn-post-content blockquote {
+  margin: var(--s-6) 0;
+  padding: var(--s-4) var(--s-6);
+  border-left: 3px solid var(--emerald);
+  background: var(--paper-2);
+  font-family: var(--font-serif);
+  font-size: var(--t-xl);
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--ink);
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+}
+
+.gn-post-content code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  padding: 0.1em 0.3em;
+  background: var(--paper-3);
+  border-radius: var(--r-xs);
+}
+
+.gn-post-content pre {
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  padding: var(--s-5);
+  background: var(--forest);
+  color: var(--fg-on-forest);
+  border-radius: var(--r-md);
+  overflow-x: auto;
+}
+
+.gn-post-content pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.gn-post-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--r-lg);
+}
+
+/* Optional drop-cap on the first paragraph — opt-in via class. */
+.gn-post-content.has-dropcap > p:first-of-type::first-letter {
+  float: left;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 4.2em;
+  line-height: 0.85;
+  margin: 0.05em 0.1em 0 0;
+  color: var(--emerald-deep);
 }
 
 .gn-archive-list {
   list-style: none;
   padding: 0;
+  margin: 0;
+  max-width: var(--wp-preset--layout--content);
 }
 
-.gn-archive-item + .gn-archive-item {
-  margin-top: var(--s-7);
+.gn-archive-item {
+  padding: var(--s-6) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.gn-archive-item:last-child {
+  border-bottom: 0;
+}
+
+.gn-archive-heading {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(32px, 4vw, 44px);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--track-tight);
+  color: var(--ink);
+  margin: 0 0 var(--s-7);
+}
+
+.gn-archive-heading em {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-style: italic;
+  color: var(--emerald-deep);
 }
 
 .gn-archive-title {
-  margin: 0;
+  margin: 0 0 var(--s-2);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--t-xl);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--track-tight);
+}
+
+.gn-archive-title a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.gn-archive-title a:hover {
+  color: var(--emerald-deep);
+}
+
+.gn-archive-excerpt {
+  margin-top: var(--s-2);
+  color: var(--fg-muted);
+  font-size: var(--t-md);
+  line-height: var(--lh-normal);
 }
 
 .gn-404 {
   text-align: center;
-  padding: var(--s-9) 0;
+  padding: var(--s-10) var(--s-4);
+}
+
+.gn-404__eyebrow {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--danger);
+  margin-bottom: var(--s-3);
+}
+
+.gn-404 h1 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(48px, 6vw, 96px);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--track-tight);
+  color: var(--ink);
+  margin: 0 0 var(--s-4);
+}
+
+.gn-404 h1 em {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-style: italic;
+  color: var(--emerald-deep);
+}
+
+.gn-404 p {
+  margin: 0 0 var(--s-4);
+  color: var(--fg-muted);
+}
+
+.gn-404 a {
+  color: var(--emerald-deep);
+  text-decoration: none;
 }
