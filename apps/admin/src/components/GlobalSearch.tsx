@@ -28,6 +28,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { ChangeEvent, KeyboardEvent, ReactElement } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { Search as SearchIcon } from 'lucide-react';
 import { api, ApiError } from '@/lib/api-client';
 
 // DEBOUNCE_MS is the input-to-fetch delay. Tuned for fast typists:
@@ -230,16 +231,21 @@ export function GlobalSearch(
   );
 
   return (
-    <div className="global-search" role="search">
+    <div className="global-search" role="search" data-testid="global-search">
       <label className="visually-hidden" htmlFor={inputId}>
         Search posts, pages, and users
       </label>
+      <SearchIcon
+        aria-hidden="true"
+        className="global-search__icon"
+        size={14}
+      />
       <input
         id={inputId}
         ref={inputRef}
         type="search"
         className="global-search__input"
-        placeholder="Search…  (⌘K)"
+        placeholder="Search posts, pages, users…"
         value={query}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
@@ -262,6 +268,7 @@ export function GlobalSearch(
         }
         role="combobox"
       />
+      <kbd className="global-search__kbd" aria-hidden="true">⌘K</kbd>
       {open && (
         <ul
           id={listboxId}
