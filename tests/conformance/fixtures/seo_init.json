@@ -1,0 +1,40 @@
+{
+  "bundle": "examples/plugins/seo",
+  "suite": "conformance",
+  "pass": true,
+  "results": [
+    {
+      "name": "init.expected-trace",
+      "status": "pass",
+      "message": "seo plugin's init records one cron+audit+log call",
+      "events": [
+        {
+          "kind": "gn_cron_register",
+          "at": "2025-01-01T00:00:00Z",
+          "args": {
+            "handler": "handle",
+            "name": "seo.recompute-scores",
+            "spec": "0 * * * *"
+          }
+        },
+        {
+          "kind": "gn_audit_emit",
+          "at": "2025-01-01T00:00:00Z",
+          "args": {
+            "event_type": "plugin.init",
+            "metadata": {"slug": "gonext-seo"},
+            "slug": ""
+          }
+        },
+        {
+          "kind": "gn_log",
+          "at": "2025-01-01T00:00:00Z",
+          "args": {
+            "level": 1,
+            "msg": "init complete"
+          }
+        }
+      ]
+    }
+  ]
+}
