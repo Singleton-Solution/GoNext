@@ -1,0 +1,436 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ThemeBrowser > snapshots the gallery shape so visual structure is locked in 1`] = `
+<DocumentFragment>
+  <section
+    aria-labelledby="appearance-heading"
+    class="flex flex-col gap-12 pb-16"
+    data-testid="theme-browser"
+  >
+    <header
+      class="flex flex-col gap-3 border-b border-border pb-8"
+    >
+      <span
+        class="font-sans text-2xs font-medium uppercase tracking-[0.12em] text-emerald-deep"
+      >
+        Appearance · 2 themes installed
+      </span>
+      <h1
+        class="font-display font-extrabold tracking-tight m-0 text-ink [&_em]:font-serif [&_em]:italic [&_em]:font-normal [&_em]:text-[1.05em] [&_em]:tracking-[-0.01em] [&_em]:text-emerald-deep data-[surface=forest]:text-fg-on-forest [[data-surface=forest]_&]:text-fg-on-forest data-[surface=forest]:[&_em]:text-emerald-bright [[data-surface=forest]_&]:[&_em]:text-emerald-bright text-[clamp(40px,5.5vw,64px)] leading-[1.0]"
+        id="appearance-heading"
+      >
+        Themes & 
+        <em>
+          appearance
+        </em>
+        .
+      </h1>
+      <p
+        class="max-w-[640px] text-md leading-normal text-fg-muted"
+      >
+        Every theme is a living system — pick the one that fits the shape of your site today, then bend it with the customizer. Switching is one click; nothing in your content moves.
+      </p>
+    </header>
+    <div
+      class="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3"
+      data-testid="theme-grid"
+      role="list"
+    >
+      <article
+        class="group relative flex flex-col overflow-hidden rounded-lg border bg-paper-2 transition-all duration-[160ms] ease-brand shadow-xs hover:-translate-y-[2px] hover:shadow-md border-emerald-bright ring-2 ring-emerald-bright/35"
+        data-active="true"
+        data-testid="theme-card-gn-hello"
+        role="listitem"
+      >
+        <span
+          class="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-pill bg-emerald px-2 py-[3px] font-sans text-2xs font-semibold uppercase tracking-wider text-emerald-ink shadow-xs"
+          data-testid="theme-badge-gn-hello"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-sparkles h-3 w-3"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"
+            />
+            <path
+              d="M20 3v4"
+            />
+            <path
+              d="M22 5h-4"
+            />
+            <path
+              d="M4 17v2"
+            />
+            <path
+              d="M5 18H3"
+            />
+          </svg>
+          Active
+        </span>
+        <div
+          class="relative aspect-[4/3] overflow-hidden border-b border-border bg-paper"
+          data-preview="editorial"
+        >
+          <div
+            class="absolute inset-3 flex flex-col overflow-hidden rounded-sm border border-border shadow-sm"
+          >
+            <div
+              class="flex gap-1 border-b border-border bg-paper-3 px-2 py-[5px]"
+            >
+              <span
+                class="block h-[6px] w-[6px] rounded-full bg-fg-faint/60"
+              />
+              <span
+                class="block h-[6px] w-[6px] rounded-full bg-fg-faint/60"
+              />
+              <span
+                class="block h-[6px] w-[6px] rounded-full bg-fg-faint/60"
+              />
+            </div>
+            <div
+              class="flex-1 overflow-hidden"
+            >
+              <div
+                class="flex h-full flex-col gap-1.5 bg-paper p-3.5"
+              >
+                <span
+                  class="font-sans text-[8px] font-medium uppercase tracking-[0.14em] text-emerald-deep"
+                >
+                  // 02 — Sourcing
+                </span>
+                <span
+                  class="font-display text-[18px] font-extrabold leading-none tracking-tight text-ink"
+                >
+                  Single-
+                  <em
+                    class="font-serif text-[1.05em] font-normal italic text-emerald-deep"
+                  >
+                    origin
+                  </em>
+                  .
+                </span>
+                <span
+                  class="text-[8px] leading-[1.5] text-fg-muted"
+                >
+                  Five years, eleven trips, a few thousand cups later.
+                </span>
+                <div
+                  class="mt-1 h-9 overflow-hidden rounded-[3px]"
+                  style="background: linear-gradient(135deg, #1F2D26 0%, #0E1A14 100%);"
+                >
+                  <div
+                    aria-hidden="true"
+                    class="h-full w-full"
+                    style="background-image: radial-gradient(circle at 30% 60%, rgba(52, 211, 153, 0.4) 0%, transparent 40%), radial-gradient(circle at 70% 20%, rgba(167, 139, 250, 0.3) 0%, transparent 40%);"
+                  />
+                </div>
+                <div
+                  class="mt-1 h-[5px] w-4/5 rounded-[2px] bg-paper-3"
+                />
+                <div
+                  class="h-[5px] w-1/2 rounded-[2px] bg-paper-3"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          class="flex flex-1 flex-col gap-3 p-5"
+        >
+          <div
+            class="flex items-baseline justify-between gap-3"
+          >
+            <h2
+              class="font-display text-xl font-bold tracking-tight text-ink"
+            >
+              Hello
+            </h2>
+            <span
+              class="font-sans text-2xs font-medium uppercase tracking-[0.08em] text-fg-subtle"
+            >
+              Editorial
+            </span>
+          </div>
+          <p
+            class="text-sm leading-normal text-fg-muted [&_em]:font-serif [&_em]:italic [&_em]:font-normal [&_em]:text-emerald-deep"
+          >
+            <span>
+              A 
+            </span>
+            <em
+              class="font-serif italic font-normal text-emerald-deep"
+            >
+              living
+            </em>
+            <span>
+               starter theme.
+            </span>
+          </p>
+          <div
+            class="mt-auto flex items-center justify-between gap-3 border-t border-border pt-4"
+          >
+            <div
+              class="flex flex-wrap gap-1"
+            >
+              <span
+                class="inline-flex items-center rounded-sm border border-border bg-paper-3 px-2 py-[2px] font-sans text-2xs font-medium text-fg-muted"
+              >
+                Editorial
+              </span>
+            </div>
+            <button
+              aria-label="Hello is the active theme"
+              class="inline-flex items-center gap-[6px] rounded-md font-display text-xs font-bold leading-none transition-colors duration-[160ms] ease-brand px-3 py-[7px] shadow-xs focus-visible:outline-none focus-visible:shadow-focus cursor-default bg-emerald-soft text-emerald-deep"
+              data-testid="theme-activate-gn-hello"
+              disabled=""
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-check h-3 w-3"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M20 6 9 17l-5-5"
+                />
+              </svg>
+              Active
+            </button>
+          </div>
+        </div>
+      </article>
+      <article
+        class="group relative flex flex-col overflow-hidden rounded-lg border bg-paper-2 transition-all duration-[160ms] ease-brand shadow-xs hover:-translate-y-[2px] hover:shadow-md border-border hover:border-border-strong"
+        data-testid="theme-card-counter"
+        role="listitem"
+      >
+        <div
+          class="relative aspect-[4/3] overflow-hidden border-b border-border bg-paper"
+          data-preview="shop"
+        >
+          <div
+            class="absolute inset-3 flex flex-col overflow-hidden rounded-sm border border-border shadow-sm"
+          >
+            <div
+              class="flex gap-1 border-b border-border bg-paper-3 px-2 py-[5px]"
+            >
+              <span
+                class="block h-[6px] w-[6px] rounded-full bg-fg-faint/60"
+              />
+              <span
+                class="block h-[6px] w-[6px] rounded-full bg-fg-faint/60"
+              />
+              <span
+                class="block h-[6px] w-[6px] rounded-full bg-fg-faint/60"
+              />
+            </div>
+            <div
+              class="flex-1 overflow-hidden"
+            >
+              <div
+                class="grid h-full grid-cols-2 content-start gap-1.5 bg-paper p-3"
+              >
+                <div
+                  class="col-span-2 font-display text-[13px] font-extrabold tracking-tight text-ink"
+                >
+                  Brick & 
+                  <em
+                    class="font-serif font-normal italic text-emerald-deep"
+                  >
+                    Mortar
+                  </em>
+                  .
+                </div>
+                <div
+                  class="flex flex-col gap-[3px] rounded-[4px] border border-border bg-paper-2 p-1.5"
+                >
+                  <div
+                    aria-hidden="true"
+                    class="relative h-6 overflow-hidden rounded-[2px] bg-forest"
+                  >
+                    <div
+                      class="absolute inset-0"
+                      style="background: radial-gradient(circle at 60% 50%, rgba(52, 211, 153, 0.4) 0%, transparent 60%);"
+                    />
+                  </div>
+                  <span
+                    class="text-[7px] font-semibold text-ink"
+                  >
+                    Roaster v2
+                  </span>
+                  <span
+                    class="font-mono text-[7px] text-fg-muted"
+                  >
+                    $420
+                  </span>
+                </div>
+                <div
+                  class="flex flex-col gap-[3px] rounded-[4px] border border-border bg-paper-2 p-1.5"
+                >
+                  <div
+                    aria-hidden="true"
+                    class="relative h-6 overflow-hidden rounded-[2px] bg-forest"
+                  >
+                    <div
+                      class="absolute inset-0"
+                      style="background: radial-gradient(circle at 60% 50%, rgba(167, 139, 250, 0.5) 0%, transparent 60%);"
+                    />
+                  </div>
+                  <span
+                    class="text-[7px] font-semibold text-ink"
+                  >
+                    Burr Grinder
+                  </span>
+                  <span
+                    class="font-mono text-[7px] text-fg-muted"
+                  >
+                    $180
+                  </span>
+                </div>
+                <div
+                  class="flex flex-col gap-[3px] rounded-[4px] border border-border bg-paper-2 p-1.5"
+                >
+                  <div
+                    aria-hidden="true"
+                    class="relative h-6 overflow-hidden rounded-[2px] bg-forest"
+                  >
+                    <div
+                      class="absolute inset-0"
+                      style="background: radial-gradient(circle at 60% 50%, rgba(52, 211, 153, 0.4) 0%, transparent 60%);"
+                    />
+                  </div>
+                  <span
+                    class="text-[7px] font-semibold text-ink"
+                  >
+                    Bag · 250g
+                  </span>
+                  <span
+                    class="font-mono text-[7px] text-fg-muted"
+                  >
+                    $22
+                  </span>
+                </div>
+                <div
+                  class="flex flex-col gap-[3px] rounded-[4px] border border-border bg-paper-2 p-1.5"
+                >
+                  <div
+                    aria-hidden="true"
+                    class="relative h-6 overflow-hidden rounded-[2px] bg-forest"
+                  >
+                    <div
+                      class="absolute inset-0"
+                      style="background: radial-gradient(circle at 60% 50%, rgba(52, 211, 153, 0.4) 0%, transparent 60%);"
+                    />
+                  </div>
+                  <span
+                    class="text-[7px] font-semibold text-ink"
+                  >
+                    Subscription
+                  </span>
+                  <span
+                    class="font-mono text-[7px] text-fg-muted"
+                  >
+                    $18/mo
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          class="flex flex-1 flex-col gap-3 p-5"
+        >
+          <div
+            class="flex items-baseline justify-between gap-3"
+          >
+            <h2
+              class="font-display text-xl font-bold tracking-tight text-ink"
+            >
+              Counter
+            </h2>
+            <span
+              class="font-sans text-2xs font-medium uppercase tracking-[0.08em] text-fg-subtle"
+            >
+              Commerce
+            </span>
+          </div>
+          <p
+            class="text-sm leading-normal text-fg-muted [&_em]:font-serif [&_em]:italic [&_em]:font-normal [&_em]:text-emerald-deep"
+          >
+            <span>
+              Commerce that 
+            </span>
+            <em
+              class="font-serif italic font-normal text-emerald-deep"
+            >
+              grows
+            </em>
+            <span>
+              .
+            </span>
+          </p>
+          <div
+            class="mt-auto flex items-center justify-between gap-3 border-t border-border pt-4"
+          >
+            <div
+              class="flex flex-wrap gap-1"
+            >
+              <span
+                class="inline-flex items-center rounded-sm border border-border bg-paper-3 px-2 py-[2px] font-sans text-2xs font-medium text-fg-muted"
+              >
+                Commerce
+              </span>
+            </div>
+            <button
+              aria-label="Activate Counter"
+              class="inline-flex items-center gap-[6px] rounded-md font-display text-xs font-bold leading-none transition-colors duration-[160ms] ease-brand px-3 py-[7px] shadow-xs focus-visible:outline-none focus-visible:shadow-focus bg-emerald text-emerald-ink hover:bg-emerald-deep hover:text-paper"
+              data-testid="theme-activate-counter"
+              type="button"
+            >
+              Activate
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-arrow-right h-3 w-3"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M5 12h14"
+                />
+                <path
+                  d="m12 5 7 7-7 7"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+</DocumentFragment>
+`;
