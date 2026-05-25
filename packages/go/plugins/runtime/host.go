@@ -81,6 +81,14 @@ func (r *Runtime) registerEnvHost(ctx context.Context) error {
 			[]api.ValueType{api.ValueTypeI64}).
 		Export("gn_time_ms")
 
+	// Layer the observability ABI (gn_i18n_translate, gn_metric_observe,
+	// gn_event_emit, gn_span_event) onto the same env builder so the
+	// guest imports them under one namespace. The function bodies live
+	// in host_observability.go and read per-Runtime configuration from
+	// the package-level observabilityRegistry side map, so this call
+	// does not require any constructor-time wiring on Runtime itself.
+	r.registerObservabilityHost(b)
+
 	if _, err := b.Instantiate(ctx); err != nil {
 		return fmt.Errorf("instantiate %q host module: %w", hostModuleName, err)
 	}
