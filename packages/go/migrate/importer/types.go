@@ -108,6 +108,24 @@ type Options struct {
 	// user resets — but callers can override it for tests or to
 	// pin a specific hash format.
 	PlaceholderPasswordHash string
+
+	// MediaMigrator, when non-nil, is the per-asset ingestion
+	// orchestrator the importer hands every WXR attachment URL.
+	// Wired up by the CLI or the migration wizard UI from the
+	// operator's selection of "copy" vs "proxy" mode (#187, #234).
+	//
+	// Nil disables media migration entirely — the importer still
+	// records attachment posts but does not download or proxy the
+	// underlying bytes; the post bodies retain their original
+	// source URLs and the imported site falls back to hot-linking.
+	MediaMigrator *MediaMigrator
+
+	// MediaUploaderID is the GoNext users.id the MediaMigrator
+	// attributes every migrated media row to. Required when
+	// MediaMigrator is non-nil; empty triggers an error at Run-
+	// validation time. Typically the operator who triggered the
+	// migration.
+	MediaUploaderID string
 }
 
 // resolved returns a copy of Options with defaults applied. Internal.
@@ -161,6 +179,28 @@ type Report struct {
 	// "attachment". They contribute to Posts as well; this is a
 	// secondary breakdown for the CLI report.
 	Attachments int
+
+	// MediaCopied is the number of attachment URLs the MediaMigrator
+	// successfully downloaded and stored locally. Always zero when
+	// the migration ran in proxy mode (or when no MediaMigrator was
+	// wired). Issue #187.
+	MediaCopied int
+
+	// MediaProxied is the number of attachment URLs the MediaMigrator
+	// registered as proxied rows. Always zero in copy mode.
+	MediaProxied int
+
+	// MediaSkipped is the number of attachment URLs the
+	// MediaMigrator did not ingest because a row already existed
+	// (idempotency hit on FindBySourceURL). Both modes can produce
+	// skips on a re-run.
+	MediaSkipped int
+
+	// MediaBytesFetched is the total number of source bytes the
+	// MediaMigrator downloaded in copy mode. Always zero in proxy
+	// mode. Useful for the CLI report to surface "we transferred
+	// X MB during the migration".
+	MediaBytesFetched int64
 
 	// Errors collects per-record failures. Never nil-checked by
 	// callers — an empty slice means "no errors" and an unset slice

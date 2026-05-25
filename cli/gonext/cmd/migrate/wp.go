@@ -28,6 +28,7 @@ Flags:
   --on-conflict string  Conflict policy: skip | update | fail. Default "skip".
   --batch-size int      Number of post rows per transaction. Default 100.
   --skip-comments       Do not import comment threads.
+  --media-mode string   Media migration mode: '' (off, default), 'copy', or 'proxy'. See issue #187.
 
 Environment:
   DATABASE_URL              Required (unless --dry-run). Postgres DSN.
@@ -54,12 +55,14 @@ func runWP(args []string, stdout, stderr io.Writer) int {
 		conflictFlag     string
 		batchSizeFlag    int
 		skipCommentsFlag bool
+		mediaModeFlag    string
 	)
 	fs.StringVar(&fileFlag, "file", "", "Path to WXR XML export (required)")
 	fs.BoolVar(&dryFlag, "dry-run", false, "Walk the WXR but write no rows")
 	fs.StringVar(&conflictFlag, "on-conflict", "skip", "Conflict policy: skip | update | fail")
 	fs.IntVar(&batchSizeFlag, "batch-size", 100, "Posts per transaction")
 	fs.BoolVar(&skipCommentsFlag, "skip-comments", false, "Skip comment import")
+	fs.StringVar(&mediaModeFlag, "media-mode", "", "Media migration mode: '' (off), 'copy' (download bytes), 'proxy' (proxy via image proxy). See issue #187.")
 	fs.Usage = func() { fmt.Fprintln(stderr, wpUsage) }
 
 	if err := fs.Parse(args); err != nil {
@@ -79,6 +82,20 @@ func runWP(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		fmt.Fprintf(stderr, "gonext migrate wp: %v\n", err)
 		return ExitUsage
+	}
+
+	// Media migration mode is opt-in: an empty flag value disables
+	// the MediaMigrator entirely (post bodies retain their source
+	// URLs; the imported site hot-links to the source). Operators
+	// pick 'copy' or 'proxy' explicitly when they want migration.
+	// The CLI does not (yet) wire the MediaMigrator's storage
+	// backend — that requires DB + bucket configuration the wizard
+	// UI in #234 will supply.
+	if mediaModeFlag != "" {
+		if _, perr := importer.ParseMediaMode(mediaModeFlag); perr != nil {
+			fmt.Fprintf(stderr, "gonext migrate wp: %v\n", perr)
+			return ExitUsage
+		}
 	}
 
 	opts := importer.Options{
@@ -163,6 +180,14 @@ func printReport(w io.Writer, r *importer.Report, dryrun bool) {
 	fmt.Fprintf(w, "  posts:       %d\n", r.Posts)
 	fmt.Fprintf(w, "  attachments: %d\n", r.Attachments)
 	fmt.Fprintf(w, "  comments:    %d\n", r.Comments)
+	if r.MediaCopied > 0 || r.MediaProxied > 0 || r.MediaSkipped > 0 {
+		fmt.Fprintf(w, "  media copied:  %d\n", r.MediaCopied)
+		fmt.Fprintf(w, "  media proxied: %d\n", r.MediaProxied)
+		fmt.Fprintf(w, "  media skipped: %d\n", r.MediaSkipped)
+		if r.MediaBytesFetched > 0 {
+			fmt.Fprintf(w, "  media bytes:   %d\n", r.MediaBytesFetched)
+		}
+	}
 	fmt.Fprintf(w, "  errors:      %d\n", len(r.Errors))
 	fmt.Fprintf(w, "  took:        %s\n", r.Took)
 }
