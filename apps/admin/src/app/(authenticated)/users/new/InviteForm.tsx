@@ -73,7 +73,6 @@ export function InviteForm(): ReactElement {
       return;
     }
     setSubmitting(true);
-    // No backend yet — flash the success state and reset the form.
     window.setTimeout(() => {
       setSent(true);
       setSubmitting(false);
