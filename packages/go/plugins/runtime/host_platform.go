@@ -13,6 +13,7 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 
@@ -48,10 +49,14 @@ type AuditEmitterFunc interface {
 type platformContext struct {
 	secrets *SecretsService
 
-	// audit and cron are landed in their own follow-up files
-	// (platform_audit.go, platform_cron.go) and wired here by the
-	// matching commits. Kept as separate fields so the addition is
-	// purely additive once those types exist.
+	// audit is the rate-limited, slug-gated sink backing
+	// gn_audit_emit (#183). Nil when the host did not configure
+	// audit; the export is then absent.
+	audit *AuditSink
+
+	// cron lands in the follow-up commit for issue #191
+	// (platform_cron.go). The field will appear here in additive
+	// fashion once that type exists.
 
 	// slugFor maps a wazero module name to the plugin's slug. Nil is
 	// fine when the host uses "module name == slug" (the documented
@@ -113,10 +118,13 @@ func (p *platformContext) emitPlatform(ctx context.Context, log *slog.Logger, pl
 type PlatformConfig struct {
 	Secrets *SecretsService
 
-	// Audit and Cron are populated by the follow-up issues #183
-	// (gn_audit_emit) and #191 (gn_cron_register). The fields will
-	// be added in the matching commits; carrying them as a single
-	// PlatformConfig shape keeps the caller API stable across issues.
+	// Audit is the per-plugin slug-gated rate-limited audit emitter
+	// backing gn_audit_emit (#183). May be nil.
+	Audit *AuditSink
+
+	// Cron is populated by the follow-up issue #191
+	// (gn_cron_register). The field is added in the matching commit;
+	// PlatformConfig grows additively.
 
 	PlatformEmitter AuditEmitterFunc
 	SlugFor         func(moduleName string) string
@@ -135,6 +143,7 @@ func WithPlatform(cfg PlatformConfig) Option {
 	return func(rc *runtimeConfig) {
 		rc.platform = &platformContext{
 			secrets:         cfg.Secrets,
+			audit:           cfg.Audit,
 			slugFor:         cfg.SlugFor,
 			platformEmitter: cfg.PlatformEmitter,
 		}
@@ -160,11 +169,18 @@ func (r *Runtime) addPlatformExports(b wazero.HostModuleBuilder) {
 			WithParameterNames("key_ptr", "key_len", "out_ptr", "out_cap").
 			Export("gn_secrets_get")
 	}
-	// gn_audit_emit and gn_cron_register are registered in the
-	// follow-up commits for issues #183 and #191. Their exports are
-	// gated on r.platform.audit / r.platform.cron once those fields
-	// exist; the gating shape (additive nil-check) is identical to
-	// gn_secrets_get above.
+	if r.platform.audit != nil {
+		b.NewFunctionBuilder().
+			WithGoModuleFunction(api.GoModuleFunc(r.hostGnAuditEmit),
+				[]api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32},
+				[]api.ValueType{api.ValueTypeI32}).
+			WithParameterNames("event_ptr", "event_len", "meta_ptr", "meta_len").
+			Export("gn_audit_emit")
+	}
+	// gn_cron_register is registered in the follow-up commit for
+	// issue #191. The gating shape (additive nil-check on
+	// r.platform.cron) is identical to gn_secrets_get and
+	// gn_audit_emit above.
 }
 
 // ----- gn_secrets_get ------------------------------------------------
@@ -279,3 +295,107 @@ func (r *Runtime) hostGnSecretsGet(ctx context.Context, mod api.Module, stack []
 	r.platform.emitPlatform(ctx, r.logger, pluginSlug, auditEvent, auditMeta)
 	stack[0] = api.EncodeI32(int32(len(plain)))
 }
+
+// maxAuditMetadataBytes caps the JSON payload a guest can hand to
+// gn_audit_emit. 32 KiB is generous for structured event metadata
+// (the typical audit row metadata is a few hundred bytes); larger
+// payloads almost always indicate a guest bug shoveling unbounded
+// data into the audit log.
+const maxAuditMetadataBytes = 32 * 1024
+
+// ----- gn_audit_emit -------------------------------------------------
+
+// hostGnAuditEmit implements env.gn_audit_emit.
+//
+// Signature: (event_ptr i32, event_len i32, meta_ptr i32, meta_len i32) -> i32
+//
+// Returns 0 on success, -1 on any rejection. Rejection reasons:
+//
+//   * event_name doesn't start with the plugin's slug
+//     (ErrAuditSlugPrefix)
+//   * Per-plugin rate-limit exceeded (ErrAuditRateLimited)
+//   * meta payload is malformed JSON or exceeds maxAuditMetadataBytes
+//   * Service not configured
+//
+// Every call (success or rejection) emits a
+// plugin.<slug>.platform.audit_emit row tracking the attempt, so an
+// operator sees what plugins are doing even when rate-limited.
+func (r *Runtime) hostGnAuditEmit(ctx context.Context, mod api.Module, stack []uint64) {
+	eventPtr := api.DecodeU32(stack[0])
+	eventLen := api.DecodeU32(stack[1])
+	metaPtr := api.DecodeU32(stack[2])
+	metaLen := api.DecodeU32(stack[3])
+
+	if r.platform == nil || r.platform.audit == nil {
+		r.logger.WarnContext(ctx, "runtime: gn_audit_emit: service not configured",
+			slog.String("module", mod.Name()))
+		stack[0] = api.EncodeI32(-1)
+		return
+	}
+
+	pluginSlug := r.platform.resolveSlug(mod.Name())
+
+	eventBuf, err := readHostString("gn_audit_emit", mod, eventPtr, eventLen)
+	if err != nil {
+		r.logger.WarnContext(ctx, "runtime: gn_audit_emit: bad event args",
+			slog.String("module", mod.Name()),
+			slog.String("err", err.Error()))
+		stack[0] = api.EncodeI32(-1)
+		return
+	}
+	eventName := string(append([]byte(nil), eventBuf...))
+
+	if metaLen > maxAuditMetadataBytes {
+		r.logger.WarnContext(ctx, "runtime: gn_audit_emit: metadata too large",
+			slog.String("module", mod.Name()),
+			slog.Uint64("size", uint64(metaLen)))
+		stack[0] = api.EncodeI32(-1)
+		return
+	}
+	var metadata map[string]any
+	if metaLen > 0 {
+		metaBuf, err := readHostString("gn_audit_emit", mod, metaPtr, metaLen)
+		if err != nil {
+			r.logger.WarnContext(ctx, "runtime: gn_audit_emit: bad meta args",
+				slog.String("module", mod.Name()),
+				slog.String("err", err.Error()))
+			stack[0] = api.EncodeI32(-1)
+			return
+		}
+		if err := json.Unmarshal(metaBuf, &metadata); err != nil {
+			r.logger.WarnContext(ctx, "runtime: gn_audit_emit: invalid JSON",
+				slog.String("module", mod.Name()),
+				slog.String("err", err.Error()))
+			stack[0] = api.EncodeI32(-1)
+			return
+		}
+	}
+
+	platformMeta := map[string]any{"event": eventName}
+	platformEvent := "plugin." + pluginSlug + ".platform.audit_emit"
+	if err := r.platform.audit.Emit(ctx, pluginSlug, eventName, metadata); err != nil {
+		switch {
+		case errors.Is(err, ErrAuditSlugPrefix):
+			platformMeta["result"] = "slug_prefix_rejected"
+		case errors.Is(err, ErrAuditRateLimited):
+			platformMeta["result"] = "rate_limited"
+		case errors.Is(err, ErrAuditEmpty):
+			platformMeta["result"] = "empty_event"
+		default:
+			platformMeta["result"] = "error"
+		}
+		r.platform.emitPlatform(ctx, r.logger, pluginSlug, platformEvent, platformMeta)
+		r.logger.WarnContext(ctx, "runtime: gn_audit_emit: rejected",
+			slog.String("module", mod.Name()),
+			slog.String("plugin", pluginSlug),
+			slog.String("event", eventName),
+			slog.String("err", err.Error()))
+		stack[0] = api.EncodeI32(-1)
+		return
+	}
+
+	platformMeta["result"] = "ok"
+	r.platform.emitPlatform(ctx, r.logger, pluginSlug, platformEvent, platformMeta)
+	stack[0] = api.EncodeI32(0)
+}
+
