@@ -67,10 +67,7 @@ require (
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
-<<<<<<< HEAD
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1 // indirect
-=======
->>>>>>> 7481fa9 (test(comments): integration tests for PgxStore against real Postgres)
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
 	github.com/shirou/gopsutil/v4 v4.26.3 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
