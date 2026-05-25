@@ -23,13 +23,37 @@
  * on the step the `code` maps to so the operator can correct the
  * specific field without losing the rest of their input.
  *
+ * Visual treatment follows docs/design/ui_kits/onboarding/index.html —
+ * the canonical onboarding hero. Cream paper background with soft
+ * off-canvas emerald + lavender radial glows, a centered paper-2 card
+ * holding each step, an Archivo headline with the italic-accent rule
+ * for every step heading, Geist body, Archivo button labels, Lucide
+ * icons throughout. The top strip mirrors the onboarding step
+ * indicator: numbered pills connected by hairlines, the current step
+ * inked, completed steps emerald with a check glyph.
+ *
  * The component is a Client Component because every step has either an
  * input event handler or a router.push call — both of which require
  * client runtime.
  */
 import { useState, type FormEvent, type ReactElement } from 'react';
 import { useRouter } from 'next/navigation';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  Loader2,
+  ShieldCheck,
+  Sparkles,
+} from 'lucide-react';
+
 import { apiBaseUrl } from '@/lib/api-client';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Headline } from '@/components/ui/headline';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import type { InstallError, InstallResponse, SetupStatus } from './types';
 import { scorePassword, StrengthMeter } from './components/StrengthMeter';
 import { SystemCheck } from './components/SystemCheck';
@@ -188,15 +212,54 @@ export default function SetupWizard({ initialStatus }: SetupWizardProps): ReactE
   }
 
   return (
-    <section className="setup">
-      <header className="setup__header">
-        <h1>Set up GoNext</h1>
-        <p className="muted">
-          One-time first-run wizard. Once installed, this page is locked.
-        </p>
+    <section
+      className={cn(
+        'setup',
+        'relative mx-auto w-full max-w-[760px]',
+      )}
+    >
+      {/* Soft brand glows tucked behind the card so the cream surface
+          feels alive without overwhelming the form. Matches the
+          off-canvas emerald + lavender radial gradients on the
+          canonical onboarding hero. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed -top-[20%] -right-[15%] -z-10 h-[700px] w-[700px]"
+        style={{
+          background:
+            'radial-gradient(circle, rgba(16, 185, 129, 0.10) 0%, transparent 60%)',
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed -bottom-[25%] -left-[15%] -z-10 h-[600px] w-[600px]"
+        style={{
+          background:
+            'radial-gradient(circle, rgba(167, 139, 250, 0.08) 0%, transparent 60%)',
+        }}
+      />
+
+      <header className={cn('setup__header', 'mb-6 flex flex-col gap-5')}>
+        <div className="flex items-center justify-between gap-4">
+          <Wordmark />
+          <span className="font-sans text-xs uppercase tracking-[0.12em] text-fg-subtle">
+            First-run setup
+          </span>
+        </div>
         <StepIndicator current={step} />
+        {/* Preserve the legacy h1 in the DOM (visually hidden) so any
+            tooling that scans for "Set up GoNext" still sees it; the
+            brand surface uses per-step Headlines instead. */}
+        <h1 className="sr-only">Set up GoNext</h1>
       </header>
-      <div className="setup__step">
+
+      <div
+        className={cn(
+          'setup__step',
+          'rounded-xl border border-border bg-paper-2 shadow-md',
+          'px-8 py-8 sm:px-10 sm:py-10',
+        )}
+      >
         {step === 'welcome' ? (
           <WelcomeStep status={initialStatus} onNext={(): void => goNext('admin')} />
         ) : null}
@@ -242,10 +305,36 @@ export default function SetupWizard({ initialStatus }: SetupWizardProps): ReactE
 // and emit callbacks.
 // ---------------------------------------------------------------------------
 
+/**
+ * Wordmark — composite of Archivo `Go` and italic-serif `Next` per the
+ * brand handoff. Inline rather than imported so the wizard has no
+ * cross-route dependency on the authenticated Sidebar's copy.
+ */
+function Wordmark(): ReactElement {
+  return (
+    <span
+      className="inline-flex items-baseline gap-[1px] leading-none"
+      aria-label="GoNext"
+    >
+      <span className="font-display text-[19px] font-extrabold tracking-tight text-ink">
+        Go
+      </span>
+      <span className="font-serif text-[21px] italic text-ink">
+        Next
+      </span>
+    </span>
+  );
+}
+
 interface StepIndicatorProps {
   current: Step;
 }
 
+/**
+ * Mirrors `.topstrip .steps` from the canonical onboarding HTML: a
+ * row of numbered pills (or check glyphs once complete) joined by
+ * hairlines. Done = emerald, current = ink, pending = paper-3.
+ */
 function StepIndicator({ current }: StepIndicatorProps): ReactElement {
   const labels: Record<Step, string> = {
     welcome: 'Welcome',
@@ -256,23 +345,67 @@ function StepIndicator({ current }: StepIndicatorProps): ReactElement {
   };
   const idx = STEPS.indexOf(current);
   return (
-    <ol className="setup-steps" aria-label="Setup progress">
-      {STEPS.map((s, i) => (
-        <li
-          key={s}
-          className={
-            i === idx
-              ? 'setup-steps__item setup-steps__item--current'
-              : i < idx
-                ? 'setup-steps__item setup-steps__item--done'
-                : 'setup-steps__item'
-          }
-          aria-current={i === idx ? 'step' : undefined}
-        >
-          <span className="setup-steps__num">{i + 1}</span>
-          <span className="setup-steps__label">{labels[s]}</span>
-        </li>
-      ))}
+    <ol
+      className={cn(
+        'setup-steps',
+        'flex w-full items-center gap-0 list-none p-0 m-0',
+      )}
+      aria-label="Setup progress"
+    >
+      {STEPS.map((s, i) => {
+        const state =
+          i === idx ? 'current' : i < idx ? 'done' : 'pending';
+        const isFirst = i === 0;
+        return (
+          <li
+            key={s}
+            className={cn(
+              'setup-steps__item',
+              state === 'current' && 'setup-steps__item--current',
+              state === 'done' && 'setup-steps__item--done',
+              'relative flex flex-1 items-center gap-2 text-sm',
+            )}
+            aria-current={state === 'current' ? 'step' : undefined}
+          >
+            {/* Connector to the previous step. */}
+            {!isFirst ? (
+              <span
+                aria-hidden="true"
+                className="h-px flex-1 bg-border"
+              />
+            ) : null}
+            <span className="flex items-center gap-2 px-2">
+              <span
+                className={cn(
+                  'setup-steps__num',
+                  'flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill border font-mono text-[10px] font-medium',
+                  state === 'pending' &&
+                    'bg-paper-3 border-border text-fg-muted',
+                  state === 'current' &&
+                    'bg-ink border-ink text-paper',
+                  state === 'done' &&
+                    'bg-emerald border-emerald text-emerald-ink',
+                )}
+              >
+                {state === 'done' ? (
+                  <Check width={11} height={11} strokeWidth={3} />
+                ) : (
+                  String(i + 1).padStart(2, '0')
+                )}
+              </span>
+              <span
+                className={cn(
+                  'setup-steps__label',
+                  'font-sans font-medium',
+                  state === 'current' ? 'text-ink' : 'text-fg-muted',
+                )}
+              >
+                {labels[s]}
+              </span>
+            </span>
+          </li>
+        );
+      })}
     </ol>
   );
 }
@@ -284,18 +417,37 @@ interface WelcomeStepProps {
 
 function WelcomeStep({ status, onNext }: WelcomeStepProps): ReactElement {
   return (
-    <div className="setup-step">
-      <h2>Welcome to GoNext</h2>
-      <p>
-        This wizard creates the bootstrap administrator and stamps the
-        installation marker. It runs once — after a successful install
-        this page returns to the login screen.
-      </p>
+    <div className="setup-step flex flex-col gap-6">
+      <div className="flex flex-col gap-3">
+        <span className="font-sans text-xs font-medium uppercase tracking-[0.12em] text-emerald-deep">
+          Welcome — let&apos;s begin
+        </span>
+        {/* "Welcome to GoNext" sits in the heading as a single text
+            node so screen-reader and getByText callers see one
+            uninterrupted phrase. The italic accent lands on the
+            verb-mood word "begin" — the brand's signature emphasis
+            without splitting the product name across two type families. */}
+        <Headline as="h2" size="sub">
+          Welcome to GoNext. <em>Let&apos;s begin</em>.
+        </Headline>
+        <p className="font-sans text-md text-fg-muted">
+          This wizard creates the bootstrap administrator and stamps the
+          installation marker. It runs once — after a successful install
+          this page returns to the login screen.
+        </p>
+      </div>
       <SystemCheck status={status} />
-      <div className="setup-step__actions">
-        <button type="button" className="btn-primary" onClick={onNext}>
+      <div className="setup-step__actions flex items-center justify-end gap-3 border-t border-border pt-5">
+        <Button
+          type="button"
+          variant="primary"
+          size="lg"
+          className="btn-primary"
+          onClick={onNext}
+        >
           Begin
-        </button>
+          <ArrowRight width={14} height={14} aria-hidden="true" />
+        </Button>
       </div>
     </div>
   );
@@ -325,48 +477,73 @@ function AdminStep({
       : null;
   return (
     <form
-      className="setup-step"
+      className="setup-step flex flex-col gap-6"
       onSubmit={(e): void => {
         e.preventDefault();
         if (canAdvance) onNext();
       }}
       noValidate
     >
-      <h2>Administrator</h2>
-      <p className="muted">
-        This account becomes the super_admin. Pick a long passphrase — short
-        passwords are refused server-side regardless of what the meter
-        reports.
-      </p>
+      <div className="flex flex-col gap-3">
+        <span className="font-sans text-xs font-medium uppercase tracking-[0.12em] text-emerald-deep">
+          Step 02 — Identity
+        </span>
+        {/* Heading reads "First Administrator" so the existing test
+            (getByRole('heading', { name: /Administrator/i })) still
+            resolves; the italic accent lands on "First" — the brand's
+            signature emphasis. */}
+        <Headline as="h2" size="sub">
+          <em>First</em> Administrator
+        </Headline>
+        <p className="font-sans text-md text-fg-muted">
+          This account becomes the super_admin. Pick a long passphrase —
+          short passwords are refused server-side regardless of what the
+          meter reports.
+        </p>
+      </div>
       {error && (error.code === 'invalid_email' || error.code === 'weak_password') ? (
-        <p className="setup-step__error" role="alert">
+        <p
+          className={cn(
+            'setup-step__error',
+            'rounded-md border border-danger/30 bg-danger-soft px-4 py-3 font-sans text-sm text-danger',
+          )}
+          role="alert"
+        >
           {error.message}
         </p>
       ) : null}
-      <div className="form-field">
-        <label htmlFor="setup-email">Email</label>
-        <input
+      <div className="form-field flex flex-col gap-[6px]">
+        <Label htmlFor="setup-email">Email</Label>
+        <Input
           id="setup-email"
           name="admin_email"
           type="email"
           autoComplete="username"
+          placeholder="you@example.com"
           required
           value={form.adminEmail}
           onChange={(e): void => setForm({ ...form, adminEmail: e.target.value })}
         />
         {emailError ? (
-          <span className="setup-step__hint" role="status">
+          <span
+            className={cn(
+              'setup-step__hint',
+              'mt-1 font-sans text-xs text-danger',
+            )}
+            role="status"
+          >
             {emailError}
           </span>
         ) : null}
       </div>
-      <div className="form-field">
-        <label htmlFor="setup-password">Password</label>
-        <input
+      <div className="form-field flex flex-col gap-[6px]">
+        <Label htmlFor="setup-password">Password</Label>
+        <Input
           id="setup-password"
           name="admin_password"
           type="password"
           autoComplete="new-password"
+          placeholder="At least 12 characters"
           required
           minLength={12}
           aria-describedby="setup-password-strength"
@@ -375,13 +552,26 @@ function AdminStep({
         />
         <StrengthMeter password={form.adminPassword} describedFor="setup-password" />
       </div>
-      <div className="setup-step__actions">
-        <button type="button" className="btn-secondary" onClick={onBack}>
+      <div className="setup-step__actions flex items-center justify-between gap-3 border-t border-border pt-5">
+        <Button
+          type="button"
+          variant="default"
+          className="btn-secondary"
+          onClick={onBack}
+        >
+          <ArrowLeft width={14} height={14} aria-hidden="true" />
           Back
-        </button>
-        <button type="submit" className="btn-primary" disabled={!canAdvance}>
+        </Button>
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          className="btn-primary"
+          disabled={!canAdvance}
+        >
           Continue
-        </button>
+          <ArrowRight width={14} height={14} aria-hidden="true" />
+        </Button>
       </div>
     </form>
   );
@@ -410,38 +600,56 @@ function SiteStep({
       : null;
   return (
     <form
-      className="setup-step"
+      className="setup-step flex flex-col gap-6"
       onSubmit={(e): void => {
         e.preventDefault();
         if (canAdvance) onNext();
       }}
       noValidate
     >
-      <h2>Site</h2>
-      <p className="muted">
-        You can change these later from Settings → General; they ship as
-        the first values your visitors see.
-      </p>
+      <div className="flex flex-col gap-3">
+        <span className="font-sans text-xs font-medium uppercase tracking-[0.12em] text-emerald-deep">
+          Step 03 — Identity
+        </span>
+        {/* Heading text is the bare word "Site" so the existing test
+            (getByRole('heading', { name: /^Site$/i })) keeps passing.
+            The brand's signature italic-serif accent is applied to the
+            word itself — emphasis without changing the accessible name. */}
+        <Headline as="h2" size="sub">
+          <em>Site</em>
+        </Headline>
+        <p className="font-sans text-md text-fg-muted">
+          You can change these later from Settings → General; they ship
+          as the first values your visitors see.
+        </p>
+      </div>
       {error && (error.code === 'invalid_site_name' || error.code === 'invalid_site_url') ? (
-        <p className="setup-step__error" role="alert">
+        <p
+          className={cn(
+            'setup-step__error',
+            'rounded-md border border-danger/30 bg-danger-soft px-4 py-3 font-sans text-sm text-danger',
+          )}
+          role="alert"
+        >
           {error.message}
         </p>
       ) : null}
-      <div className="form-field">
-        <label htmlFor="setup-site-name">Site name</label>
-        <input
+      <div className="form-field flex flex-col gap-[6px]">
+        <Label htmlFor="setup-site-name">Site name</Label>
+        <Input
           id="setup-site-name"
           name="site_name"
           type="text"
+          placeholder="Brick &amp; Mortar"
           required
           maxLength={200}
           value={form.siteName}
           onChange={(e): void => setForm({ ...form, siteName: e.target.value })}
         />
       </div>
-      <div className="form-field">
-        <label htmlFor="setup-site-url">Site URL</label>
-        <input
+      <div className="form-field flex flex-col gap-[6px]">
+        <Label htmlFor="setup-site-url">Site URL</Label>
+        <Input
           id="setup-site-url"
           name="site_url"
           type="url"
@@ -451,18 +659,37 @@ function SiteStep({
           onChange={(e): void => setForm({ ...form, siteURL: e.target.value })}
         />
         {urlError ? (
-          <span className="setup-step__hint" role="status">
+          <span
+            className={cn(
+              'setup-step__hint',
+              'mt-1 font-sans text-xs text-danger',
+            )}
+            role="status"
+          >
             {urlError}
           </span>
         ) : null}
       </div>
-      <div className="setup-step__actions">
-        <button type="button" className="btn-secondary" onClick={onBack}>
+      <div className="setup-step__actions flex items-center justify-between gap-3 border-t border-border pt-5">
+        <Button
+          type="button"
+          variant="default"
+          className="btn-secondary"
+          onClick={onBack}
+        >
+          <ArrowLeft width={14} height={14} aria-hidden="true" />
           Back
-        </button>
-        <button type="submit" className="btn-primary" disabled={!canAdvance}>
+        </Button>
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          className="btn-primary"
+          disabled={!canAdvance}
+        >
           Continue
-        </button>
+          <ArrowRight width={14} height={14} aria-hidden="true" />
+        </Button>
       </div>
     </form>
   );
@@ -484,37 +711,100 @@ function ReviewStep({
   onSubmit,
 }: ReviewStepProps): ReactElement {
   return (
-    <form className="setup-step" onSubmit={onSubmit} noValidate>
-      <h2>Review</h2>
+    <form
+      className="setup-step flex flex-col gap-6"
+      onSubmit={onSubmit}
+      noValidate
+    >
+      <div className="flex flex-col gap-3">
+        <span className="font-sans text-xs font-medium uppercase tracking-[0.12em] text-emerald-deep">
+          Step 04 — Confirm
+        </span>
+        <Headline as="h2" size="sub">
+          One last <em>look</em>. Review.
+        </Headline>
+        <p className="font-sans text-md text-fg-muted">
+          Everything below ships to the API on confirm. The install lock
+          seals after a 200 — you can&apos;t re-run this wizard.
+        </p>
+      </div>
       {error ? (
-        <p className="setup-step__error" role="alert">
+        <p
+          className={cn(
+            'setup-step__error',
+            'rounded-md border border-danger/30 bg-danger-soft px-4 py-3 font-sans text-sm text-danger',
+          )}
+          role="alert"
+        >
           {error.message ?? 'Install failed.'}
         </p>
       ) : null}
-      <dl className="setup-review">
-        <dt>Admin email</dt>
-        <dd>{form.adminEmail}</dd>
-        <dt>Site name</dt>
-        <dd>{form.siteName}</dd>
-        <dt>Site URL</dt>
-        <dd>{form.siteURL}</dd>
-        <dt>Password</dt>
-        <dd>
+      <dl
+        className={cn(
+          'setup-review',
+          'grid grid-cols-[160px_1fr] gap-x-5 gap-y-3 rounded-lg border border-border bg-paper px-5 py-4',
+        )}
+      >
+        <dt className="font-sans text-xs uppercase tracking-[0.08em] text-fg-subtle">
+          Admin email
+        </dt>
+        <dd className="font-mono text-sm text-ink">{form.adminEmail}</dd>
+        <dt className="font-sans text-xs uppercase tracking-[0.08em] text-fg-subtle">
+          Site name
+        </dt>
+        <dd className="font-sans text-sm font-medium text-ink">{form.siteName}</dd>
+        <dt className="font-sans text-xs uppercase tracking-[0.08em] text-fg-subtle">
+          Site URL
+        </dt>
+        <dd className="font-mono text-sm text-ink">{form.siteURL}</dd>
+        <dt className="font-sans text-xs uppercase tracking-[0.08em] text-fg-subtle">
+          Password
+        </dt>
+        <dd className="flex items-center gap-2 font-sans text-sm text-fg-muted">
+          <ShieldCheck
+            width={14}
+            height={14}
+            className="text-emerald-deep"
+            aria-hidden="true"
+          />
           <span className="muted">stored as argon2id</span>
         </dd>
       </dl>
-      <div className="setup-step__actions">
-        <button
+      <div className="setup-step__actions flex items-center justify-between gap-3 border-t border-border pt-5">
+        <Button
           type="button"
+          variant="default"
           className="btn-secondary"
           onClick={onBack}
           disabled={submitting}
         >
+          <ArrowLeft width={14} height={14} aria-hidden="true" />
           Back
-        </button>
-        <button type="submit" className="btn-primary" disabled={submitting}>
-          {submitting ? 'Installing…' : 'Confirm install'}
-        </button>
+        </Button>
+        <Button
+          type="submit"
+          variant="emerald"
+          size="lg"
+          className="btn-primary"
+          disabled={submitting}
+        >
+          {submitting ? (
+            <>
+              <Loader2
+                width={14}
+                height={14}
+                className="animate-spin"
+                aria-hidden="true"
+              />
+              Installing…
+            </>
+          ) : (
+            <>
+              Confirm install
+              <ArrowRight width={14} height={14} aria-hidden="true" />
+            </>
+          )}
+        </Button>
       </div>
     </form>
   );
@@ -522,11 +812,34 @@ function ReviewStep({
 
 function DoneStep(): ReactElement {
   return (
-    <div className="setup-step">
-      <h2>You are in</h2>
-      <p>
+    <div className="setup-step flex flex-col items-center gap-5 py-6 text-center">
+      <span
+        className="flex h-14 w-14 items-center justify-center rounded-pill bg-emerald-soft text-emerald-deep"
+        aria-hidden="true"
+      >
+        <CheckCircle2 width={28} height={28} strokeWidth={2.25} />
+      </span>
+      <span className="font-sans text-xs font-medium uppercase tracking-[0.12em] text-emerald-deep">
+        Installed — welcome aboard
+      </span>
+      <Headline as="h2" size="sub">
+        You are <em>in</em>.
+      </Headline>
+      <p className="font-sans text-md text-fg-muted max-w-[420px]">
         Install completed. Redirecting to the admin dashboard…
       </p>
+      <span
+        className="mt-2 inline-flex items-center gap-2 font-sans text-xs text-fg-subtle"
+        aria-live="polite"
+      >
+        <Sparkles
+          width={12}
+          height={12}
+          className="text-emerald-deep"
+          aria-hidden="true"
+        />
+        Spinning up your workspace
+      </span>
     </div>
   );
 }
