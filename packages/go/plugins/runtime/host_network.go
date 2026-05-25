@@ -926,6 +926,78 @@ func emitResourceAudit(ctx context.Context, nc *NetworkContext, event, id string
 	)
 }
 
+// MemoryMediaProvider is an in-process MediaProvider backed by a map.
+// Useful for tests, the dev CLI, and the bootstrap path before the
+// full media pipeline (packages/go/media) exposes a Read API.
+//
+// Safe for concurrent use.
+type MemoryMediaProvider struct {
+	mu     sync.RWMutex
+	assets map[string]*MediaAsset
+}
+
+// NewMemoryMediaProvider returns an empty provider.
+func NewMemoryMediaProvider() *MemoryMediaProvider {
+	return &MemoryMediaProvider{assets: map[string]*MediaAsset{}}
+}
+
+// Set associates the asset with id. Overwrites any prior value.
+func (p *MemoryMediaProvider) Set(id string, asset *MediaAsset) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.assets[id] = asset
+}
+
+// Read implements MediaProvider. Returns (nil, nil) for an unknown id
+// so the host translates to NetStatusNotFound.
+func (p *MemoryMediaProvider) Read(_ context.Context, id string) (*MediaAsset, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.assets[id], nil
+}
+
+// MemoryUsersProvider is the in-process counterpart for users.read.
+// Same use cases as MemoryMediaProvider — tests, dev mode, the
+// not-yet-wired bootstrap.
+//
+// Safe for concurrent use. Returned maps are NOT copied — callers
+// must not mutate them after Set.
+type MemoryUsersProvider struct {
+	mu    sync.RWMutex
+	users map[string]map[string]any
+}
+
+// NewMemoryUsersProvider returns an empty provider.
+func NewMemoryUsersProvider() *MemoryUsersProvider {
+	return &MemoryUsersProvider{users: map[string]map[string]any{}}
+}
+
+// Set associates the row with id. Overwrites any prior value. The
+// caller is expected to hand off ownership of the map; mutating it
+// later races with concurrent Reads.
+func (p *MemoryUsersProvider) Set(id string, row map[string]any) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.users[id] = row
+}
+
+// Read implements UsersProvider. Returns (nil, nil) for unknown id.
+func (p *MemoryUsersProvider) Read(_ context.Context, id string) (map[string]any, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	row := p.users[id]
+	if row == nil {
+		return nil, nil
+	}
+	// Return a shallow copy so subsequent host-side projection mutations
+	// don't leak into the stored row.
+	out := make(map[string]any, len(row))
+	for k, v := range row {
+		out[k] = v
+	}
+	return out, nil
+}
+
 // Compile-time guards that the host functions still satisfy wazero's
 // expected shape. If wazero ever changes its GoModuleFunc signature
 // this file fails at build time rather than at registration.
@@ -933,6 +1005,14 @@ var (
 	_ api.GoModuleFunction = api.GoModuleFunc(hostGnHTTPFetch)
 	_ api.GoModuleFunction = api.GoModuleFunc(hostGnMediaRead)
 	_ api.GoModuleFunction = api.GoModuleFunc(hostGnUsersRead)
+)
+
+// Compile-time guards that the in-memory providers satisfy the
+// public interfaces. Catches signature drift in either direction at
+// build time.
+var (
+	_ MediaProvider = (*MemoryMediaProvider)(nil)
+	_ UsersProvider = (*MemoryUsersProvider)(nil)
 )
 
 // silence linter warnings if slog ever gets used in a future patch
