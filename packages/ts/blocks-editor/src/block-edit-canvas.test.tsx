@@ -174,4 +174,102 @@ describe('<BlockEditCanvas>', () => {
     expect(() => clearEditModuleCache(registry)).not.toThrow();
     expect(() => clearEditModuleCache(registry)).not.toThrow();
   });
+
+  it('wraps the tree in the paper document chip when blocks are present', async () => {
+    const registry = buildRegistry();
+    clearEditModuleCache(registry);
+
+    await act(async () => {
+      render(
+        <BlockEditCanvas
+          registry={registry}
+          blocks={[
+            { type: 'core/paragraph', attributes: { text: 'Hello.' } },
+          ]}
+        />,
+      );
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('block-edit-canvas-node-core/paragraph'),
+      ).toBeInTheDocument();
+    });
+    const chip = screen.getByTestId('block-edit-canvas-doc');
+    expect(chip).toBeInTheDocument();
+    // The doc chip carries the brand surface tokens — paper-2 background,
+    // the soft drop shadow, a rounded corner. We sniff inline styles
+    // here rather than the computed CSS so the assertion stays stable
+    // in jsdom (no tokens.css loaded).
+    expect(chip.getAttribute('style')).toMatch(/--paper-2/);
+    expect(chip.getAttribute('style')).toMatch(/--sh-md/);
+    expect(chip.getAttribute('style')).toMatch(/--r-lg/);
+  });
+
+  it('applies emerald selection chrome to the matching block', async () => {
+    const registry = buildRegistry();
+    clearEditModuleCache(registry);
+
+    await act(async () => {
+      render(
+        <BlockEditCanvas
+          registry={registry}
+          blocks={[
+            {
+              type: 'core/paragraph',
+              clientId: 'block-1',
+              attributes: { text: 'Selected.' },
+            },
+            {
+              type: 'core/paragraph',
+              clientId: 'block-2',
+              attributes: { text: 'Not selected.' },
+            },
+          ]}
+          selectedClientId="block-1"
+        />,
+      );
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByTestId('block-edit-canvas-node-core/paragraph'),
+      ).toHaveLength(2);
+    });
+    const nodes = screen.getAllByTestId(
+      'block-edit-canvas-node-core/paragraph',
+    );
+    expect(nodes[0]?.getAttribute('data-selected')).toBe('true');
+    expect(nodes[0]?.getAttribute('style')).toMatch(/--emerald/);
+    expect(nodes[1]?.getAttribute('data-selected')).toBe('false');
+  });
+
+  it('matches the canvas snapshot for a single-paragraph tree', async () => {
+    const registry = buildRegistry();
+    clearEditModuleCache(registry);
+
+    let container: HTMLElement;
+    await act(async () => {
+      const result = render(
+        <BlockEditCanvas
+          registry={registry}
+          blocks={[
+            {
+              type: 'core/paragraph',
+              clientId: 'p-1',
+              attributes: { text: 'Snapshot.' },
+            },
+          ]}
+        />,
+      );
+      container = result.container;
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('block-edit-canvas-node-core/paragraph'),
+      ).toBeInTheDocument();
+    });
+    expect(container!.firstChild).toMatchSnapshot();
+  });
 });

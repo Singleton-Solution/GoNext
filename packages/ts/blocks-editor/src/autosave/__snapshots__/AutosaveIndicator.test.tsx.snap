@@ -1,0 +1,44 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<AutosaveIndicator> > matches the snapshot for the saved 12s state 1`] = `
+<span
+  aria-label="Saved 12s ago"
+  aria-live="polite"
+  data-status="saved"
+  data-surface="forest"
+  data-testid="autosave-indicator"
+  role="status"
+  style="display: inline-flex; align-items: center; gap: var(--s-2, 8px); padding: 4px 10px; background: var(--forest-2, #18261E); border: 1px solid var(--forest-border, #2C3D33); border-radius: var(--r-pill, 999px); font-family: var(--font-sans, 'Geist', -apple-system, system-ui, sans-serif); font-size: var(--t-xs, 12px); color: var(--fg-on-forest-muted, #A8B5AC); line-height: 1;"
+>
+  <style>
+    
+      @keyframes gonext-autosave-pulse {
+        0%, 100% { opacity: 1; }
+        50%      { opacity: 0.35; }
+      }
+    
+  </style>
+  <span
+    aria-hidden="true"
+    data-testid="autosave-indicator-dot"
+    style="width: 6px; height: 6px; border-radius: 999px; flex-shrink: 0; background: var(--emerald-bright, #34D399);"
+  />
+  <span
+    data-testid="autosave-indicator-label"
+  >
+    Saved 
+    <span
+      style="color: inherit;"
+    >
+      ·
+    </span>
+     
+    <span
+      data-testid="autosave-indicator-timestamp"
+      style="font-family: var(--font-serif, 'Instrument Serif', Georgia, serif); font-style: italic; font-size: 1.05em; letter-spacing: -0.005em;"
+    >
+      12s ago
+    </span>
+  </span>
+</span>
+`;

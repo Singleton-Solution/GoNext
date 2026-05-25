@@ -1,0 +1,104 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<EditorTitle> > matches the snapshot for an empty title with default placeholder 1`] = `
+<div
+  data-testid="editor-title-wrapper"
+  style="position: relative; margin: 0px 0px 16px;"
+>
+  <h1
+    aria-label="Document title"
+    contenteditable="true"
+    data-empty="true"
+    data-testid="editor-title"
+    role="textbox"
+    spellcheck="false"
+    style="display: block; margin: 0px; padding: 0px; outline: none; background: transparent; font-family: var(--font-display, 'Archivo', system-ui, sans-serif); font-weight: 800; font-size: 56px; line-height: 0.95; letter-spacing: -0.03em; color: var(--ink, #0E1A14);"
+  />
+  <span
+    aria-hidden="true"
+    data-testid="editor-title-placeholder"
+    style="display: block; margin: 0px; padding: 0px; outline: none; background: transparent; font-family: var(--font-display, 'Archivo', system-ui, sans-serif); font-weight: 800; font-size: 56px; line-height: 0.95; letter-spacing: -0.03em; color: var(--fg-faint, #94A199); pointer-events: none; user-select: none; position: absolute; top: 0px; left: 0px;"
+  >
+    How we 
+    <em
+      data-testid="editor-title-placeholder-accent"
+      style="font-family: var(--font-serif, 'Instrument Serif', Georgia, serif); font-style: italic; font-weight: 400; color: var(--emerald-deep, #047857); font-size: 1.05em; letter-spacing: -0.01em;"
+    >
+      source
+    </em>
+     great writing.
+  </span>
+</div>
+`;
+
+exports[`<EditorTopBar> > matches the snapshot for the canonical layout 1`] = `
+<div
+  data-surface="forest"
+  data-testid="editor-top-bar"
+  style="display: flex; align-items: center; justify-content: space-between; height: 54px; padding: 0px 14px 0px 16px; background: var(--forest, #0E1A14); color: var(--fg-on-forest, #F0EAD8); border-bottom: 1px solid var(--forest-border, #2C3D33); font-family: var(--font-sans, 'Geist', -apple-system, system-ui, sans-serif); font-size: var(--t-sm, 13px); flex-shrink: 0;"
+>
+  <div
+    data-testid="editor-top-bar-left"
+    style="display: flex; align-items: center; gap: 14px; min-width: 0;"
+  >
+    <span>
+      Posts
+    </span>
+  </div>
+  <div
+    data-testid="editor-top-bar-center"
+  >
+    <span>
+      Write
+    </span>
+  </div>
+  <div
+    data-testid="editor-top-bar-right"
+    style="display: flex; align-items: center; gap: var(--s-2, 8px);"
+  >
+    <span>
+      Publish
+    </span>
+  </div>
+</div>
+`;
+
+exports[`<InspectorTabs> > matches the snapshot for the default three-tab layout 1`] = `
+<div
+  aria-label="Inspector tabs"
+  data-testid="inspector-tabs"
+  role="tablist"
+  style="display: flex; border-bottom: 1px solid var(--border, #D9D2C0); padding: 0px 6px; background: var(--paper-2, #EFEBE0); font-family: var(--font-sans, 'Geist', -apple-system, system-ui, sans-serif);"
+>
+  <button
+    aria-selected="true"
+    data-active="true"
+    data-testid="inspector-tab-block"
+    role="tab"
+    style="flex: 1 1 0%; padding: 12px 6px; background: transparent; border-bottom-width: 2px; border-bottom-style: solid; border-bottom-color: var(--lavender, #A78BFA); cursor: pointer; font-family: inherit; font-size: var(--t-xs, 12px); font-weight: 500; color: var(--ink, #0E1A14); transition: color var(--dur-fast, 100ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1)), border-color var(--dur-fast, 100ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1));"
+    type="button"
+  >
+    Block
+  </button>
+  <button
+    aria-selected="false"
+    data-active="false"
+    data-testid="inspector-tab-document"
+    role="tab"
+    style="flex: 1 1 0%; padding: 12px 6px; background: transparent; border-bottom-width: 2px; border-bottom-style: solid; border-bottom-color: transparent; cursor: pointer; font-family: inherit; font-size: var(--t-xs, 12px); font-weight: 500; color: var(--fg-muted, #4A5C52); transition: color var(--dur-fast, 100ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1)), border-color var(--dur-fast, 100ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1));"
+    type="button"
+  >
+    Document
+  </button>
+  <button
+    aria-selected="false"
+    data-active="false"
+    data-testid="inspector-tab-seo"
+    role="tab"
+    style="flex: 1 1 0%; padding: 12px 6px; background: transparent; border-bottom-width: 2px; border-bottom-style: solid; border-bottom-color: transparent; cursor: pointer; font-family: inherit; font-size: var(--t-xs, 12px); font-weight: 500; color: var(--fg-muted, #4A5C52); transition: color var(--dur-fast, 100ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1)), border-color var(--dur-fast, 100ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1));"
+    type="button"
+  >
+    SEO
+  </button>
+</div>
+`;

@@ -1,0 +1,56 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<BlockTransformToolbar> > matches the snapshot for an open menu with one option 1`] = `
+<div
+  class="gonext-block-transform-toolbar"
+  data-block-type="core/paragraph"
+  data-testid="block-transform-toolbar"
+  style="position: relative; display: inline-flex; font-family: var(--font-sans, 'Geist', -apple-system, system-ui, sans-serif);"
+>
+  <button
+    aria-expanded="true"
+    aria-haspopup="menu"
+    aria-label="Transform to: core/paragraph"
+    class="gonext-block-transform-toolbar__toggle"
+    data-open="true"
+    data-testid="block-transform-toolbar-toggle"
+    style="display: inline-flex; align-items: center; gap: var(--s-2, 8px); padding: 6px 12px; background: var(--paper-2, #EFEBE0); border: 1px solid var(--border, #D9D2C0); border-radius: var(--r-pill, 999px); font-family: inherit; font-size: var(--t-xs, 12px); font-weight: 500; color: var(--ink, #0E1A14); cursor: pointer; box-shadow: var(--sh-xs, 0 1px 2px rgba(14, 26, 20, 0.04)); transition: background var(--dur-fast, 100ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1)), color var(--dur-fast, 100ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1));"
+    type="button"
+  >
+    Transform to
+  </button>
+  <ul
+    aria-label="Transform to options"
+    class="gonext-block-transform-toolbar__menu"
+    data-testid="block-transform-toolbar-menu"
+    role="menu"
+    style="position: absolute; top: calc(100% + 4px); left: 0px; z-index: 30; min-width: 200px; margin: 0px; padding: 6px; list-style: none; background: var(--paper-2, #EFEBE0); border: 1px solid var(--border, #D9D2C0); border-radius: var(--r-md, 8px); box-shadow: var(--sh-md, 0 6px 14px -4px rgba(14, 26, 20, 0.08), 0 2px 6px -2px rgba(14, 26, 20, 0.04)); display: flex; flex-direction: column; gap: 2px;"
+  >
+    <li
+      role="none"
+    >
+      <button
+        class="gonext-block-transform-toolbar__option"
+        data-testid="block-transform-toolbar-option-core/paragraph-to-heading"
+        role="menuitem"
+        style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 7px 10px; background: transparent; border: 1px solid transparent; border-radius: var(--r-sm, 6px); font-family: inherit; text-align: left; cursor: pointer; color: var(--ink, #0E1A14);"
+        title="Promote this paragraph to a heading."
+        type="button"
+      >
+        <span
+          class="gonext-block-transform-toolbar__option-label"
+          style="font-size: var(--t-sm, 13px); font-weight: 500;"
+        >
+          Heading
+        </span>
+        <span
+          class="gonext-block-transform-toolbar__option-description"
+          style="font-family: var(--font-mono, 'Geist Mono', ui-monospace, monospace); font-size: var(--t-2xs, 11px); color: var(--fg-subtle, #6B7B72);"
+        >
+          Promote this paragraph to a heading.
+        </span>
+      </button>
+    </li>
+  </ul>
+</div>
+`;

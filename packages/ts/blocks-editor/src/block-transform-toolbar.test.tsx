@@ -253,4 +253,35 @@ describe('<BlockTransformToolbar>', () => {
       'Promote this paragraph to a heading.',
     );
   });
+
+  it('applies brand tokens to the toggle pill and the menu surface', () => {
+    render(
+      <BlockTransformToolbar
+        block={paragraph()}
+        registry={stubRegistry([paragraphToHeading])}
+        onApply={vi.fn()}
+        initialOpen
+      />,
+    );
+
+    const toggle = screen.getByTestId('block-transform-toolbar-toggle');
+    expect(toggle.getAttribute('style')).toMatch(/--paper-2/);
+    expect(toggle.getAttribute('style')).toMatch(/--r-pill/);
+
+    const menu = screen.getByTestId('block-transform-toolbar-menu');
+    expect(menu.getAttribute('style')).toMatch(/--paper-2/);
+    expect(menu.getAttribute('style')).toMatch(/--sh-md/);
+  });
+
+  it('matches the snapshot for an open menu with one option', () => {
+    const { container } = render(
+      <BlockTransformToolbar
+        block={paragraph()}
+        registry={stubRegistry([paragraphToHeading])}
+        onApply={vi.fn()}
+        initialOpen
+      />,
+    );
+    expect(container.firstChild).toMatchSnapshot();
+  });
 });

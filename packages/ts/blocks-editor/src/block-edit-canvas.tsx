@@ -18,6 +18,18 @@
  * don't kick off a thundering herd of imports. The cache is keyed by the
  * registry reference so swapping registries (e.g. test isolation) doesn't
  * leak between trees.
+ *
+ * Visual styling — "Living systems" brand (docs/design/HANDOFF.md):
+ *   - Canvas sits on cream `--paper` with generous editorial padding so the
+ *     document chip floats; the chip itself is `--paper-2` framed with a
+ *     hairline `--border` and a soft `--sh-md` drop shadow.
+ *   - The selected block carries an emerald left-rule, mirroring the
+ *     "Selected block has emerald left-border" note in the editor mock.
+ *   - All colour, spacing, type and shadow values are expressed as CSS
+ *     custom-property references — tokens are law (see
+ *     docs/design/colors_and_type.css). Values gracefully fall back to
+ *     literal hex/px when the admin tokens.css isn't loaded (vitest
+ *     snapshots, dev sandboxes), so the package stays useful in isolation.
  */
 'use client';
 
@@ -28,7 +40,7 @@ import type {
   BlockTree,
   EditComponent,
 } from '@gonext/blocks-sdk';
-import { createElement, Suspense, use } from 'react';
+import { createElement, Suspense, use, type CSSProperties } from 'react';
 import { BlockTransformToolbar } from './block-transform-toolbar.tsx';
 import type {
   Transform,
@@ -71,7 +83,72 @@ export interface BlockEditCanvasProps {
     transformId: string,
     transform: Transform,
   ) => void;
+  /**
+   * `clientId` of the currently selected block, if any. The canvas
+   * adds an emerald left-rule + indent to the matching node so
+   * authors can see what they're editing. Optional — when omitted
+   * nothing is selected and the canvas renders its plain "walker"
+   * shape exactly as before.
+   */
+  selectedClientId?: string;
 }
+
+/**
+ * Style tokens for the canvas. Tokens-as-law: every value below references
+ * a CSS custom property declared in `apps/admin/src/styles/tokens.css`,
+ * with a literal fallback so the package stays renderable in isolation
+ * (e.g. vitest snapshots that don't pull in the admin stylesheet).
+ */
+const canvasStyle: CSSProperties = {
+  background: 'var(--paper, #F5F2EA)',
+  padding: '40px 56px 200px',
+  minHeight: '100%',
+  fontFamily:
+    "var(--font-sans, 'Geist', -apple-system, system-ui, sans-serif)",
+  color: 'var(--ink-soft, #1F2D26)',
+};
+
+const docChipStyle: CSSProperties = {
+  maxWidth: 720,
+  margin: '0 auto',
+  background: 'var(--paper-2, #EFEBE0)',
+  border: '1px solid var(--border, #D9D2C0)',
+  borderRadius: 'var(--r-lg, 12px)',
+  padding: 'var(--s-7, 32px) var(--s-7, 32px) var(--s-8, 48px)',
+  boxShadow:
+    'var(--sh-md, 0 6px 14px -4px rgba(14, 26, 20, 0.08), 0 2px 6px -2px rgba(14, 26, 20, 0.04))',
+};
+
+const nodeStyle: CSSProperties = {
+  position: 'relative',
+  padding: '4px 0',
+  transition:
+    'box-shadow var(--dur, 160ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1)), padding var(--dur, 160ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1))',
+};
+
+const selectedNodeStyle: CSSProperties = {
+  ...nodeStyle,
+  boxShadow: '-3px 0 0 var(--emerald, #10B981)',
+  paddingLeft: 14,
+  marginLeft: -14,
+};
+
+const childrenStyle: CSSProperties = {
+  marginTop: 'var(--s-2, 8px)',
+  paddingLeft: 'var(--s-4, 16px)',
+  borderLeft: '1px dashed var(--border-subtle, #E8E2D1)',
+};
+
+const unknownStyle: CSSProperties = {
+  padding: 'var(--s-3, 12px) var(--s-4, 16px)',
+  border: '1px dashed var(--danger, #DC2626)',
+  borderRadius: 'var(--r-md, 8px)',
+  background: 'var(--danger-soft, #FEE2E2)',
+  color: 'var(--danger, #DC2626)',
+  fontFamily:
+    "var(--font-mono, 'Geist Mono', ui-monospace, monospace)",
+  fontSize: 'var(--t-sm, 13px)',
+};
 
 /**
  * Walks `blocks` and renders each node. The rendering happens inside a
@@ -85,25 +162,45 @@ export function BlockEditCanvas({
   loadingFallback = null,
   transformRegistry,
   onApplyTransform,
+  selectedClientId,
 }: BlockEditCanvasProps) {
+  // Empty trees render as a bare canvas root — the document chip only
+  // materialises when there is something to author. This keeps the
+  // "empty editor === empty DOM" contract the scaffold tests assert.
+  if (blocks.length === 0) {
+    return (
+      <div
+        className="gonext-block-edit-canvas"
+        data-testid="block-edit-canvas"
+      />
+    );
+  }
   return (
     <div
       className="gonext-block-edit-canvas"
       data-testid="block-edit-canvas"
+      style={canvasStyle}
     >
-      <Suspense fallback={loadingFallback}>
-        {blocks.map((block, index) => (
-          <BlockNode
-            key={block.clientId ?? `${block.type}-${index}`}
-            block={block}
-            registry={registry}
-            context={context ?? {}}
-            indexPath={[index]}
-            transformRegistry={transformRegistry}
-            onApplyTransform={onApplyTransform}
-          />
-        ))}
-      </Suspense>
+      <div
+        className="gonext-block-edit-canvas__doc"
+        data-testid="block-edit-canvas-doc"
+        style={docChipStyle}
+      >
+        <Suspense fallback={loadingFallback}>
+          {blocks.map((block, index) => (
+            <BlockNode
+              key={block.clientId ?? `${block.type}-${index}`}
+              block={block}
+              registry={registry}
+              context={context ?? {}}
+              indexPath={[index]}
+              transformRegistry={transformRegistry}
+              onApplyTransform={onApplyTransform}
+              selectedClientId={selectedClientId}
+            />
+          ))}
+        </Suspense>
+      </div>
     </div>
   );
 }
@@ -119,6 +216,7 @@ interface BlockNodeProps {
     transformId: string,
     transform: Transform,
   ) => void;
+  selectedClientId?: string;
 }
 
 function BlockNode({
@@ -128,6 +226,7 @@ function BlockNode({
   indexPath,
   transformRegistry,
   onApplyTransform,
+  selectedClientId,
 }: BlockNodeProps): React.ReactNode {
   const def = registry.get(block.type);
   if (def === undefined) {
@@ -139,12 +238,16 @@ function BlockNode({
   const mod = use(getEditModule(registry, block.type, def.edit));
   const Edit = mod.default as EditComponent;
 
+  const resolvedClientId =
+    block.clientId ?? `${block.type}-${indexPath.join('-')}`;
+  const isSelected =
+    selectedClientId !== undefined && selectedClientId === resolvedClientId;
+
   const props: BlockEditProps = {
     attributes: block.attributes,
     setAttributes: noopSetAttributes,
-    isSelected: false,
-    clientId:
-      block.clientId ?? `${block.type}-${indexPath.join('-')}`,
+    isSelected,
+    clientId: resolvedClientId,
     context,
   };
 
@@ -164,9 +267,14 @@ function BlockNode({
 
   return (
     <div
-      className="gonext-block-edit-canvas__node"
+      className={
+        'gonext-block-edit-canvas__node' +
+        (isSelected ? ' gonext-block-edit-canvas__node--selected' : '')
+      }
       data-block-type={block.type}
+      data-selected={isSelected ? 'true' : 'false'}
       data-testid={`block-edit-canvas-node-${block.type}`}
+      style={isSelected ? selectedNodeStyle : nodeStyle}
     >
       {showToolbar ? (
         <BlockTransformToolbar
@@ -179,7 +287,10 @@ function BlockNode({
       ) : null}
       {rendered}
       {block.innerBlocks && block.innerBlocks.length > 0 ? (
-        <div className="gonext-block-edit-canvas__children">
+        <div
+          className="gonext-block-edit-canvas__children"
+          style={childrenStyle}
+        >
           {block.innerBlocks.map((child, childIndex) => (
             <BlockNode
               key={child.clientId ?? `${child.type}-${childIndex}`}
@@ -189,6 +300,7 @@ function BlockNode({
               indexPath={[...indexPath, childIndex]}
               transformRegistry={transformRegistry}
               onApplyTransform={onApplyTransform}
+              selectedClientId={selectedClientId}
             />
           ))}
         </div>
@@ -210,6 +322,7 @@ function UnknownBlock({ type, path }: UnknownBlockProps) {
       data-testid="block-edit-canvas-unknown"
       data-block-type={type}
       data-path={path.join('/')}
+      style={unknownStyle}
     >
       Unknown block type: <code>{type}</code>
     </div>

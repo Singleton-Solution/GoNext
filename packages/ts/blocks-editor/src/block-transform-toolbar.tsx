@@ -28,8 +28,98 @@
 'use client';
 
 import type { Block } from '@gonext/blocks-sdk';
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import type { Transform, TransformRegistry } from './transform-types.ts';
+
+/**
+ * Brand styling — "Living systems" (docs/design/HANDOFF.md and the
+ * block-transform pill pattern in docs/design/ui_kits/editor/index.html).
+ * The toggle is a `--paper-2` pill with a soft `--sh-xs` shadow; on
+ * hover the fill shifts to `--emerald-soft` (never translates — quiet,
+ * not bouncy, per the motion handoff). The menu is the slash-menu
+ * panel from the editor mock: `--paper-2` surface, `--sh-md` lift,
+ * Geist menu items, emerald-soft hover, no chrome borrowed from the
+ * native `<select>` popup.
+ */
+const wrapperStyle: CSSProperties = {
+  position: 'relative',
+  display: 'inline-flex',
+  fontFamily:
+    "var(--font-sans, 'Geist', -apple-system, system-ui, sans-serif)",
+};
+
+const toggleStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 'var(--s-2, 8px)',
+  padding: '6px 12px',
+  background: 'var(--paper-2, #EFEBE0)',
+  border: '1px solid var(--border, #D9D2C0)',
+  borderRadius: 'var(--r-pill, 999px)',
+  fontFamily: 'inherit',
+  fontSize: 'var(--t-xs, 12px)',
+  fontWeight: 500,
+  color: 'var(--ink, #0E1A14)',
+  cursor: 'pointer',
+  boxShadow: 'var(--sh-xs, 0 1px 2px rgba(14, 26, 20, 0.04))',
+  transition:
+    'background var(--dur-fast, 100ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1)), color var(--dur-fast, 100ms) var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1))',
+};
+
+const toggleDisabledStyle: CSSProperties = {
+  ...toggleStyle,
+  color: 'var(--fg-faint, #94A199)',
+  background: 'var(--paper-3, #E6E1D2)',
+  cursor: 'not-allowed',
+  boxShadow: 'none',
+};
+
+const menuStyle: CSSProperties = {
+  position: 'absolute',
+  top: 'calc(100% + 4px)',
+  left: 0,
+  zIndex: 30,
+  minWidth: 200,
+  margin: 0,
+  padding: 6,
+  listStyle: 'none',
+  background: 'var(--paper-2, #EFEBE0)',
+  border: '1px solid var(--border, #D9D2C0)',
+  borderRadius: 'var(--r-md, 8px)',
+  boxShadow:
+    'var(--sh-md, 0 6px 14px -4px rgba(14, 26, 20, 0.08), 0 2px 6px -2px rgba(14, 26, 20, 0.04))',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 2,
+};
+
+const optionStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-start',
+  gap: 2,
+  width: '100%',
+  padding: '7px 10px',
+  background: 'transparent',
+  border: '1px solid transparent',
+  borderRadius: 'var(--r-sm, 6px)',
+  fontFamily: 'inherit',
+  textAlign: 'left',
+  cursor: 'pointer',
+  color: 'var(--ink, #0E1A14)',
+};
+
+const optionLabelStyle: CSSProperties = {
+  fontSize: 'var(--t-sm, 13px)',
+  fontWeight: 500,
+};
+
+const optionDescStyle: CSSProperties = {
+  fontFamily:
+    "var(--font-mono, 'Geist Mono', ui-monospace, monospace)",
+  fontSize: 'var(--t-2xs, 11px)',
+  color: 'var(--fg-subtle, #6B7B72)',
+};
 
 export interface BlockTransformToolbarProps {
   /** The currently selected block. */
@@ -80,6 +170,7 @@ export function BlockTransformToolbar({
       className="gonext-block-transform-toolbar"
       data-testid="block-transform-toolbar"
       data-block-type={block.type}
+      style={wrapperStyle}
     >
       <button
         type="button"
@@ -91,6 +182,20 @@ export function BlockTransformToolbar({
         className="gonext-block-transform-toolbar__toggle"
         data-testid="block-transform-toolbar-toggle"
         data-open={open ? 'true' : 'false'}
+        style={!hasOptions ? toggleDisabledStyle : toggleStyle}
+        onMouseEnter={(event) => {
+          if (!hasOptions) return;
+          event.currentTarget.style.background =
+            'var(--emerald-soft, #D1FAE5)';
+          event.currentTarget.style.color =
+            'var(--emerald-deep, #047857)';
+        }}
+        onMouseLeave={(event) => {
+          if (!hasOptions) return;
+          event.currentTarget.style.background =
+            'var(--paper-2, #EFEBE0)';
+          event.currentTarget.style.color = 'var(--ink, #0E1A14)';
+        }}
       >
         {toggleLabel}
       </button>
@@ -101,6 +206,7 @@ export function BlockTransformToolbar({
           aria-label={`${toggleLabel} options`}
           className="gonext-block-transform-toolbar__menu"
           data-testid="block-transform-toolbar-menu"
+          style={menuStyle}
         >
           {options.map((t) => (
             <li key={t.id} role="none">
@@ -114,12 +220,29 @@ export function BlockTransformToolbar({
                 className="gonext-block-transform-toolbar__option"
                 data-testid={`block-transform-toolbar-option-${t.id}`}
                 title={t.description ?? t.label}
+                style={optionStyle}
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.background =
+                    'var(--emerald-soft, #D1FAE5)';
+                  event.currentTarget.style.color =
+                    'var(--emerald-deep, #047857)';
+                }}
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.background = 'transparent';
+                  event.currentTarget.style.color = 'var(--ink, #0E1A14)';
+                }}
               >
-                <span className="gonext-block-transform-toolbar__option-label">
+                <span
+                  className="gonext-block-transform-toolbar__option-label"
+                  style={optionLabelStyle}
+                >
                   {t.label}
                 </span>
                 {t.description !== undefined ? (
-                  <span className="gonext-block-transform-toolbar__option-description">
+                  <span
+                    className="gonext-block-transform-toolbar__option-description"
+                    style={optionDescStyle}
+                  >
                     {t.description}
                   </span>
                 ) : null}
