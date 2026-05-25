@@ -474,6 +474,17 @@ func TestPgxStore_ListCursorPagination(t *testing.T) {
 
 	ids := make([]string, 0, 5)
 	for i := 0; i < 5; i++ {
+		// Sleep between inserts so each comment lands in a distinct
+		// millisecond. List orders by (path, id), and UUIDv7's
+		// millisecond-precision timestamp dominates the id ordering;
+		// within the SAME ms two ids' 62 bits of random can flip
+		// relative to insertion order, which races the assertion
+		// below. The sleep is the smallest change that keeps the
+		// test deterministic without changing the production sort
+		// key.
+		if i > 0 {
+			time.Sleep(2 * time.Millisecond)
+		}
 		c, err := store.Submit(context.Background(), SubmitInput{
 			PostID:     post.String(),
 			AuthorName: "Anon",
