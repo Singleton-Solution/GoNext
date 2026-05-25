@@ -54,9 +54,10 @@ type platformContext struct {
 	// audit; the export is then absent.
 	audit *AuditSink
 
-	// cron lands in the follow-up commit for issue #191
-	// (platform_cron.go). The field will appear here in additive
-	// fashion once that type exists.
+	// cron is the persistence + dispatch seam backing
+	// gn_cron_register (#191). Nil when the host did not configure
+	// cron; the export is then absent.
+	cron *CronService
 
 	// slugFor maps a wazero module name to the plugin's slug. Nil is
 	// fine when the host uses "module name == slug" (the documented
@@ -122,9 +123,9 @@ type PlatformConfig struct {
 	// backing gn_audit_emit (#183). May be nil.
 	Audit *AuditSink
 
-	// Cron is populated by the follow-up issue #191
-	// (gn_cron_register). The field is added in the matching commit;
-	// PlatformConfig grows additively.
+	// Cron is the schedule-register seam backing gn_cron_register
+	// (#191). May be nil.
+	Cron *CronService
 
 	PlatformEmitter AuditEmitterFunc
 	SlugFor         func(moduleName string) string
@@ -144,6 +145,7 @@ func WithPlatform(cfg PlatformConfig) Option {
 		rc.platform = &platformContext{
 			secrets:         cfg.Secrets,
 			audit:           cfg.Audit,
+			cron:            cfg.Cron,
 			slugFor:         cfg.SlugFor,
 			platformEmitter: cfg.PlatformEmitter,
 		}
@@ -177,10 +179,14 @@ func (r *Runtime) addPlatformExports(b wazero.HostModuleBuilder) {
 			WithParameterNames("event_ptr", "event_len", "meta_ptr", "meta_len").
 			Export("gn_audit_emit")
 	}
-	// gn_cron_register is registered in the follow-up commit for
-	// issue #191. The gating shape (additive nil-check on
-	// r.platform.cron) is identical to gn_secrets_get and
-	// gn_audit_emit above.
+	if r.platform.cron != nil {
+		b.NewFunctionBuilder().
+			WithGoModuleFunction(api.GoModuleFunc(r.hostGnCronRegister),
+				[]api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32},
+				[]api.ValueType{api.ValueTypeI32}).
+			WithParameterNames("schedule_ptr", "schedule_len", "handler_ptr", "handler_len").
+			Export("gn_cron_register")
+	}
 }
 
 // ----- gn_secrets_get ------------------------------------------------
@@ -396,6 +402,85 @@ func (r *Runtime) hostGnAuditEmit(ctx context.Context, mod api.Module, stack []u
 
 	platformMeta["result"] = "ok"
 	r.platform.emitPlatform(ctx, r.logger, pluginSlug, platformEvent, platformMeta)
+	stack[0] = api.EncodeI32(0)
+}
+
+// ----- gn_cron_register ----------------------------------------------
+
+// hostGnCronRegister implements env.gn_cron_register.
+//
+// Signature: (schedule_ptr i32, schedule_len i32, handler_ptr i32, handler_len i32) -> i32
+//
+// Returns 0 on success, -1 on rejection (empty/missing args,
+// bad handler ID shape, service not configured, store failure).
+//
+// Each call emits a plugin.<slug>.platform.cron_register row with the
+// (schedule, handler_id, result) triple so an operator can see
+// exactly what schedules a plugin asked for during activation. The
+// audit row is written even on rejection so misbehaving plugins are
+// visible in the audit trail.
+func (r *Runtime) hostGnCronRegister(ctx context.Context, mod api.Module, stack []uint64) {
+	schedPtr := api.DecodeU32(stack[0])
+	schedLen := api.DecodeU32(stack[1])
+	handlerPtr := api.DecodeU32(stack[2])
+	handlerLen := api.DecodeU32(stack[3])
+
+	if r.platform == nil || r.platform.cron == nil {
+		r.logger.WarnContext(ctx, "runtime: gn_cron_register: service not configured",
+			slog.String("module", mod.Name()))
+		stack[0] = api.EncodeI32(-1)
+		return
+	}
+
+	pluginSlug := r.platform.resolveSlug(mod.Name())
+
+	schedBuf, err := readHostString("gn_cron_register", mod, schedPtr, schedLen)
+	if err != nil {
+		r.logger.WarnContext(ctx, "runtime: gn_cron_register: bad schedule args",
+			slog.String("module", mod.Name()),
+			slog.String("err", err.Error()))
+		stack[0] = api.EncodeI32(-1)
+		return
+	}
+	schedule := string(append([]byte(nil), schedBuf...))
+
+	handlerBuf, err := readHostString("gn_cron_register", mod, handlerPtr, handlerLen)
+	if err != nil {
+		r.logger.WarnContext(ctx, "runtime: gn_cron_register: bad handler args",
+			slog.String("module", mod.Name()),
+			slog.String("err", err.Error()))
+		stack[0] = api.EncodeI32(-1)
+		return
+	}
+	handlerID := string(append([]byte(nil), handlerBuf...))
+
+	auditMeta := map[string]any{
+		"schedule":   schedule,
+		"handler_id": handlerID,
+	}
+	auditEvent := "plugin." + pluginSlug + ".platform.cron_register"
+	if err := r.platform.cron.Register(ctx, pluginSlug, schedule, handlerID); err != nil {
+		switch {
+		case errors.Is(err, ErrCronEmpty):
+			auditMeta["result"] = "empty"
+		case errors.Is(err, ErrCronHandlerIDShape):
+			auditMeta["result"] = "bad_handler_id"
+		default:
+			auditMeta["result"] = "error"
+		}
+		r.platform.emitPlatform(ctx, r.logger, pluginSlug, auditEvent, auditMeta)
+		r.logger.WarnContext(ctx, "runtime: gn_cron_register: rejected",
+			slog.String("module", mod.Name()),
+			slog.String("plugin", pluginSlug),
+			slog.String("schedule", schedule),
+			slog.String("handler_id", handlerID),
+			slog.String("err", err.Error()))
+		stack[0] = api.EncodeI32(-1)
+		return
+	}
+
+	auditMeta["result"] = "ok"
+	r.platform.emitPlatform(ctx, r.logger, pluginSlug, auditEvent, auditMeta)
 	stack[0] = api.EncodeI32(0)
 }
 
