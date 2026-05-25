@@ -1,0 +1,251 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`GeneralForm > matches the brand snapshot 1`] = `
+<form
+  class="settings-form"
+  novalidate=""
+>
+  <section
+    class=""
+  >
+    <div
+      class="settings-form__fields"
+    >
+      <div
+        class="form-field"
+      >
+        <label
+          class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          for="setting-core-site-name"
+        >
+          Site name
+        </label>
+        <input
+          aria-describedby="setting-core-site-name-help"
+          class="flex h-9 w-full rounded-md border border-border bg-paper-3 px-3 py-1.5 font-sans text-sm leading-none text-ink placeholder:text-fg-faint transition-shadow duration-[160ms] ease-brand hover:border-border-strong focus-visible:outline-none focus-visible:border-emerald focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-ink"
+          id="setting-core-site-name"
+          placeholder="GoNext"
+          type="text"
+          value="GoNext Demo"
+        />
+        <p
+          class="form-field__help"
+          id="setting-core-site-name-help"
+        >
+          Shown in the browser tab, RSS feed, and email notifications.
+        </p>
+      </div>
+      <div
+        class="form-field"
+      >
+        <label
+          class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          for="setting-core-site-tagline"
+        >
+          Tagline
+        </label>
+        <input
+          aria-describedby="setting-core-site-tagline-help"
+          class="flex h-9 w-full rounded-md border border-border bg-paper-3 px-3 py-1.5 font-sans text-sm leading-none text-ink placeholder:text-fg-faint transition-shadow duration-[160ms] ease-brand hover:border-border-strong focus-visible:outline-none focus-visible:border-emerald focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-ink"
+          id="setting-core-site-tagline"
+          placeholder="Just another GoNext site"
+          type="text"
+          value="A tagline"
+        />
+        <p
+          class="form-field__help"
+          id="setting-core-site-tagline-help"
+        >
+          A short description of your site — appears below the title in themes that use it.
+        </p>
+      </div>
+      <div
+        class="form-field"
+      >
+        <label
+          class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          for="setting-core-site-url"
+        >
+          Site URL
+        </label>
+        <input
+          aria-describedby="setting-core-site-url-help"
+          class="flex h-9 w-full rounded-md border border-border bg-paper-3 px-3 py-1.5 font-sans text-sm leading-none text-ink placeholder:text-fg-faint transition-shadow duration-[160ms] ease-brand hover:border-border-strong focus-visible:outline-none focus-visible:border-emerald focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-ink"
+          id="setting-core-site-url"
+          placeholder="https://example.com"
+          type="url"
+          value="https://example.com"
+        />
+        <p
+          class="form-field__help"
+          id="setting-core-site-url-help"
+        >
+          The canonical address used in feeds, emails, and SEO metadata.
+        </p>
+      </div>
+      <div
+        class="form-field"
+      >
+        <label
+          class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          for="setting-core-timezone"
+        >
+          Timezone
+        </label>
+        <select
+          id="setting-core-timezone"
+        >
+          <option
+            disabled=""
+            value=""
+          >
+            Select…
+          </option>
+          <option
+            value="UTC"
+          >
+            UTC
+          </option>
+          <option
+            value="America/New_York"
+          >
+            America/New_York
+          </option>
+          <option
+            value="America/Los_Angeles"
+          >
+            America/Los_Angeles
+          </option>
+          <option
+            value="Europe/London"
+          >
+            Europe/London
+          </option>
+          <option
+            value="Europe/Paris"
+          >
+            Europe/Paris
+          </option>
+          <option
+            value="Asia/Tokyo"
+          >
+            Asia/Tokyo
+          </option>
+        </select>
+      </div>
+      <div
+        class="form-field"
+      >
+        <label
+          class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          for="setting-core-locale"
+        >
+          Site language
+        </label>
+        <select
+          id="setting-core-locale"
+        >
+          <option
+            disabled=""
+            value=""
+          >
+            Select…
+          </option>
+          <option
+            value="en-US"
+          >
+            English (United States)
+          </option>
+          <option
+            value="en-GB"
+          >
+            English (United Kingdom)
+          </option>
+          <option
+            value="fr-FR"
+          >
+            French
+          </option>
+          <option
+            value="de-DE"
+          >
+            German
+          </option>
+          <option
+            value="es-ES"
+          >
+            Spanish
+          </option>
+          <option
+            value="ja-JP"
+          >
+            Japanese
+          </option>
+        </select>
+      </div>
+      <div
+        class="form-field"
+      >
+        <label
+          class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          for="setting-core-default_role"
+        >
+          Default role
+        </label>
+        <select
+          aria-describedby="setting-core-default_role-help"
+          id="setting-core-default_role"
+        >
+          <option
+            disabled=""
+            value=""
+          >
+            Select…
+          </option>
+          <option
+            value="subscriber"
+          >
+            Subscriber
+          </option>
+          <option
+            value="contributor"
+          >
+            Contributor
+          </option>
+          <option
+            value="author"
+          >
+            Author
+          </option>
+          <option
+            value="editor"
+          >
+            Editor
+          </option>
+          <option
+            value="admin"
+          >
+            Administrator
+          </option>
+        </select>
+        <p
+          class="form-field__help"
+          id="setting-core-default_role-help"
+        >
+          Assigned to newly registered users when no role is specified.
+        </p>
+      </div>
+    </div>
+  </section>
+  <div
+    class="settings-form__actions"
+  >
+    <button
+      class="inline-flex items-center justify-center gap-[6px] whitespace-nowrap rounded-md font-display font-bold transition-shadow duration-[160ms] ease-brand focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 bg-emerald text-emerald-ink border border-emerald shadow-xs hover:bg-emerald-deep hover:text-paper hover:border-emerald-deep px-5 py-3 text-base btn-primary"
+      type="submit"
+    >
+      Save changes
+    </button>
+  </div>
+</form>
+`;

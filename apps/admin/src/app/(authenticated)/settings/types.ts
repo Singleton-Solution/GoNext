@@ -36,6 +36,12 @@ export interface Setting {
   required?: boolean;
   /** Optional placeholder forwarded to the input. */
   placeholder?: string;
+  /**
+   * When true, the rendered input uses the mono font stack
+   * (Geist Mono). Used by the Permalinks custom-structure field
+   * so URL templates read like code.
+   */
+  mono?: boolean;
 }
 
 /**
@@ -44,6 +50,24 @@ export interface Setting {
  * the input boundary.
  */
 export type SettingsValues = Record<string, unknown>;
+
+/**
+ * Optional grouping for the schema-driven form. Each section renders as
+ * its own paper-2 card with a title + optional description, holding the
+ * subset of fields whose keys are listed. Pages that do NOT declare
+ * sections fall back to a single unsectioned card.
+ *
+ * Living-Systems brand uses these sections as the primary visual rhythm
+ * for forms — see docs/design/HANDOFF.md ("Component patterns to honor").
+ */
+export interface SettingsSection {
+  /** Short, sentence-case title rendered above the fields. */
+  title: string;
+  /** Optional supporting copy under the title. */
+  description?: string;
+  /** Keys of `Setting.key` entries that belong to this section. */
+  keys: readonly string[];
+}
 
 /**
  * Group identifier passed to the API. Matches the registry buckets defined in

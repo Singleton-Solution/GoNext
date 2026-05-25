@@ -59,4 +59,17 @@ export const GENERAL_SCHEMA: readonly Setting[] = [
       { value: 'ja-JP', label: 'Japanese' },
     ],
   },
+  {
+    key: 'core.default_role',
+    label: 'Default role',
+    type: 'select',
+    options: [
+      { value: 'subscriber', label: 'Subscriber' },
+      { value: 'contributor', label: 'Contributor' },
+      { value: 'author', label: 'Author' },
+      { value: 'editor', label: 'Editor' },
+      { value: 'admin', label: 'Administrator' },
+    ],
+    help: 'Assigned to newly registered users when no role is specified.',
+  },
 ];

@@ -1,0 +1,215 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`WritingSettingsPage > matches the brand snapshot 1`] = `
+<form
+  class="settings-form"
+  novalidate=""
+>
+  <section
+    class=""
+  >
+    <div
+      class="settings-form__fields"
+    >
+      <div
+        class="form-field"
+      >
+        <label
+          class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          for="setting-core-writing-default_category"
+        >
+          Default category
+        </label>
+        <select
+          aria-describedby="setting-core-writing-default_category-help"
+          id="setting-core-writing-default_category"
+        >
+          <option
+            disabled=""
+            value=""
+          >
+            Select…
+          </option>
+          <option
+            value="uncategorized"
+          >
+            Uncategorized
+          </option>
+          <option
+            value="news"
+          >
+            News
+          </option>
+          <option
+            value="blog"
+          >
+            Blog
+          </option>
+          <option
+            value="updates"
+          >
+            Updates
+          </option>
+        </select>
+        <p
+          class="form-field__help"
+          id="setting-core-writing-default_category-help"
+        >
+          Applied to new posts that do not explicitly set one.
+        </p>
+      </div>
+      <div
+        class="form-field"
+      >
+        <label
+          class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          for="setting-core-writing-default_format"
+        >
+          Default post format
+        </label>
+        <select
+          aria-describedby="setting-core-writing-default_format-help"
+          id="setting-core-writing-default_format"
+        >
+          <option
+            disabled=""
+            value=""
+          >
+            Select…
+          </option>
+          <option
+            value="standard"
+          >
+            Standard
+          </option>
+          <option
+            value="aside"
+          >
+            Aside
+          </option>
+          <option
+            value="gallery"
+          >
+            Gallery
+          </option>
+          <option
+            value="link"
+          >
+            Link
+          </option>
+          <option
+            value="quote"
+          >
+            Quote
+          </option>
+        </select>
+        <p
+          class="form-field__help"
+          id="setting-core-writing-default_format-help"
+        >
+          Themes use this hint to pick a post template.
+        </p>
+      </div>
+      <div
+        class="form-field"
+      >
+        <label
+          class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          for="setting-core-writing-default_editor"
+        >
+          Default editor
+        </label>
+        <select
+          aria-describedby="setting-core-writing-default_editor-help"
+          id="setting-core-writing-default_editor"
+        >
+          <option
+            disabled=""
+            value=""
+          >
+            Select…
+          </option>
+          <option
+            value="block"
+          >
+            Block editor
+          </option>
+          <option
+            value="classic"
+          >
+            Classic editor
+          </option>
+        </select>
+        <p
+          class="form-field__help"
+          id="setting-core-writing-default_editor-help"
+        >
+          Which editor opens when you click “New post”.
+        </p>
+      </div>
+      <div
+        class="form-field"
+      >
+        <label
+          class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          for="setting-core-writing-post_by_email_enabled"
+        >
+          Enable post by email
+        </label>
+        <label
+          class="form-field__toggle"
+        >
+          <input
+            aria-describedby="setting-core-writing-post_by_email_enabled-help"
+            id="setting-core-writing-post_by_email_enabled"
+            type="checkbox"
+          />
+          <span>
+            Disabled
+          </span>
+        </label>
+        <p
+          class="form-field__help"
+          id="setting-core-writing-post_by_email_enabled-help"
+        >
+          Messages sent to the address below are converted to drafts.
+        </p>
+      </div>
+      <div
+        class="form-field"
+      >
+        <label
+          class="font-sans text-xs font-medium leading-[1.4] text-fg-subtle peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          for="setting-core-writing-post_by_email_address"
+        >
+          Inbound email address
+        </label>
+        <input
+          aria-describedby="setting-core-writing-post_by_email_address-help"
+          class="flex h-9 w-full rounded-md border border-border bg-paper-3 px-3 py-1.5 font-sans text-sm leading-none text-ink placeholder:text-fg-faint transition-shadow duration-[160ms] ease-brand hover:border-border-strong focus-visible:outline-none focus-visible:border-emerald focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-ink"
+          id="setting-core-writing-post_by_email_address"
+          placeholder="posts@example.com"
+          type="text"
+          value=""
+        />
+        <p
+          class="form-field__help"
+          id="setting-core-writing-post_by_email_address-help"
+        >
+          Only used when post-by-email is enabled.
+        </p>
+      </div>
+    </div>
+  </section>
+  <div
+    class="settings-form__actions"
+  >
+    <button
+      class="inline-flex items-center justify-center gap-[6px] whitespace-nowrap rounded-md font-display font-bold transition-shadow duration-[160ms] ease-brand focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 bg-emerald text-emerald-ink border border-emerald shadow-xs hover:bg-emerald-deep hover:text-paper hover:border-emerald-deep px-5 py-3 text-base btn-primary"
+      type="submit"
+    >
+      Save changes
+    </button>
+  </div>
+</form>
+`;
