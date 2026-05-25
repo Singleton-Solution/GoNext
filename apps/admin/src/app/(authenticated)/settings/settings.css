@@ -1,113 +1,409 @@
 /*
- * Settings-only styles.
+ * Settings — brand-tokenized styles (Living-Systems).
  *
- * Imported by `apps/admin/src/app/settings/layout.tsx` so the rules only apply
- * to routes under `/settings/*`. Kept here (rather than in `globals.css`) to
- * respect the file ownership for the settings feature and avoid drift with the
- * scaffold-level styles.
+ * All four settings sub-pages compose the same `SettingsForm` plus
+ * page-level wrappers. The legacy class names (`settings-form`,
+ * `form-field`, `permalinks-preview`) are kept so the existing
+ * a11y + interaction tests stay green, but every visual rule now
+ * reads from the GoNext design tokens declared in `src/styles/tokens.css`.
+ *
+ * Tokens are LAW — no raw hex, no scaffold `--color-*` left in this file.
+ * See docs/design/HANDOFF.md ("Component patterns to honor").
  */
 
+/* ─── Page wrapper ───────────────────────────────────────────── */
+.settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-7);
+  max-width: 760px;
+  padding-bottom: var(--s-9);
+}
+
+.settings-page__back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  font-family: var(--font-sans);
+  font-size: var(--t-xs);
+  font-weight: 500;
+  color: var(--fg-muted);
+  text-decoration: none;
+  transition: color var(--dur) var(--ease);
+}
+.settings-page__back:hover { color: var(--emerald-deep); }
+
+.settings-page__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.settings-page__lead {
+  font-family: var(--font-sans);
+  font-size: var(--t-md);
+  line-height: var(--lh-normal);
+  color: var(--fg-muted);
+  max-width: 56ch;
+  margin: 0;
+}
+
+/* ─── Section card (paper-2) ─────────────────────────────────── */
+.settings-section {
+  background: var(--paper-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--s-7);
+  box-shadow: var(--sh-xs);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+}
+
+.settings-section__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+
+.settings-section__title {
+  font-family: var(--font-sans);
+  font-size: var(--t-lg);
+  font-weight: 600;
+  letter-spacing: var(--track-normal);
+  color: var(--ink);
+  margin: 0;
+}
+
+.settings-section__sub {
+  font-family: var(--font-sans);
+  font-size: var(--t-sm);
+  color: var(--fg-muted);
+  margin: 0;
+}
+
+/* ─── Form container ─────────────────────────────────────────── */
 .settings-form {
-  max-width: 560px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: var(--space-6);
-  margin-top: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-6);
   position: relative;
 }
 
 .settings-form__banner {
-  background: #fff8e1;
-  border: 1px solid #f0d68a;
-  border-radius: var(--radius);
-  padding: var(--space-2) var(--space-3);
-  color: #6b4f00;
-  margin: 0 0 var(--space-4);
-  font-size: 13px;
+  background: var(--warning-soft);
+  border: 1px solid color-mix(in oklab, var(--warning) 25%, transparent);
+  border-radius: var(--r-md);
+  padding: var(--s-3) var(--s-4);
+  color: var(--warning);
+  font-family: var(--font-sans);
+  font-size: var(--t-sm);
+  font-weight: 500;
+  margin: 0;
 }
 
 .settings-form__actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: var(--space-4);
+  align-items: center;
+  gap: var(--s-3);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .settings-form__toast {
   position: absolute;
-  right: var(--space-4);
-  bottom: -52px;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius);
-  font-size: 13px;
+  right: 0;
+  bottom: -56px;
+  padding: var(--s-2) var(--s-4);
+  border-radius: var(--r-md);
+  font-family: var(--font-sans);
+  font-size: var(--t-sm);
   font-weight: 500;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--sh-md);
 }
 
 .settings-form__toast--success {
-  background: #ecfdf3;
-  border: 1px solid #6ad58f;
-  color: #105a2c;
+  background: var(--emerald-soft);
+  border: 1px solid color-mix(in oklab, var(--emerald) 25%, transparent);
+  color: var(--emerald-deep);
 }
 
 .settings-form__toast--error {
-  background: #fef2f2;
-  border: 1px solid #f3a3a3;
-  color: #7a1313;
+  background: var(--danger-soft);
+  border: 1px solid color-mix(in oklab, var(--danger) 25%, transparent);
+  color: var(--danger);
 }
 
-.settings-form select {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: var(--space-2) var(--space-3);
-  font: inherit;
-  background: var(--color-surface);
+/* ─── Form field — label + control + help + error ──────────── */
+.settings-form .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.settings-form .form-field > label {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: var(--t-sm);
+  color: var(--ink);
+  margin: 0;
+}
+
+.settings-form .form-field__help {
+  font-family: var(--font-sans);
+  font-size: var(--t-xs);
+  color: var(--fg-muted);
+  margin: 0;
+}
+
+.settings-form .form-field__error {
+  font-family: var(--font-sans);
+  font-size: var(--t-xs);
+  color: var(--danger);
+  margin: 0;
 }
 
 .settings-form .form-field__toggle {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  font-weight: 400;
+  gap: var(--s-2);
+  font-family: var(--font-sans);
+  font-size: var(--t-sm);
+  color: var(--ink);
+  cursor: pointer;
 }
 
-.settings-form .form-field__help {
-  font-size: 12px;
-  margin: var(--space-1) 0 0;
+.settings-form .form-field__toggle input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--emerald);
+  cursor: pointer;
 }
 
-.settings-form .form-field__error {
-  font-size: 12px;
-  color: #7a1313;
-  margin: var(--space-1) 0 0;
+/* ─── Inputs / Selects (paper-3 sunken surface) ──────────────── */
+.settings-form input[type='text'],
+.settings-form input[type='url'],
+.settings-form input[type='number'],
+.settings-form input[type='email'],
+.settings-form select {
+  display: block;
+  width: 100%;
+  padding: var(--s-2) var(--s-3);
+  font-family: var(--font-sans);
+  font-size: var(--t-sm);
+  line-height: var(--lh-normal);
+  color: var(--ink);
+  background: var(--paper-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  outline: none;
+  transition:
+    border-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease),
+    background var(--dur) var(--ease);
+}
+
+.settings-form input::placeholder { color: var(--fg-faint); }
+
+.settings-form input:hover,
+.settings-form select:hover { border-color: var(--border-strong); }
+
+.settings-form input:focus,
+.settings-form select:focus {
+  border-color: var(--emerald);
+  box-shadow: var(--sh-focus);
 }
 
 .settings-form input[aria-invalid='true'],
 .settings-form select[aria-invalid='true'] {
-  border-color: #c44a4a;
-  outline-color: #c44a4a;
+  border-color: var(--danger);
+}
+.settings-form input[aria-invalid='true']:focus,
+.settings-form select[aria-invalid='true']:focus {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--danger) 22%, transparent);
 }
 
+.settings-form select {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--fg-muted) 50%),
+    linear-gradient(135deg, var(--fg-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 13px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: var(--s-7);
+}
+
+/* ─── Mono input variant (Permalinks custom structure) ──────── */
+.settings-form .form-field--mono input[type='text'] {
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+}
+
+/* ─── Save button (emerald) ──────────────────────────────────── */
+.settings-form .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-1);
+  padding: var(--s-3) var(--s-5);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--t-sm);
+  line-height: 1;
+  color: var(--emerald-ink);
+  background: var(--emerald);
+  border: 1px solid var(--emerald);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  box-shadow: var(--sh-xs);
+  transition:
+    background var(--dur) var(--ease),
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+
+.settings-form .btn-primary:hover:not(:disabled) {
+  background: var(--emerald-deep);
+  color: var(--paper);
+  border-color: var(--emerald-deep);
+}
+
+.settings-form .btn-primary:focus-visible {
+  outline: none;
+  box-shadow: var(--sh-focus);
+}
+
+.settings-form .btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ─── Permalinks — preset radio cards (paper-3 sunken) ──────── */
+.permalinks-presets {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--s-3);
+}
+
+.permalinks-preset {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  background: var(--paper-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition:
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+
+.permalinks-preset:hover {
+  border-color: var(--border-strong);
+  background: var(--paper-2);
+}
+
+.permalinks-preset:has(input:checked) {
+  border-color: var(--emerald);
+  background: var(--paper-2);
+  box-shadow: var(--sh-focus);
+}
+
+.permalinks-preset__radio {
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--emerald);
+  cursor: pointer;
+}
+
+.permalinks-preset__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+}
+
+.permalinks-preset__label {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: var(--t-sm);
+  color: var(--ink);
+}
+
+.permalinks-preset__url {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--fg-muted);
+  word-break: break-all;
+}
+
+/* ─── Permalinks live preview ────────────────────────────────── */
+.permalinks-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  background: var(--paper-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  font-family: var(--font-sans);
+  font-size: var(--t-sm);
+}
+
+.permalinks-preview strong {
+  font-weight: 500;
+  color: var(--fg-muted);
+}
+
+.permalinks-preview code {
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  color: var(--emerald-deep);
+  background: transparent;
+  padding: 0;
+}
+
+/* ─── Settings overview card (cream link card) ──────────────── */
 .settings-card {
   display: block;
-  color: var(--color-text);
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
 
 .settings-card:hover {
   text-decoration: none;
-  border-color: var(--color-accent);
+  border-color: var(--emerald);
+  transform: translateY(-2px);
+  box-shadow: var(--sh-md);
 }
 
-.permalinks-preview {
-  margin-top: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius);
-  background: var(--color-bg);
-  font-size: 13px;
+/* ─── Brand glows behind settings pages (subtle) ─────────────── */
+.settings-page__glow {
+  position: fixed;
+  pointer-events: none;
+  z-index: -1;
+  width: 600px;
+  height: 600px;
+  border-radius: var(--r-pill);
 }
-
-.permalinks-preview code {
-  font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: 12px;
+.settings-page__glow--emerald {
+  top: -20%;
+  right: -15%;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 60%);
+}
+.settings-page__glow--lavender {
+  bottom: -20%;
+  left: -15%;
+  background: radial-gradient(circle, rgba(167, 139, 250, 0.06) 0%, transparent 60%);
 }

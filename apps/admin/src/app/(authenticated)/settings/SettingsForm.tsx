@@ -18,9 +18,21 @@
  *
  * Keep this file generic. Group-specific business rules live in the page
  * components that compose the schema array.
+ *
+ * Visual treatment follows the Living-Systems brand: fields render inside
+ * paper-2 section cards (when `sections` is provided), labels use the
+ * shadcn `<Label>` primitive, text controls use `<Input>` and select
+ * controls use the shadcn `<Select>` group, and the submit action is an
+ * emerald `<Button>` per docs/design/HANDOFF.md.
  */
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react';
-import type { Setting, SettingsValues } from './types';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
+
+import type { Setting, SettingsSection, SettingsValues } from './types';
 
 const TOAST_DISMISS_MS = 4_000;
 
@@ -35,9 +47,22 @@ export interface SettingsFormProps {
   banner?: string;
   /**
    * Optional render prop for the `permalinks` page to display a preview
-   * derived from current field values. Receives the live values map.
+   * derived from current field values. Receives the live values map and
+   * a setter for one-off mutations from preset cards / shortcuts.
    */
-  renderExtras?: (values: SettingsValues) => ReactElement | null;
+  renderExtras?: (
+    values: SettingsValues,
+    setValue: (key: string, value: unknown) => void,
+  ) => ReactElement | null;
+  /**
+   * Optional section grouping. When provided, fields render inside
+   * paper-2 section cards in the declared order. Any schema entries
+   * whose key isn't listed in a section fall into a trailing
+   * "More" card so nothing silently disappears.
+   */
+  sections?: readonly SettingsSection[];
+  /** Optional override for the submit button label. Defaults to "Save changes". */
+  submitLabel?: string;
 }
 
 type FieldErrors = Record<string, string | undefined>;
@@ -137,12 +162,55 @@ function buildPatch(
   return out;
 }
 
+/**
+ * Resolve which fields go into which section. Unsectioned fields fall
+ * into a trailing "More" card so nothing silently disappears when a
+ * section list misses a key.
+ */
+function partitionFields(
+  schema: readonly Setting[],
+  sections: readonly SettingsSection[] | undefined,
+): ReadonlyArray<{ section: SettingsSection; fields: readonly Setting[] }> {
+  if (!sections || sections.length === 0) {
+    return [
+      {
+        section: { title: '', keys: schema.map((f) => f.key) },
+        fields: schema,
+      },
+    ];
+  }
+  const byKey = new Map(schema.map((field) => [field.key, field]));
+  const claimed = new Set<string>();
+  const out: Array<{ section: SettingsSection; fields: readonly Setting[] }> = [];
+  for (const section of sections) {
+    const fields: Setting[] = [];
+    for (const key of section.keys) {
+      const field = byKey.get(key);
+      if (field) {
+        fields.push(field);
+        claimed.add(key);
+      }
+    }
+    if (fields.length > 0) out.push({ section, fields });
+  }
+  const leftover = schema.filter((f) => !claimed.has(f.key));
+  if (leftover.length > 0) {
+    out.push({
+      section: { title: 'More', keys: leftover.map((f) => f.key) },
+      fields: leftover,
+    });
+  }
+  return out;
+}
+
 export function SettingsForm({
   schema,
   initialValues,
   onSubmit,
   banner,
   renderExtras,
+  sections,
+  submitLabel,
 }: SettingsFormProps): ReactElement {
   const [values, setValues] = useState<SettingsValues>(() => ({ ...initialValues }));
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -203,6 +271,9 @@ export function SettingsForm({
     }
   }
 
+  const grouped = partitionFields(schema, sections);
+  const sectioned = Boolean(sections && sections.length > 0);
+
   return (
     <form className="settings-form" onSubmit={handleSubmit} noValidate>
       {banner ? (
@@ -211,22 +282,45 @@ export function SettingsForm({
         </p>
       ) : null}
 
-      {schema.map((field) => (
-        <Field
-          key={field.key}
-          field={field}
-          value={values[field.key]}
-          error={errors[field.key]}
-          onChange={(v) => updateField(field.key, v)}
-        />
+      {grouped.map(({ section, fields }, index) => (
+        <section
+          key={section.title || `__unsectioned-${index}`}
+          className={cn(sectioned && 'settings-section')}
+        >
+          {sectioned && section.title ? (
+            <header className="settings-section__head">
+              <h2 className="settings-section__title">{section.title}</h2>
+              {section.description ? (
+                <p className="settings-section__sub">{section.description}</p>
+              ) : null}
+            </header>
+          ) : null}
+          <div className="settings-form__fields">
+            {fields.map((field) => (
+              <Field
+                key={field.key}
+                field={field}
+                value={values[field.key]}
+                error={errors[field.key]}
+                onChange={(v) => updateField(field.key, v)}
+              />
+            ))}
+          </div>
+        </section>
       ))}
 
-      {renderExtras ? renderExtras(values) : null}
+      {renderExtras ? renderExtras(values, updateField) : null}
 
       <div className="settings-form__actions">
-        <button type="submit" className="btn-primary" disabled={submitting}>
-          {submitting ? 'Saving…' : 'Save changes'}
-        </button>
+        <Button
+          type="submit"
+          variant="emerald"
+          size="lg"
+          className="btn-primary"
+          disabled={submitting}
+        >
+          {submitting ? 'Saving…' : (submitLabel ?? 'Save changes')}
+        </Button>
       </div>
 
       {toast ? (
@@ -255,13 +349,19 @@ interface FieldProps {
 function Field({ field, value, error, onChange }: FieldProps): ReactElement {
   const inputId = `setting-${field.key.replace(/\./g, '-')}`;
   const errorId = `${inputId}-error`;
+  const helpId = field.help ? `${inputId}-help` : undefined;
+  const describedBy = [errorId && error ? errorId : null, helpId]
+    .filter(Boolean)
+    .join(' ') || undefined;
 
   return (
-    <div className="form-field">
-      <label htmlFor={inputId}>{field.label}</label>
-      {renderControl(field, inputId, value, onChange, error ? errorId : undefined)}
+    <div className={cn('form-field', field.mono && 'form-field--mono')}>
+      <Label htmlFor={inputId}>{field.label}</Label>
+      {renderControl(field, inputId, value, onChange, error ? errorId : undefined, describedBy)}
       {field.help ? (
-        <p className="form-field__help muted">{field.help}</p>
+        <p id={helpId} className="form-field__help">
+          {field.help}
+        </p>
       ) : null}
       {error ? (
         <p id={errorId} className="form-field__error" role="alert">
@@ -278,17 +378,24 @@ function renderControl(
   value: unknown,
   onChange: (next: unknown) => void,
   errorId: string | undefined,
+  describedBy: string | undefined,
 ): ReactElement {
   const ariaInvalid = errorId ? true : undefined;
   switch (field.type) {
     case 'select':
+      // Native <select> kept on purpose — the schema-driven settings
+      // form needs to remain interrogable by `getByLabelText` +
+      // `toHaveValue` in jsdom tests, which Radix's portal-based
+      // SelectTrigger doesn't expose. The CSS in `settings.css` paints
+      // it on the paper-3 surface with the emerald focus halo so it
+      // matches the brand visually.
       return (
         <select
           id={inputId}
           value={asInputValue(value)}
           onChange={(e) => onChange(e.target.value)}
           aria-invalid={ariaInvalid}
-          aria-describedby={errorId}
+          aria-describedby={describedBy}
         >
           <option value="" disabled>
             Select…
@@ -309,14 +416,14 @@ function renderControl(
             checked={Boolean(value)}
             onChange={(e) => onChange(e.target.checked)}
             aria-invalid={ariaInvalid}
-            aria-describedby={errorId}
+            aria-describedby={describedBy}
           />
           <span>{Boolean(value) ? 'Enabled' : 'Disabled'}</span>
         </label>
       );
     case 'number':
       return (
-        <input
+        <Input
           id={inputId}
           type="number"
           value={asInputValue(value)}
@@ -325,32 +432,32 @@ function renderControl(
             onChange(e.target.value === '' ? '' : Number(e.target.value))
           }
           aria-invalid={ariaInvalid}
-          aria-describedby={errorId}
+          aria-describedby={describedBy}
         />
       );
     case 'url':
       return (
-        <input
+        <Input
           id={inputId}
           type="url"
           value={asInputValue(value)}
           placeholder={field.placeholder}
           onChange={(e) => onChange(e.target.value)}
           aria-invalid={ariaInvalid}
-          aria-describedby={errorId}
+          aria-describedby={describedBy}
         />
       );
     case 'text':
     default:
       return (
-        <input
+        <Input
           id={inputId}
           type="text"
           value={asInputValue(value)}
           placeholder={field.placeholder}
           onChange={(e) => onChange(e.target.value)}
           aria-invalid={ariaInvalid}
-          aria-describedby={errorId}
+          aria-describedby={describedBy}
         />
       );
   }
