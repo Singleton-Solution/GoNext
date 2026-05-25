@@ -101,6 +101,7 @@ export function BlockEditCanvas({
             indexPath={[index]}
             transformRegistry={transformRegistry}
             onApplyTransform={onApplyTransform}
+            depth={0}
           />
         ))}
       </Suspense>
@@ -119,6 +120,8 @@ interface BlockNodeProps {
     transformId: string,
     transform: Transform,
   ) => void;
+  /** Tree depth — top-level nodes get the document-chip drop shadow. */
+  depth: number;
 }
 
 function BlockNode({
@@ -128,6 +131,7 @@ function BlockNode({
   indexPath,
   transformRegistry,
   onApplyTransform,
+  depth,
 }: BlockNodeProps): React.ReactNode {
   const def = registry.get(block.type);
   if (def === undefined) {
@@ -166,6 +170,7 @@ function BlockNode({
     <div
       className="gonext-block-edit-canvas__node"
       data-block-type={block.type}
+      data-depth={depth}
       data-testid={`block-edit-canvas-node-${block.type}`}
     >
       {showToolbar ? (
@@ -189,6 +194,7 @@ function BlockNode({
               indexPath={[...indexPath, childIndex]}
               transformRegistry={transformRegistry}
               onApplyTransform={onApplyTransform}
+              depth={depth + 1}
             />
           ))}
         </div>
