@@ -84,3 +84,12 @@ export {
   type EditorViewSwitcherProps,
   type InspectorTabsProps,
 } from './editor-chrome.tsx';
+
+export {
+  convertPaste,
+  detectPasteSource,
+  markdownToBlocks,
+  onPaste,
+  type DetectedPaste,
+  type PasteSource,
+} from './paste-handler.ts';
