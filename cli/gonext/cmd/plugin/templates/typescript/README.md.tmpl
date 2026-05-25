@@ -1,0 +1,36 @@
+# {{slug}}
+
+GoNext plugin scaffolded with `gonext plugin init --template=typescript`.
+
+## Build
+
+```bash
+pnpm install
+npx gonext-sdk-build
+```
+
+The pipeline:
+
+1. `tsc` compiles `src/index.ts` to `dist/index.js`.
+2. Javy compiles `dist/index.js` to `dist/plugin.wasm`.
+3. `manifest.json` is validated and written to `dist/manifest.json`.
+
+Javy must be on `$PATH` (or pass `--javy <path>`). Install it from the
+[Javy releases page](https://github.com/bytecodealliance/javy/releases).
+
+## Sign and ship
+
+```bash
+gonext plugin sign dist/
+```
+
+See [`docs/02-plugin-system.md`](https://github.com/Singleton-Solution/GoNext/blob/main/docs/02-plugin-system.md)
+for the install + activation flow.
+
+## Develop
+
+```bash
+pnpm typecheck       # tsc --noEmit
+gonext plugin test dist/   # contract checks
+gonext plugin dev          # auto-build + upload + log-tail loop
+```

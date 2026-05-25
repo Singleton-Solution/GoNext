@@ -1,0 +1,18 @@
+{
+  "apiVersion": "gonext.io/v1",
+  "name": "gn-sdk-ts-hello",
+  "version": "0.1.0",
+  "entry": "plugin.wasm",
+  "capabilities": [
+    "kv.write",
+    "audit.emit",
+    "hooks.subscribe"
+  ],
+  "hooks": {
+    "actions": ["save_post"],
+    "filters": ["the_content"]
+  },
+  "requires": {
+    "host": ">=0.1.0"
+  }
+}
