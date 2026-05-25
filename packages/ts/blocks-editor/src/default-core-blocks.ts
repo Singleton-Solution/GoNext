@@ -25,6 +25,20 @@ import type {
 import { createElement } from 'react';
 
 /**
+ * Lucide-glyph inline SVGs for the core block tiles. Hand-copied from
+ * lucide.dev so the inserter can render proper icons without pulling
+ * `lucide-react` into the SDK (it's a peer-light surface). Each path
+ * is the exact `lucide` source minus the wrapper attributes — we add
+ * width/height/stroke at render time via the `.gonext-block-inserter
+ * __tile-icon svg` rule in editor-theme.css.
+ */
+const ICON_TYPE =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>';
+
+const ICON_HEADING_1 =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h8"></path><path d="M4 18V6"></path><path d="M12 18V6"></path><path d="m17 12 3-2v8"></path></svg>';
+
+/**
  * The placeholder paragraph block. Single `text` attribute (string), no
  * inner blocks, lives in the `text` category. The edit surface is a
  * `data-block="core/paragraph"` div showing the text or a placeholder hint.
@@ -34,9 +48,7 @@ export const paragraphBlock: BlockTypeDefinition<{ text: string }> = {
   title: 'Paragraph',
   category: 'text',
   description: 'Start with the building block of all narrative.',
-  // A minimal "P" glyph so the inserter shows something next to the title.
-  icon:
-    '<svg viewBox="0 0 24 24" aria-hidden="true"><text x="6" y="18" font-size="18" font-family="serif">P</text></svg>',
+  icon: ICON_TYPE,
   attributes: {
     type: 'object',
     required: ['text'],
@@ -67,8 +79,7 @@ export const headingBlock: BlockTypeDefinition<{
   title: 'Heading',
   category: 'text',
   description: 'Introduce a new section.',
-  icon:
-    '<svg viewBox="0 0 24 24" aria-hidden="true"><text x="3" y="18" font-size="16" font-family="serif">H</text></svg>',
+  icon: ICON_HEADING_1,
   attributes: {
     type: 'object',
     required: ['level', 'text'],

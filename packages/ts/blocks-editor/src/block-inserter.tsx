@@ -66,6 +66,15 @@ export const INSERTER_CATEGORIES: readonly BlockCategory[] = [
 /** Sentinel used as the `category` value when the Patterns tab is active. */
 const PATTERNS_TAB = '__patterns__' as const;
 
+/**
+ * Lucide search-glyph used in the inserter's search row. Inlined as
+ * a string so we don't introduce a hard dep on `lucide-react` in
+ * this package's bundle. The svg picks up `currentColor` so the host
+ * theme controls the tint.
+ */
+const SEARCH_ICON_SVG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>';
+
 export interface BlockInserterProps {
   /** Source of truth for what blocks exist. Required. */
   registry: BlockRegistry;
@@ -187,20 +196,30 @@ export function BlockInserter({
 
   return (
     <div className="gonext-block-inserter" data-testid="block-inserter">
-      <input
-        type="search"
-        role="searchbox"
-        aria-label={
-          isPatternsTabActive ? 'Search patterns' : 'Search blocks'
-        }
-        placeholder={
-          isPatternsTabActive ? 'Search patterns' : 'Search blocks'
-        }
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        className="gonext-block-inserter__search"
-        data-testid="block-inserter-search"
-      />
+      <div
+        className="gonext-block-inserter__search-row"
+        data-testid="block-inserter-search-row"
+      >
+        <span
+          aria-hidden="true"
+          className="gonext-block-inserter__search-icon"
+          dangerouslySetInnerHTML={{ __html: SEARCH_ICON_SVG }}
+        />
+        <input
+          type="search"
+          role="searchbox"
+          aria-label={
+            isPatternsTabActive ? 'Search patterns' : 'Search blocks'
+          }
+          placeholder={
+            isPatternsTabActive ? 'Search patterns' : 'Search blocks'
+          }
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          className="gonext-block-inserter__search"
+          data-testid="block-inserter-search"
+        />
+      </div>
 
       <div
         role="tablist"
