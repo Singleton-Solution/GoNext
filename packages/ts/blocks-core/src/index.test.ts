@@ -33,6 +33,7 @@ const EXPECTED_NAMES = [
   'core/button',
   'core/file',
   'core/embed',
+  'core/media-text',
 ] as const;
 
 describe('registerCoreBlocks', () => {
@@ -45,7 +46,7 @@ describe('registerCoreBlocks', () => {
     expect(r.list()).toHaveLength(EXPECTED_NAMES.length);
   });
 
-  it('CORE_BLOCKS is exactly the 16 expected entries, in the expected order', () => {
+  it('CORE_BLOCKS is exactly the 17 expected entries, in the expected order', () => {
     expect(CORE_BLOCKS.map((b) => b.definition.name)).toStrictEqual(
       EXPECTED_NAMES,
     );
@@ -120,6 +121,13 @@ describe('registerCoreBlocks', () => {
         attributes: { href: 'https://x/a.pdf', fileName: 'a.pdf' },
       },
       { type: 'core/embed', attributes: { url: 'https://youtu.be/abc' } },
+      {
+        type: 'core/media-text',
+        attributes: { mediaUrl: 'https://x/a.png', mediaAlt: 'A' },
+        innerBlocks: [
+          { type: 'core/paragraph', attributes: { content: 'side' } },
+        ],
+      },
     ];
     const result = r.validate(tree);
     expect(result.errors).toStrictEqual([]);
