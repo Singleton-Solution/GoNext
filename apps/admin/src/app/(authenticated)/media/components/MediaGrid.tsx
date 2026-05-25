@@ -299,7 +299,6 @@ export function MediaGrid(props: MediaGridProps): ReactElement {
         // mood (and the icon tile) reflects "your filter narrowed
         // nothing" instead of "first run, go for it".
         <EmptyState
-          data-testid="empty-state"
           variant={filter === 'all' ? 'default' : 'search'}
           icon={ImagePlus}
           title={
