@@ -71,7 +71,9 @@ const styles: Record<string, CSSProperties> = {
   chip: {
     padding: '5px 12px',
     background: 'var(--paper-2)',
-    border: '1px solid var(--border)',
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: 'var(--border)',
     borderRadius: 'var(--r-pill)',
     fontFamily: 'var(--font-sans)',
     fontSize: 'var(--t-xs)',

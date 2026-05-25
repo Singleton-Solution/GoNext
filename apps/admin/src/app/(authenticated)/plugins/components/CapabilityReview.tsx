@@ -28,6 +28,15 @@
  *    auto-tick it — defaulting consent to true would defeat the
  *    purpose of the screen.
  *
+ *  - Brand: each capability row is its own `--paper-2` card with the
+ *    canonical hairline border. Sensitive rows swap to a `--lavender`
+ *    accent — the secondary brand colour, signalling "look here". An
+ *    emerald checkmark appears once the consent box is ticked,
+ *    confirming the row has been reviewed alongside the panel. Both
+ *    treatments stay accessible: the row carries a data attribute,
+ *    `aria-label`s spell out the risk, and the marker is text not
+ *    colour.
+ *
  * Pure-ish: takes a manifest's `capabilities` array, renders the
  * review UI, and emits the acknowledgement state via the controlled
  * `onAcknowledgeChange` callback. No side effects; no fetch.
@@ -48,53 +57,94 @@ import {
 
 const styles: Record<string, CSSProperties> = {
   panel: {
-    border: '1px solid var(--color-border, #e4e6ea)',
-    borderRadius: 6,
-    background: 'var(--color-surface, #ffffff)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--r-lg)',
+    background: 'var(--paper-2)',
     overflow: 'hidden',
+    boxShadow: 'var(--sh-xs)',
   },
   panelHeader: {
-    padding: '12px 16px',
-    background: '#f9fafb',
-    borderBottom: '1px solid var(--color-border, #e4e6ea)',
+    padding: '16px 20px',
+    background: 'var(--paper)',
+    borderBottom: '1px solid var(--border)',
   },
   panelTitle: {
     margin: 0,
-    fontSize: 16,
+    fontFamily: 'var(--font-sans)',
     fontWeight: 600,
+    fontSize: 'var(--t-lg)',
+    color: 'var(--ink)',
+    letterSpacing: '-0.005em',
   },
   panelSubtitle: {
     margin: '4px 0 0',
-    fontSize: 13,
-    color: 'var(--color-text-muted, #6b7280)',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--t-sm)',
+    color: 'var(--fg-muted)',
   },
   empty: {
-    padding: '20px 16px',
-    color: 'var(--color-text-muted, #6b7280)',
-    fontSize: 14,
+    padding: '24px 20px',
+    color: 'var(--fg-muted)',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--t-sm)',
   },
   list: {
     listStyle: 'none',
     margin: 0,
-    padding: 0,
+    padding: '12px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
   },
   row: {
     display: 'flex',
     alignItems: 'flex-start',
     gap: 12,
-    padding: '12px 16px',
-    borderTop: '1px solid var(--color-border, #e4e6ea)',
+    padding: '14px 16px',
+    background: 'var(--paper-2)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--r-md)',
+    transition: 'border-color var(--dur) var(--ease)',
   },
   rowSensitive: {
-    background: '#fff7ed',
+    background: 'var(--lavender-soft)',
+    borderColor: 'var(--lavender-soft)',
   },
   rowUnknown: {
-    background: '#fef9c3',
+    background: 'var(--warning-soft)',
+    borderColor: 'var(--warning-soft)',
   },
   marker: {
-    fontSize: 18,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 22,
+    height: 22,
+    borderRadius: 999,
+    fontFamily: 'var(--font-sans)',
+    fontWeight: 700,
+    fontSize: 12,
     lineHeight: 1,
-    marginTop: 2,
+    flex: '0 0 auto',
+    marginTop: 1,
+  },
+  markerLow: {
+    background: 'var(--paper)',
+    color: 'var(--fg-muted)',
+    border: '1px solid var(--border)',
+  },
+  markerSensitive: {
+    background: 'var(--lavender)',
+    color: '#ffffff',
+  },
+  markerUnknown: {
+    background: 'var(--warning)',
+    color: '#ffffff',
+  },
+  markerConsented: {
+    background: 'var(--emerald)',
+    color: 'var(--emerald-ink)',
+    border: '1px solid var(--emerald)',
   },
   body: {
     flex: 1,
@@ -102,55 +152,103 @@ const styles: Record<string, CSSProperties> = {
   },
   human: {
     margin: 0,
-    fontSize: 14,
+    fontFamily: 'var(--font-sans)',
     fontWeight: 500,
-    color: 'var(--color-text, #1c2024)',
+    fontSize: 'var(--t-sm)',
+    color: 'var(--ink)',
   },
   meta: {
-    marginTop: 4,
-    fontSize: 12,
-    color: 'var(--color-text-muted, #6b7280)',
+    marginTop: 6,
     display: 'flex',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
+    alignItems: 'center',
   },
-  tag: {
-    border: '1px solid var(--color-border, #e4e6ea)',
-    borderRadius: 4,
+  capId: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: 'var(--t-xs)',
+    color: 'var(--fg-muted)',
+    background: 'var(--paper)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--r-xs)',
     padding: '1px 6px',
-    background: '#ffffff',
-    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
   },
-  warnTag: {
-    border: '1px solid #fdba74',
-    background: '#ffedd5',
-    color: '#9a3412',
-    borderRadius: 4,
+  tagSensitive: {
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--t-2xs)',
+    color: 'var(--lavender-deep)',
+    background: 'var(--paper)',
+    border: '1px solid var(--lavender)',
+    borderRadius: 'var(--r-xs)',
     padding: '1px 6px',
     fontWeight: 600,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+  },
+  tagUnknown: {
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--t-2xs)',
+    color: 'var(--warning)',
+    background: 'var(--paper)',
+    border: '1px solid var(--warning)',
+    borderRadius: 'var(--r-xs)',
+    padding: '1px 6px',
+    fontWeight: 600,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
   },
   footer: {
-    padding: '12px 16px',
-    borderTop: '1px solid var(--color-border, #e4e6ea)',
-    background: '#fafafa',
+    padding: '14px 20px',
+    borderTop: '1px solid var(--border)',
+    background: 'var(--paper)',
     display: 'flex',
     alignItems: 'flex-start',
     gap: 12,
   },
   checkbox: {
-    marginTop: 2,
+    marginTop: 3,
+    width: 16,
+    height: 16,
+    accentColor: 'var(--emerald)',
+    cursor: 'pointer',
   },
   consentText: {
     flex: 1,
-    fontSize: 13,
-    color: 'var(--color-text, #1c2024)',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--t-sm)',
+    color: 'var(--ink)',
     margin: 0,
+    cursor: 'pointer',
+  },
+  consentHelp: {
+    display: 'block',
+    marginTop: 4,
+    color: 'var(--fg-muted)',
+    fontSize: 'var(--t-xs)',
   },
 };
 
-function markerFor(risk: CapabilityRisk, unknown: boolean): string {
+function markerSymbol(risk: CapabilityRisk, unknown: boolean, acknowledged: boolean): string {
+  if (acknowledged && !unknown) return '✓';
   if (unknown) return '!';
   return risk === 'sensitive' ? '!' : '·';
+}
+
+function markerStyle(
+  risk: CapabilityRisk,
+  unknown: boolean,
+  acknowledged: boolean,
+): CSSProperties {
+  if (acknowledged && !unknown) {
+    return { ...styles.marker, ...styles.markerConsented };
+  }
+  if (unknown) {
+    return { ...styles.marker, ...styles.markerUnknown };
+  }
+  if (risk === 'sensitive') {
+    return { ...styles.marker, ...styles.markerSensitive };
+  }
+  return { ...styles.marker, ...styles.markerLow };
 }
 
 export interface CapabilityReviewProps {
@@ -222,18 +320,21 @@ export function CapabilityReview({
                 data-capability-id={cap.id}
                 data-capability-risk={cap.risk}
               >
-                <span aria-hidden="true" style={styles.marker}>
-                  {markerFor(cap.risk, isUnknown)}
+                <span
+                  aria-hidden="true"
+                  style={markerStyle(cap.risk, isUnknown, acknowledged)}
+                >
+                  {markerSymbol(cap.risk, isUnknown, acknowledged)}
                 </span>
                 <div style={styles.body}>
                   <p style={styles.human}>{cap.human}</p>
                   <div style={styles.meta}>
-                    <span style={styles.tag}>{cap.id}</span>
+                    <span style={styles.capId}>{cap.id}</span>
                     {cap.risk === 'sensitive' ? (
-                      <span style={styles.warnTag}>Sensitive</span>
+                      <span style={styles.tagSensitive}>Sensitive</span>
                     ) : null}
                     {isUnknown ? (
-                      <span style={styles.warnTag}>Unrecognised</span>
+                      <span style={styles.tagUnknown}>Unrecognised</span>
                     ) : null}
                   </div>
                 </div>
@@ -257,14 +358,7 @@ export function CapabilityReview({
         <label htmlFor="capabilities_acknowledged" style={styles.consentText}>
           <strong>I’ve reviewed the capabilities above</strong> and accept that
           this plugin will be granted them once installed.
-          <span
-            id="capabilities_acknowledged_help"
-            style={{
-              display: 'block',
-              marginTop: 2,
-              color: 'var(--color-text-muted, #6b7280)',
-            }}
-          >
+          <span id="capabilities_acknowledged_help" style={styles.consentHelp}>
             You can uninstall the plugin from the plugins list at any time to
             revoke these permissions.
           </span>
