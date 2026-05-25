@@ -10,6 +10,12 @@
  * review screen + the consent checkbox. We deliberately do not show
  * a "one-click install" affordance: every install path in GoNext
  * must traverse the capability review, no exceptions.
+ *
+ * Brand
+ * =====
+ * The "Back" crumb uses the emerald-deep underline pattern that runs
+ * across the marketplace; on error we surface a `--warning-soft`
+ * notice with the canonical card chrome.
  */
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -22,6 +28,19 @@ import {
 import { ListingDetailView } from './ListingDetailView';
 
 export const dynamic = 'force-dynamic';
+
+const backLinkStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 4,
+  marginBottom: 18,
+  fontFamily: 'var(--font-sans)',
+  fontSize: 'var(--t-sm)',
+  color: 'var(--emerald-deep)',
+  textDecoration: 'underline',
+  textDecorationColor: 'var(--emerald-soft)',
+  textUnderlineOffset: 3,
+} as const;
 
 export default async function MarketplaceListingPage({
   params,
@@ -39,24 +58,29 @@ export default async function MarketplaceListingPage({
     // Other errors: render an inline notice rather than 404.
     return (
       <section>
-        <p style={{ marginBottom: 12 }}>
-          <Link href="/marketplace">← Back to marketplace</Link>
-        </p>
-        <h1 style={{ marginTop: 0, fontSize: 22, fontWeight: 600 }}>
+        <Link href="/marketplace" style={backLinkStyle}>
+          ← Back to marketplace
+        </Link>
+        <h1
+          className="h1"
+          style={{ marginTop: 0, fontSize: 'clamp(36px, 4.5vw, 52px)' }}
+        >
           {slug}
         </h1>
         <div
           role="alert"
           style={{
-            padding: 12,
-            background: '#fef9c3',
-            color: '#854d0e',
-            border: '1px solid #fde68a',
-            borderRadius: 6,
-            fontSize: 13,
+            marginTop: 16,
+            padding: '12px 14px',
+            background: 'var(--warning-soft)',
+            color: 'var(--warning)',
+            border: '1px solid var(--warning-soft)',
+            borderRadius: 'var(--r-md)',
+            fontFamily: 'var(--font-sans)',
+            fontSize: 'var(--t-sm)',
           }}
         >
-          Couldn’t load this listing ({error ?? 'unknown error'}).
+          Couldn&apos;t load this listing ({error ?? 'unknown error'}).
         </div>
       </section>
     );
@@ -64,9 +88,9 @@ export default async function MarketplaceListingPage({
 
   return (
     <section>
-      <p style={{ marginBottom: 12 }}>
-        <Link href="/marketplace">← Back to marketplace</Link>
-      </p>
+      <Link href="/marketplace" style={backLinkStyle}>
+        ← Back to marketplace
+      </Link>
       <ListingDetailView
         listing={listing}
         versions={versions}
