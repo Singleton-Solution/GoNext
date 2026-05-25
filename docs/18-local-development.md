@@ -90,6 +90,102 @@ The dev secrets are intentionally low-entropy and labelled
 `replace-in-prod` — production deploys MUST source secrets from a
 secrets manager. See [13-security-baseline.md §5](./13-security-baseline.md).
 
+## The `docker-compose.override.yml` pattern
+
+Docker Compose has a convention that's perfect for personal local
+tweaks: any file named `docker-compose.override.yml` next to the base
+compose file is merged in automatically, with no extra `-f` flag, and
+the path is already in `.gitignore`. Use it for anything you want to
+change that isn't worth a tracked-file commit.
+
+The single most common need is **remapping a published port** when
+something on your host is already on the same number. The dev stack
+publishes:
+
+| Service  | Container port | Host port   |
+|----------|----------------|-------------|
+| postgres | 5432           | 5432        |
+| redis    | 6379           | 6379        |
+| minio    | 9000 / 9001    | 9000 / 9001 |
+| api      | 8080           | 8080        |
+| admin    | 3000           | 3001        |
+| web      | 3000           | 3000        |
+
+If you already run a native Postgres on 5432, drop this into
+`docker-compose.override.yml`:
+
+```yaml
+services:
+  postgres:
+    ports:
+      - "5433:5432"   # publish on 5433 from the host; container stays on 5432
+```
+
+Now `make psql` (which talks via `docker compose exec`) still works
+unchanged, but your IDE, `psql`, `pgcli`, and any host-local tooling
+should point at `localhost:5433`. The same pattern fixes conflicts on
+any other published port — only the `services:` map matters; the rest
+of the base compose file is unchanged.
+
+Other things people commonly drop into the override file:
+
+```yaml
+services:
+  api:
+    environment:
+      # Crank up the logs while debugging a specific issue.
+      GONEXT_LOG_LEVEL: DEBUG
+      GONEXT_LOG_ADDSRC: "true"
+  admin:
+    volumes:
+      # Mount your local app source for hot-reload outside Compose.
+      - ./apps/admin/src:/app/apps/admin/src
+```
+
+## How the admin reaches the API: Next.js rewrites, not CORS
+
+The admin (Next.js, served on `:3001` from the host) and the API
+(`:8080`) are different origins during dev. Two ways to bridge that:
+
+1. **CORS**: ship an `Access-Control-Allow-Origin` allowlist on the API
+   that matches every shape a deployment might take.
+2. **Same-origin proxy**: rewrite `/api/:path*` on the admin server to
+   the API service, so the browser only ever talks to `:3001`.
+
+We picked option 2. The admin's `next.config.ts` defines a `rewrites()`
+block that forwards `/api/*` to the API. The browser sees one origin;
+no preflight; no allowlist to maintain.
+
+Two consequences flow from that choice:
+
+- **`NEXT_PUBLIC_API_URL=""` is the signal**, not a missing value.
+  `apps/admin/src/lib/api-client.ts` treats an empty string as "use
+  same-origin paths" — `/api/v1/posts` etc. — and lets the rewrite do
+  the work. Setting `NEXT_PUBLIC_API_URL=http://localhost:8080` makes
+  the browser hit the API directly, which means CORS preflights, which
+  means an afternoon staring at network-tab errors. Leave it empty
+  unless you're deliberately testing the cross-origin path.
+
+- **The rewrite destination is baked in at build time.** Next.js
+  evaluates `rewrites()` during `next build`, so the container image
+  has a fixed destination compiled into the bundle. The Dockerfile
+  declares `ARG NEXT_PUBLIC_API_URL=""` and the Compose build block
+  passes `http://api:8080` — the cluster-internal service name — as
+  the build-arg. If you build a custom admin image you need to pass
+  the same arg pointed at whatever your API is reachable as inside the
+  cluster (e.g. `--build-arg NEXT_PUBLIC_API_URL=http://api:8080` for
+  Compose, or your K8s Service DNS name in a cluster build).
+
+  In some deployments we pass this through as `GONEXT_API_URL` so the
+  variable name reflects "the GoNext API target", not "the public env
+  var Next bakes into the bundle"; the Dockerfile's `ARG` block is the
+  single point that ties the two names together.
+
+The rewrite happens at the Next.js server (port `:3000` inside the
+admin container, `:3001` from the host) — *not* in the browser. So
+the API service only needs to accept connections from the admin
+container on the Compose network, not from `localhost:3001`.
+
 ## The smoke harness
 
 `make smoke` invokes `tools/compose-smoke/compose-smoke.sh`. The script:
@@ -122,11 +218,16 @@ HEALTH_TIMEOUT_SECS=120 make smoke  # raise the per-probe budget
 
 ## Troubleshooting
 
+For a wider symptom → cause → fix catalogue, see
+[20-troubleshooting.md](./20-troubleshooting.md). The list below covers
+just the issues that surface during day-one local-dev setup.
+
 **"Bind for 0.0.0.0:8080 failed: port is already allocated"** —
 something else on your host is already on 8080, 3000, 3001, 5432,
 6379, 9000, or 9001. Either stop the conflicting container
 (`docker ps`, then `docker stop <name>`) or remap the published port in
-a personal `docker-compose.override.yml`.
+a personal `docker-compose.override.yml` (see the section above for
+the canonical Postgres-on-5433 example).
 
 **"service \"migrate\" didn't complete successfully: exit 1"** —
 look at `make logs` for the `migrate-1` container. The most common
@@ -145,6 +246,30 @@ care about.
 **api `/readyz` returns 503** — the api couldn't reach Postgres or
 Redis. `make ps` will show whether those containers are healthy;
 `make logs` shows the api binary's connection error.
+
+**Admin login: "invalid email or password" with the right
+credentials** — almost always a pepper mismatch. `GONEXT_AUTH_PEPPER`
+is HMAC'd into every password hash; rotating it without rehashing
+existing rows makes every existing password uncrackable. Either keep
+the pepper stable across re-bootstraps, or wipe state with
+`make down && docker volume rm gonext-dev_postgres-data && make up`
+and rerun `gonext init`.
+
+**Admin build fails with `useSearchParams() should be wrapped in a
+suspense boundary`** — Next.js 15 requires any client component that
+reads `useSearchParams()` from the App Router to sit inside a
+`<Suspense>` boundary, because the hook reads dynamic data that
+isn't available at prerender time. If you add a new page using the
+hook, wrap the consumer in `<Suspense fallback={…}>`. The compile
+error points at the file path; the fix is local.
+
+**`make up` succeeds but admin returns 502 / network error** — the
+admin built with `NEXT_PUBLIC_API_URL` pointing at something
+unreachable. Check the Compose build args (should be
+`http://api:8080`) and confirm the api service is actually healthy via
+`make ps`. If you've been switching between Compose and bare
+`pnpm dev` runs, the cached `.next/` build may have the wrong baked
+destination — `rm -rf apps/admin/.next` and rebuild.
 
 **Slow rebuilds** — the multi-stage Dockerfiles use BuildKit cache
 mounts for the Go module cache and the pnpm store. Touch a Go file
