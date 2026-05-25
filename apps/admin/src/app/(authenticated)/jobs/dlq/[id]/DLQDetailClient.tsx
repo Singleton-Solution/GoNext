@@ -293,10 +293,13 @@ export function DLQDetailClient({
             {task.redacted ? (
               <>
                 <dt className="text-fg-subtle">Redacted</dt>
-                <dd className="flex flex-wrap items-center gap-1">
+                <dd className="flex flex-wrap items-center gap-2">
                   <Badge variant="lavender">Yes</Badge>
-                  <span className="font-mono text-2xs text-fg-muted">
-                    {(task.redacted_fields ?? []).join(', ')}
+                  <span className="font-sans text-xs text-fg-muted">
+                    fields:{' '}
+                    <code className="font-mono text-2xs text-ink-soft">
+                      {(task.redacted_fields ?? []).join(', ')}
+                    </code>
                   </span>
                 </dd>
               </>
