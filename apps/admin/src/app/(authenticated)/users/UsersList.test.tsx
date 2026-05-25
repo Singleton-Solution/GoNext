@@ -91,15 +91,17 @@ describe('UsersList', () => {
     const aliceBadge = within(aliceRow).getByText(/active/i);
     const bobBadge = within(bobRow).getByText(/suspended/i);
 
+    // The legacy data-status attribute survives the brand refresh; downstream
+    // automation may still key off it.
     expect(aliceBadge).toHaveAttribute('data-status', 'active');
     expect(bobBadge).toHaveAttribute('data-status', 'suspended');
 
-    // The visual distinction is the background color — assert the styles
-    // diverge so we don't accidentally render two identical pills.
-    const aliceBg = (aliceBadge as HTMLElement).style.backgroundColor;
-    const bobBg = (bobBadge as HTMLElement).style.backgroundColor;
-    expect(aliceBg).toBeTruthy();
-    expect(bobBg).toBeTruthy();
-    expect(aliceBg).not.toBe(bobBg);
+    // Visual distinction now flows from token-driven badge variants
+    // (success / danger) rather than inline backgroundColor styles. The two
+    // pills should carry different className contracts so a reviewer can't
+    // accidentally render two visually identical pills.
+    expect(aliceBadge.className).not.toBe(bobBadge.className);
+    expect(aliceBadge.className).toMatch(/success/);
+    expect(bobBadge.className).toMatch(/danger/);
   });
 });
