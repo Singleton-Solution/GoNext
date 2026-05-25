@@ -1,180 +1,170 @@
 # GoNext
 
-A modern, modular content management platform. WordPress's ecosystem promise, built on Go + Next.js + Postgres, with a sandboxed plugin runtime so you can actually trust what you install.
+> A self-hosted WordPress alternative built on Go + Next.js.
 
-> **Status**: Pre-1.0. ~137 PRs landed; the platform boots, serves a themed page, and now ships a first-run setup wizard. Contributors welcome.
+GoNext gives you WordPress's "own your content, install plugins, switch themes" model on a modern stack — a single Go binary serves the API and a WebAssembly plugin runtime; two Next.js apps render the public site and the admin dashboard; Postgres + Redis + S3-compatible storage sit underneath. The plugin sandbox is capability-scoped and memory-isolated, so you can install something from the marketplace without praying it doesn't read `/etc/passwd`.
 
-## What this is
+> **Status**: pre-1.0. The stack boots end-to-end, the first-run install wizard works, posts render through the themed public site, and the marketplace + setup flows are wired. We tag releases when things land; pin to a tag if you're shipping.
 
-- **Backend**: a single Go binary (HTTP server + WebAssembly plugin host + background workers).
-- **Frontend**: Next.js for the public site (SSR/SSG/ISR) and a separate Next.js app for the admin.
-- **Storage**: PostgreSQL + Redis + S3-compatible object storage.
-- **Plugins**: WebAssembly modules with a capability-based ABI. Memory-isolated. Signed.
-- **Themes**: React component packages. Both classic (code-defined templates) and block themes (full-site editing).
+![Sign-in screen of the GoNext admin dashboard. Cream paper background with soft off-canvas emerald and lavender radial glows. A centered card holds the `GoNext` wordmark (see apps/admin/public/logo-wordmark.svg), an Archivo display headline reading "Sign in" with an italic accent on "in", a Geist body-copy subtitle, and email + password inputs over a primary "Sign in" button.](docs/design/screenshots/login.png)
 
-## What this is NOT
+*Screenshot pending — the brand foundation landed in #432 and a follow-up will capture the asset. Until then, the wordmark lives at `apps/admin/public/logo-wordmark.svg`.*
 
-- Not a WordPress fork. Not PHP. Will not run WordPress plugins. **Does** provide tools to import WordPress content.
-- Not a headless-only CMS. The admin and editor are first-class.
-- Not feature parity with every WordPress feature. We aim at the 95% of common use cases, done well.
+---
 
-## Quickstart
+## The first 10 minutes
 
-You have two paths to a working install. Pick one.
-
-### Path A — Browser (the WordPress route)
-
-The fastest way to a usable site. Mirrors WordPress's `/wp-admin/install.php`.
-
-```sh
-# 1. Bring up Postgres + Redis + MinIO.
-make up
-
-# 2. Apply migrations (one shot — idempotent on subsequent runs).
-make build-go && ./apps/api/bin/gonext migrate up
-
-# 3. Start the API and admin.
-#    In two terminals (or use your preferred process manager):
-go run ./apps/api/cmd/server                             # API on :8080
-pnpm --filter @gonext/admin dev                          # Admin on :3001
-```
-
-Then open **http://localhost:3001/setup** in your browser. The setup wizard walks you through:
-
-1. Welcome + system check
-2. Administrator email + password (≥12 characters, enforced server-side)
-3. Site name + URL
-4. Review + confirm
-5. Auto-redirect into the admin dashboard, already logged in
-
-After the wizard succeeds the `/setup` route is permanently locked — every endpoint under `/api/v1/setup/*` returns `423 Locked` and the admin middleware stops redirecting to it. You can re-open the install window only by dropping the `core.site.installation_completed_at` row from the `options` table (psql, out-of-band).
-
-> *Screenshot of the wizard goes here once the design system lands.*
-
-### Path B — CLI (the scripted route)
-
-For deployments where the admin UI isn't reachable from the operator's workstation (CI, Kubernetes init container, air-gapped bootstrap):
-
-```sh
-make up
-./apps/api/bin/gonext migrate up
-./apps/api/bin/gonext init \
-    --admin-email=admin@example.com \
-    --admin-password='correct-horse-battery-staple' \
-    --site-name='Acme CMS' \
-    --site-url=https://acme.example.com
-```
-
-The CLI hits the same `POST /api/v1/setup/install` endpoint the wizard uses, so the lock behavior is identical — a second invocation returns the same `423 already_installed` code.
-
-> The `gonext init` subcommand is scaffolded but not yet shipped; track its delivery in [issue #TBD]. Until then, use Path A.
-
-## Where to go next
-
-- `docs/00-architecture-overview.md` — the foundation. Read first.
-- `docs/06-auth-permissions.md` — argon2id, sessions, roles, the setup wizard's security model.
-- `docs/09-deployment-ops.md` — Docker, Kubernetes, env vars, multi-region.
-- `docs/13-security-baseline.md` — CSP, secret handling, supply-chain posture.
-- `docs/11-testing-ci.md` — running the test pyramid locally.
-
-Proposals for all open questions live in [`/docs/proposals`](./docs/proposals).
-Architecture Decision Records in [`/adr`](./adr).
-
-## Quickstart
-
-```sh
-# 1. Copy the sample env file and edit the secrets.
-cp .env.example .env
-
-# 2. Generate the three required auth secrets.
-openssl rand -base64 32   # paste into GONEXT_AUTH_PEPPER
-openssl rand -base64 32   # paste into GONEXT_AUTH_SESSION_SECRET
-openssl rand -base64 32   # paste into GONEXT_AUTH_CSRF_SECRET
-
-# 3. Bring up Postgres + Redis + MinIO and the API.
-docker compose up
-```
-
-Every environment variable the API reads is documented in [`.env.example`](.env.example) with default, type, and security notes. For the prose reference (per-section tables, redaction rules, K8s / systemd deployment shapes), see [`docs/17-environment.md`](docs/17-environment.md).
-A fresh checkout becomes a working site in three commands. You'll need Postgres reachable via `DATABASE_URL` and a pepper secret (any high-entropy string) in `GONEXT_AUTH_PEPPER`.
+You'll need Docker Desktop ≥ 24 (with Compose v2 — `docker compose`, not `docker-compose`) and GNU Make. Nothing else; no Go or Node on your host.
 
 ```bash
-# 1. Build the CLI.
-go build -o ./bin/gonext ./cli/gonext
+# 1. Clone.
+git clone https://github.com/Singleton-Solution/GoNext.git
+cd GoNext
 
-# 2. First-run bootstrap: applies migrations, installs the default
-#    theme, creates the initial super_admin user, and stamps the
-#    site name + URL into the options table. Re-running on an
-#    already-initialized install is a no-op.
-DATABASE_URL='postgres://gonext:gonext@localhost:5432/gonext?sslmode=disable' \
-GONEXT_AUTH_PEPPER='replace-me-with-a-real-secret' \
-  ./bin/gonext init \
+# 2. Copy the env template. Edit secrets before you ship to anything
+#    that isn't your laptop — the file ships with dev-only defaults
+#    flagged "replace-in-prod".
+cp .env.example .env
+
+# 3. Bring up the full stack: Postgres, Redis, MinIO, migrate (one-shot),
+#    api, worker, admin, web. `make up` composes the base
+#    docker-compose.yml with docker-compose.dev.yml — see the local-dev
+#    doc for the full long-form command.
+make up
+
+# 4. Bootstrap the first admin user. Two options — pick one.
+
+#    Option A (CLI): scripted, friendly to CI and air-gapped boxes.
+docker compose run --rm migrate \
+  gonext init \
     --admin-email you@example.com \
+    --admin-password 'replace-with-a-real-≥12-char-password' \
     --site-name 'My Site' \
-    --site-url https://example.com
+    --site-url http://localhost:3000
 
-# 3. Run the API + worker (see apps/api, apps/worker).
+#    Option B (browser): the WordPress-style wizard. Open
+#    http://localhost:3001/setup and walk through welcome → admin
+#    credentials → site name + URL → confirm. The wizard locks itself
+#    on success — every /api/v1/setup/* endpoint returns 423 Locked
+#    afterwards, and the admin middleware stops redirecting to /setup.
+
+# 5. Sign in.
+open http://localhost:3001/login
 ```
 
-Pass `--admin-password` (insecure on shared hosts), `--admin-password-stdin` (pipe from a secret manager), or omit both and `init` will prompt with no-echo. Add `--non-interactive` in CI to fail fast on missing fields. The full flag list is in `gonext init --help`.
+That's it. The public site is at `http://localhost:3000`, the API at `http://localhost:8080`, the MinIO console at `http://localhost:9001` (creds: `gonext` / `gonext_dev_only_change_me`).
 
-## Design documents
+To stop everything (volumes preserved): `make down`. To wipe state and start over: `docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v && make up`.
 
-| # | Document | What it covers |
-|---|---|---|
-| 00 | [Architecture Overview](docs/00-architecture-overview.md) | Foundation. Read first. |
-| 01 | [Core CMS & Data Model](docs/01-core-cms.md) | Content types, taxonomies, Postgres schema |
-| 02 | [Plugin System](docs/02-plugin-system.md) | WASM runtime, hook bus, capability ABI |
-| 03 | [Theme System](docs/03-theme-system.md) | Template hierarchy, theme.json, FSE |
-| 04 | [Block Editor](docs/04-block-editor.md) | JSON block tree, editor UX |
-| 05 | [Admin & API](docs/05-admin-api.md) | Admin UI, REST + GraphQL |
-| 06 | [Auth & Permissions](docs/06-auth-permissions.md) | Argon2id, sessions, roles & capabilities |
-| 07 | [Media & Performance](docs/07-media-performance.md) | Upload pipeline, cache layers, ISR |
-| 08 | [Migration & WP Compat](docs/08-migration-compat.md) | WordPress importers, REST shim |
-| 09 | [Deployment & Ops](docs/09-deployment-ops.md) | Docker, K8s, env, multi-region |
-| 10 | [Observability](docs/10-observability.md) | Logs, metrics, traces, RUM |
-| 11 | [Testing & CI](docs/11-testing-ci.md) | Test pyramid, contract tests, CI |
-| 12 | [Jobs & Cron](docs/12-jobs-cron.md) | Asynq queues, retries, leader election |
-| 13 | [Security Baseline](docs/13-security-baseline.md) | Headers, CSP, secrets, supply chain |
-| 17 | [Environment & Configuration](docs/17-environment.md) | Every env var the loader reads — type, default, deployment patterns |
+---
 
-Proposals for all open questions live in [`/docs/proposals`](./docs/proposals).
-Architecture Decision Records in [`/adr`](./adr).
-| 15 | [Security Policy](docs/15-security-policy.md) | Vulnerability disclosure, SLA |
-| 16 | [Bug Bounty](docs/16-bug-bounty.md) | Scope, rewards |
+## Local development tips
 
-## Roadmap
+A few things that bit us when we ran this for the first time — fix them up front and the stack just works.
 
-Six phases, ~24 months to v1 with two engineers. See [ROADMAP.md](./ROADMAP.md) for detail.
+### Port conflicts: the `docker-compose.override.yml` pattern
 
-| Phase | Scope | Milestone |
-|---|---|---|
-| P0 | Skeleton | Go server, schema, basic auth, one rendered page |
-| P1 | CMS Core | Posts/pages/CPTs, taxonomies, media, admin CRUD |
-| P2 | Editor | Block editor with ~20 core blocks |
-| P3 | Themes | Template hierarchy, customizer, 1-2 reference themes |
-| P4 | Plugins | WASM runtime, SDK, 3 reference plugins |
-| P5 | Migration | WordPress importer, REST compat |
-| P6 | Polish | Performance, docs, launch |
+The dev stack publishes Postgres on `5432`, Redis on `6379`, the API on `8080`, the admin on `3001`, the public site on `3000`, MinIO on `9000`/`9001`. If you already run a native Postgres for another project, `make up` fails with `Bind for 0.0.0.0:5432 failed: port is already allocated`.
 
-## Contributing
+Fix it once, in a personal override file that Compose merges automatically and that git already ignores:
 
-We need help. See [CONTRIBUTING.md](./CONTRIBUTING.md) for how to pick up an issue.
+```yaml
+# docker-compose.override.yml   (gitignored)
+services:
+  postgres:
+    ports:
+      - "5433:5432"   # talk to the dev DB on 5433 from the host
+```
 
-- Browse [open issues](https://github.com/Singleton-Solution/GoNext/issues) filtered by `area:*`, `skill:*`, or `good-first-issue`.
-- Read [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
-- Sign off your commits with `git commit -s` (the [DCO](https://developercertificate.org/) check enforces this on PRs — see [CONTRIBUTING.md](./CONTRIBUTING.md#dco-sign-off)).
+Then connect your IDE / `psql` / `make psql` to `localhost:5433` instead of `5432`. The same trick works for any other published port. Compose reads `docker-compose.override.yml` without you having to name it on the command line, which is exactly what you want — your override stays personal and local.
+
+### The admin proxies `/api/*` through Next.js to avoid CORS
+
+The admin (`:3001`) and the API (`:8080`) are different origins during dev. Rather than ship a CORS allowlist that has to be re-derived for every deploy shape, the admin's `next.config.ts` rewrites `/api/:path*` to the API service. Two consequences:
+
+- **`NEXT_PUBLIC_API_URL=""` is the signal**, not a missing value. The api-client treats an empty string as "use same-origin paths" and lets the rewrite do the work. Setting it to `http://localhost:8080` in dev means the browser hits the API directly, CORS fires, and you spend a confusing afternoon staring at preflight failures. Leave it empty unless you're deliberately testing the cross-origin path.
+- **The rewrite destination is baked at build time.** Next.js evaluates `rewrites()` during `next build`, so the container image has a fixed `http://api:8080` (the Compose service name) compiled into the bundle. Pass the destination as the `GONEXT_API_URL` Docker build-arg if you're building a custom image; the default Dockerfile reads it via `NEXT_PUBLIC_API_URL`.
+
+```dockerfile
+# Admin image build (from docker-compose.dev.yml)
+args:
+  NEXT_PUBLIC_API_URL: http://api:8080   # destination for the rewrite
+```
+
+### Secret alignment
+
+`GONEXT_AUTH_PEPPER` is HMAC'd into every password hash on user creation. If you re-bootstrap with a different pepper and the same database, every existing user's password becomes uncrackable — `init` will succeed, but you can't log back in as the previous admin. Either set the pepper once and keep it stable, or wipe the DB volume (`down -v`) when you rotate it.
+
+### Other gotchas
+
+For a fuller list — Next.js prerender failures on `useSearchParams` missing `Suspense`, the migrate one-shot exiting `dirty` after a half-applied schema, MinIO bucket creation timing — see [`docs/20-troubleshooting.md`](docs/20-troubleshooting.md).
+
+---
+
+## What's where
+
+| Path | What lives there |
+|---|---|
+| `apps/api`     | Go HTTP server. `/healthz`, `/readyz`, `/openapi.json`, `/docs/`, every `/api/v1/*` route. |
+| `apps/worker`  | Asynq background-job consumer. Image processing, webhooks, cron leaders. |
+| `apps/admin`   | Next.js admin dashboard. Login, setup wizard, posts/pages CRUD, marketplace, customizer. |
+| `apps/web`     | Next.js public site. SSR/SSG/ISR, themes, sitemap, feeds. |
+| `apps/docs`    | Static documentation site (deploys separately from the app). |
+| `cli/gonext`   | The `gonext` administrative CLI. `init`, `migrate`, `theme`, `plugin`, `bench`, `config`. |
+| `packages/go`  | Shared Go packages — auth, config, log, db, cache, hooks, middleware, testutil, etc. |
+| `packages/ts`  | Shared TypeScript packages — UI primitives, block schemas, the plugin/theme SDKs. |
+| `migrations`   | `golang-migrate` SQL files. Applied by `gonext migrate up` or the Compose `migrate` one-shot. |
+| `themes`       | First-party theme bundles (the default theme is seeded by `migrate`). |
+| `plugins`      | First-party reference plugins (WASM bundles + manifests). |
+| `docs`         | The whole design corpus — architecture docs 00–19, ADRs, proposals, troubleshooting. |
+| `tools`        | One-off operator tooling: the compose smoke harness, the e2e Playwright suite. |
+
+---
+
+## Documentation map
+
+If you want the next layer down, read these in order.
+
+| Document | What it covers |
+|---|---|
+| [`docs/00-architecture-overview.md`](docs/00-architecture-overview.md) | The shared foundation. Stack, the three hard problems, the topology, the phasing plan. **Read first.** |
+| [`docs/17-environment.md`](docs/17-environment.md) | Every env var the loader reads — type, default, redaction rules, K8s + systemd shapes. |
+| [`docs/18-local-development.md`](docs/18-local-development.md) | The dev-stack reference: Make targets, the override pattern, the smoke harness, troubleshooting. |
+| [`docs/20-troubleshooting.md`](docs/20-troubleshooting.md) | Symptom → cause → fix for every gotcha we hit running the stack for the first time. |
+
+The full catalogue (auth, plugin system, theme system, block editor, observability, jobs, security baseline, etc.) lives in [`docs/README.md`](docs/README.md). Architecture Decision Records are under [`adr/`](adr/). Open design proposals are under [`docs/proposals/`](docs/proposals/).
+
+---
 
 ## License
 
-License is being finalized — see [`LICENSE`](./LICENSE) and the rationale in [`docs/proposals/14-proposals-strategic.md`](./docs/proposals/14-proposals-strategic.md) §S2.
+GoNext core is licensed under **FSL-1.1-Apache-2.0** — the Functional Source License 1.1 with automatic conversion to Apache License 2.0 two years after each file's release. Source-available today, fully open-source on a two-year delay. Read it: [`LICENSE`](LICENSE).
 
-Current direction: **core under FSL-1.1-Apache-2.0** (source-available, converts to Apache 2.0 after 2 years per file) with the **plugin SDK under Apache 2.0** from day 1. Contributors sign off commits via the [DCO](https://developercertificate.org/) (no CLA). See [`adr/0001-licensing.md`](./adr/0001-licensing.md) and [`adr/0002-dco-requirement.md`](./adr/0002-dco-requirement.md).
+The plugin and theme SDKs (everything under `packages/ts/sdk` and `packages/go/sdk`) ship under **Apache-2.0** from day one, so authors building on top of GoNext have a permissive license to work against without any FSL strings attached.
+
+The rationale, including why we picked FSL over BSL or MIT, lives in [`adr/0001-licensing.md`](adr/0001-licensing.md).
+
+---
+
+## Contributing
+
+We need help. Go developers, React developers, designers, technical writers, security reviewers — there's an issue with your name on it.
+
+1. **Find an issue.** Filter the [issue tracker](https://github.com/Singleton-Solution/GoNext/issues) by `good-first-issue`, `help-wanted`, `area:*` (api, web, admin, plugins, themes, security, docs, …), or `skill:*` (go, react, ts, sql, devops, design, docs). Comment on the issue to claim it.
+2. **Branch.** `git checkout -b feat/<short-description>` or `fix/<short-description>` off `main`.
+3. **Sign off every commit.** GoNext uses the [Developer Certificate of Origin](https://developercertificate.org/) instead of a CLA. Pass `-s` to `git commit` — the CI check rejects unsigned commits. See [`adr/0002-dco-requirement.md`](adr/0002-dco-requirement.md) for the rationale and [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full workflow.
+4. **Open the PR against `main`.** Reference the issue you're closing. Keep PRs small and focused — one logical change per PR.
+
+[`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) applies to every interaction in the repo.
+
+---
 
 ## Security
 
-Report vulnerabilities privately per [SECURITY.md](./SECURITY.md). Do not file public issues for security reports.
+Report vulnerabilities privately per [`SECURITY.md`](SECURITY.md). Do not file public issues for security reports.
+
+---
 
 ## Maintainer
 
-Currently maintained by [@tayebmokni](https://github.com/tayebmokni) under [Singleton-Solution](https://github.com/Singleton-Solution). Project governance will transition to a maintainer team as the contributor base grows; see [GOVERNANCE.md](./GOVERNANCE.md) (coming).
+Currently maintained by [@tayebmokni](https://github.com/tayebmokni) under [Singleton-Solution](https://github.com/Singleton-Solution). Governance transitions to a maintainer team as the contributor base grows.
