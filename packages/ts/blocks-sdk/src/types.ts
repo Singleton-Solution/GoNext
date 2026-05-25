@@ -16,6 +16,28 @@
 export type BlockAttributes = Record<string, unknown>;
 
 /**
+ * Per-instance lock flags. Surfaced via `attributes.lock` (note: NOT
+ * `supports.lock` — `supports.lock: true` is the registry-side
+ * capability flag that says "this block CAN be locked"; the runtime
+ * state of "this instance IS locked" lives on the block's attributes
+ * so it round-trips with the persisted tree).
+ *
+ * Authors flip these in the inspector; the canvas respects them by
+ * disabling drag handles and delete buttons. The `BlockLockIndicator`
+ * toolbar chip is shown whenever at least one flag is set.
+ *
+ * Both flags default to `false` when absent — a block without a `lock`
+ * attribute is fully mobile and removable. See `locks.ts` in
+ * `@gonext/blocks-editor` for the read/write helpers.
+ */
+export interface BlockLockState {
+  /** When true, the canvas refuses to move (drag / reorder) the block. */
+  move?: boolean;
+  /** When true, the canvas refuses to remove (delete) the block. */
+  remove?: boolean;
+}
+
+/**
  * The persisted shape of a single block node.
  *
  * `type` is namespaced (e.g. `core/paragraph`, `wp-pricing/pricing-table`).
@@ -122,6 +144,15 @@ export interface BlockDeprecation<
   Old extends BlockAttributes = BlockAttributes,
   New extends BlockAttributes = BlockAttributes,
 > {
+  /**
+   * The schema version this entry migrates **away from** — i.e. the
+   * version of the OLD attribute shape. Optional but recommended:
+   * when present, the inspector's deprecation banner can say "this
+   * block is at v1; v3 is current" instead of a generic "needs
+   * migration" hint. Versions are monotonic integers; semantic
+   * versioning is overkill for a per-block schema.
+   */
+  version?: number;
   /** JSON Schema describing the OLD attribute shape this step matches. */
   attributes: AttributesSchema<Old>;
   /**
@@ -162,6 +193,16 @@ export interface BlockTypeDefinition<
    * an inline SVG string. The editor resolves this lazily.
    */
   icon?: string;
+  /**
+   * Current schema version. When omitted, the migration pipeline
+   * treats the block as version 1. Bumping this value tells the
+   * editor "this block has new attribute semantics — anything older
+   * needs to be walked through `deprecated[]`". The inspector
+   * surfaces a "this block is deprecated" warning when a loaded
+   * block's effective version is below `version` and no further
+   * deprecation step matches.
+   */
+  version?: number;
   /** JSON Schema for the block's attributes. */
   attributes: AttributesSchema<A>;
   /** Capability matrix. */

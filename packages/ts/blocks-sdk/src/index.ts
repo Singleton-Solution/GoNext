@@ -25,6 +25,7 @@ export type {
   BlockCategory,
   BlockDeprecation,
   BlockEditProps,
+  BlockLockState,
   BlockSaveProps,
   BlockSupports,
   BlockTree,
@@ -58,4 +59,8 @@ export {
   type RegisterOptions,
 } from './registry.ts';
 
-export { migrateBlock, migrateBlockTree } from './migrate.ts';
+export {
+  detectBlockDeprecation,
+  migrateBlock,
+  migrateBlockTree,
+} from './migrate.ts';

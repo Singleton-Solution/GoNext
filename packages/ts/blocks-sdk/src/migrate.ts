@@ -140,6 +140,36 @@ export function migrateBlock(
 }
 
 /**
+ * Inspect a block against its definition and report whether the
+ * migrator *would* upgrade it on the next pass.
+ *
+ * This is the read-only counterpart to `migrateBlock`: the editor's
+ * inspector calls it to decide whether to surface the "this block is
+ * deprecated, click to upgrade" banner. Returning `{deprecated: false}`
+ * means the block already matches the current attribute schema (or the
+ * definition has no deprecation chain at all).
+ *
+ * `fromVersion` is the version of the matched deprecation entry (or
+ * `undefined` if the entry didn't declare one). `toVersion` is the
+ * definition's current version. The banner uses these to say
+ * "v1 → v3 migration available" instead of a generic hint.
+ */
+export function detectBlockDeprecation(
+  block: Block,
+  def: BlockTypeDefinition,
+): { deprecated: boolean; fromVersion?: number; toVersion?: number } {
+  const dep = findApplicableDeprecation(block, def);
+  if (dep === undefined) {
+    return { deprecated: false };
+  }
+  return {
+    deprecated: true,
+    fromVersion: dep.version,
+    toVersion: def.version,
+  };
+}
+
+/**
  * Migrate every block in a tree recursively, using a registry-style lookup
  * to find each block's definition.
  *

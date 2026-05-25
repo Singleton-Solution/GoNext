@@ -131,3 +131,43 @@ export {
   type SelectionState,
   type SortableBlockListProps,
 } from './dnd/index.ts';
+
+export {
+  isLocked,
+  isMoveLocked,
+  isRemoveLocked,
+  LOCK_ATTRIBUTE_KEY,
+  readLockState,
+  withLockState,
+} from './locks.ts';
+
+export {
+  BlockLockIndicator,
+  type BlockLockIndicatorProps,
+} from './block-lock-indicator.tsx';
+
+export {
+  applyTemplate,
+  restoreTemplate,
+  type Template,
+  type TemplateSlot,
+} from './templates.ts';
+
+export {
+  auditDeprecations,
+  runDeprecations,
+  warnDeprecatedBlocks,
+  type DeprecationFinding,
+} from './deprecation.ts';
+
+export {
+  getReusableRef,
+  inlineReusableRefs,
+  isReusableRef,
+  makeReusableRef,
+  MISSING_BLOCK_TYPE,
+  REUSABLE_BLOCK_TYPE,
+  type ReusableEntry,
+  type ReusableLookup,
+  type ReusableRefAttrs,
+} from './reusable-blocks.ts';
