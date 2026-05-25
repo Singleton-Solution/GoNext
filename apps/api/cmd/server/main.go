@@ -45,6 +45,7 @@ import (
 	plugindev "github.com/Singleton-Solution/GoNext/apps/api/internal/plugins/dev"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/setup"
 	"github.com/Singleton-Solution/GoNext/packages/go/audit"
+	hostbus "github.com/Singleton-Solution/GoNext/packages/go/hooks"
 	"github.com/Singleton-Solution/GoNext/packages/go/auth/password"
 	"github.com/Singleton-Solution/GoNext/packages/go/buildinfo"
 	"github.com/Singleton-Solution/GoNext/packages/go/config"
@@ -402,6 +403,15 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 		auditEmitter = audit.NewEmitter(audit.NewMemoryStore())
 	}
 	mux := http.NewServeMux()
+
+	// Plugin route registry (issue #136). The Registry holds the
+	// per-plugin route bindings; the lifecycle Manager calls into it
+	// at Activate / Deactivate. Wired via plugin_routes.go so the
+	// dependencies (hook bus, audit emitter, capability registry)
+	// stay grouped. A bus of nil here disables the http.serve
+	// surface, which is what every existing route-table test expects.
+	pluginRouteRegistry := mountPluginRoutes(mux, hostbus.NewBus(), auditEmitter, logger)
+	_ = pluginRouteRegistry // referenced by the lifecycle wiring when it lands; silences "unused" until then
 
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		bi := buildinfo.Get(serviceName)
