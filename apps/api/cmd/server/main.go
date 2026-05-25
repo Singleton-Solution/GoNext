@@ -689,9 +689,6 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 	if err := restposts.Mount(mux, "/api/v1/posts", restposts.Deps{
 		Store:    postsStore,
 		Policy:   postsPolicy,
-		Audit:    audit.NewEmitter(audit.NewMemoryStore()),
-		Store:    restposts.NewMemoryStore(),
-		Policy:   policy.NewBasicPolicy(policy.DefaultRoleCapabilities()),
 		Audit:    auditEmitter,
 		Logger:   logger,
 		PostType: restposts.PostTypePost,
