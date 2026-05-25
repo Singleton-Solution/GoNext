@@ -1,0 +1,33 @@
+[
+  {
+    "key": "group_seo",
+    "title": "SEO",
+    "fields": [
+      {
+        "key": "field_seo_title",
+        "name": "seo_title",
+        "label": "SEO Title",
+        "type": "text"
+      },
+      {
+        "key": "field_seo_desc",
+        "name": "seo_desc",
+        "label": "Description",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "key": "group_related",
+    "title": "Related posts",
+    "fields": [
+      {
+        "key": "field_related",
+        "name": "related_posts",
+        "label": "Related",
+        "type": "relationship",
+        "post_type": ["post", "page"]
+      }
+    ]
+  }
+]

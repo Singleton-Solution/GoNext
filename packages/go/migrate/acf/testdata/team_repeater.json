@@ -1,0 +1,50 @@
+{
+  "key": "group_team_page",
+  "title": "Team Page",
+  "fields": [
+    {
+      "key": "field_team",
+      "name": "team",
+      "label": "Team members",
+      "type": "repeater",
+      "sub_fields": [
+        {
+          "key": "field_team_name",
+          "name": "name",
+          "label": "Name",
+          "type": "text"
+        },
+        {
+          "key": "field_team_role",
+          "name": "role",
+          "label": "Role",
+          "type": "text"
+        },
+        {
+          "key": "field_team_photo",
+          "name": "photo",
+          "label": "Photo",
+          "type": "image",
+          "return_format": "id"
+        }
+      ]
+    },
+    {
+      "key": "field_team_message",
+      "name": "team_message",
+      "label": "Note",
+      "type": "message"
+    },
+    {
+      "key": "field_team_unknown",
+      "name": "weird",
+      "label": "Weird",
+      "type": "unknown_acf_kind_42"
+    }
+  ],
+  "location": [
+    [
+      { "param": "post_type", "operator": "==", "value": "page" }
+    ]
+  ]
+}

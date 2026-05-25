@@ -1,0 +1,52 @@
+{
+  "key": "group_blog_meta",
+  "title": "Blog Meta",
+  "fields": [
+    {
+      "key": "field_blog_subtitle",
+      "name": "subtitle",
+      "label": "Subtitle",
+      "type": "text",
+      "required": 0,
+      "default_value": ""
+    },
+    {
+      "key": "field_blog_hero",
+      "name": "hero_image",
+      "label": "Hero image",
+      "type": "image",
+      "return_format": "id"
+    },
+    {
+      "key": "field_blog_featured",
+      "name": "featured",
+      "label": "Featured?",
+      "type": "true_false",
+      "default_value": 0
+    },
+    {
+      "key": "field_blog_section",
+      "name": "section",
+      "label": "Section",
+      "type": "select",
+      "choices": {
+        "news": "News",
+        "tutorials": "Tutorials",
+        "release": "Release notes"
+      }
+    },
+    {
+      "key": "field_blog_author",
+      "name": "author_ref",
+      "label": "Author",
+      "type": "user"
+    }
+  ],
+  "location": [
+    [
+      { "param": "post_type", "operator": "==", "value": "post" }
+    ]
+  ],
+  "menu_order": 0,
+  "active": true
+}
