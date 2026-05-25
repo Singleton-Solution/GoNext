@@ -10,6 +10,9 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// (Exec on fakeQuerier is defined below; it returns a canned tag so
+// Sweep can be exercised without a real database.)
+
 // fakeRow implements pgx.Row over a fixed scan result.
 type fakeRow struct {
 	values []any
@@ -44,6 +47,12 @@ type fakeQuerier struct {
 
 	queryRows pgx.Rows
 	queryErr  error
+
+	// Exec branch — used by Sweep. execTag is returned as-is; execErr,
+	// when non-nil, is propagated unchanged so callers can assert on
+	// errors.Is.
+	execTag pgconn.CommandTag
+	execErr error
 }
 
 func (q *fakeQuerier) QueryRow(_ context.Context, sql string, args ...any) pgx.Row {
@@ -59,6 +68,13 @@ func (q *fakeQuerier) Query(_ context.Context, sql string, args ...any) (pgx.Row
 	q.lastSQL = sql
 	q.lastArgs = args
 	return q.queryRows, q.queryErr
+}
+
+// Exec backs the Sweep path. Returns the canned tag + err.
+func (q *fakeQuerier) Exec(_ context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
+	q.lastSQL = sql
+	q.lastArgs = args
+	return q.execTag, q.execErr
 }
 
 func TestPostgresStore_Emit_BuildsCorrectArgs(t *testing.T) {
@@ -253,6 +269,72 @@ func TestPostgresStore_List_ZeroLimitUsesDefault(t *testing.T) {
 	}
 	if got := q.lastArgs[len(q.lastArgs)-1].(int); got != postgresDefaultLimit {
 		t.Errorf("default limit: got %d want %d", got, postgresDefaultLimit)
+	}
+}
+
+// TestPostgresStore_Sweep_NoopOnNonPositive checks that a fat-fingered
+// retention (zero or negative) is treated as "do nothing" rather than
+// truncating the table. This is the single most important guard on
+// Sweep — a misconfigured cron with retention=0 would otherwise wipe
+// every info-severity audit row in the database.
+func TestPostgresStore_Sweep_NoopOnNonPositive(t *testing.T) {
+	q := &fakeQuerier{}
+	s := NewPostgresStoreWithQuerier(q)
+
+	for _, d := range []time.Duration{0, -time.Hour, -24 * time.Hour} {
+		n, err := s.Sweep(context.Background(), d)
+		if err != nil {
+			t.Fatalf("Sweep(%v): %v", d, err)
+		}
+		if n != 0 {
+			t.Errorf("Sweep(%v): rows=%d want 0", d, n)
+		}
+	}
+	// No SQL should have been issued at all.
+	if q.lastSQL != "" {
+		t.Errorf("Sweep should not issue SQL for non-positive retention, got %q", q.lastSQL)
+	}
+}
+
+// TestPostgresStore_Sweep_ComputesHorizon checks that the WHERE-clause
+// horizon argument is computed as (NowFunc() - retention). The fake
+// captures the args; we read arg[0] and assert it matches.
+func TestPostgresStore_Sweep_ComputesHorizon(t *testing.T) {
+	now := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
+	q := &fakeQuerier{execTag: pgconn.NewCommandTag("DELETE 7")}
+	s := NewPostgresStoreWithQuerier(q)
+	s.NowFunc = func() time.Time { return now }
+
+	n, err := s.Sweep(context.Background(), 24*time.Hour)
+	if err != nil {
+		t.Fatalf("Sweep: %v", err)
+	}
+	if n != 7 {
+		t.Errorf("Sweep returned %d, want 7", n)
+	}
+	if !contains(q.lastSQL, "DELETE FROM audit_log") {
+		t.Errorf("Sweep SQL not DELETE: %s", q.lastSQL)
+	}
+	gotHorizon, ok := q.lastArgs[0].(time.Time)
+	if !ok {
+		t.Fatalf("horizon arg type: %T", q.lastArgs[0])
+	}
+	wantHorizon := now.Add(-24 * time.Hour)
+	if !gotHorizon.Equal(wantHorizon) {
+		t.Errorf("horizon: got %v want %v", gotHorizon, wantHorizon)
+	}
+}
+
+// TestPostgresStore_Sweep_PropagatesError checks that pg errors flow
+// through wrapped with %w so callers can errors.Is against e.g.
+// context.DeadlineExceeded.
+func TestPostgresStore_Sweep_PropagatesError(t *testing.T) {
+	want := errors.New("connection refused")
+	q := &fakeQuerier{execErr: want}
+	s := NewPostgresStoreWithQuerier(q)
+	_, err := s.Sweep(context.Background(), time.Hour)
+	if !errors.Is(err, want) {
+		t.Errorf("expected wrapped %v, got %v", want, err)
 	}
 }
 

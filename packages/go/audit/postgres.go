@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -26,9 +27,13 @@ const postgresMaxLimit = 1000
 // keeps PostgresStore testable with a pgxmock-style fake and lets
 // callers swap in a tx (pgx.Tx implements the same methods) when they
 // need to emit an audit event as part of a larger transaction.
+//
+// Exec is included because Sweep issues a DELETE; both *pgxpool.Pool
+// and pgx.Tx satisfy this shape.
 type PgxQuerier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 }
 
 // PostgresStore writes audit rows via INSERT to the audit_log table
@@ -87,7 +92,7 @@ INSERT INTO audit_log (
     severity,
     prev_hash
 ) VALUES (
-    $1, NULLIF($2, '')::BIGINT, $3, NULLIF($4, ''), $5,
+    $1, NULLIF($2, '')::UUID, $3, NULLIF($4, ''), $5,
     NULLIF($6, ''), NULLIF($7, ''), NULLIF($8, '')::INET, $9,
     $10, $11, $12
 ) RETURNING id::TEXT
@@ -114,7 +119,7 @@ SELECT
 FROM audit_log
 WHERE ($1::TIMESTAMPTZ IS NULL OR occurred_at >= $1)
   AND ($2::TIMESTAMPTZ IS NULL OR occurred_at <= $2)
-  AND ($3 = '' OR actor_user_id::TEXT = $3)
+  AND ($3 = '' OR actor_user_id = $3::UUID)
   AND ($4 = '' OR actor_label = $4)
   AND ($5 = '' OR event = $5)
   AND ($6 = '' OR severity = $6)
@@ -244,6 +249,49 @@ func (s *PostgresStore) List(ctx context.Context, f Filter) ([]Event, error) {
 		return nil, fmt.Errorf("audit: rows: %w", err)
 	}
 	return out, nil
+}
+
+// sweepSQL is the retention-prune statement. We delete in a single
+// bounded statement keyed on occurred_at and severity='info'; the
+// partial index audit_occurred_sweep_idx (see migration 000029) is
+// shaped for exactly this predicate. Critical/warning rows are kept
+// indefinitely per docs/06-auth-permissions.md §13.2.
+//
+// We return the deleted-row count so the cron caller can log it and
+// alert on a sweep that's mysteriously deleting orders-of-magnitude
+// more rows than expected (the canonical "are we leaking events?"
+// signal).
+const sweepSQL = `
+DELETE FROM audit_log
+WHERE occurred_at < $1
+  AND severity = 'info'
+`
+
+// Sweep deletes 'info'-severity audit rows older than the retention
+// horizon. Rows with severity='warning' or 'critical' are retained
+// indefinitely (docs/06-auth-permissions.md §13.2 — operators purge
+// them manually under a documented compliance procedure).
+//
+// retention is a duration; rows whose occurred_at is older than
+// (now - retention) are deleted. A non-positive retention is treated
+// as "no-op" so a misconfigured cron doesn't truncate the table.
+//
+// Returns the number of rows deleted. The error is the underlying
+// pgx error wrapped with %w.
+func (s *PostgresStore) Sweep(ctx context.Context, retention time.Duration) (int64, error) {
+	if retention <= 0 {
+		// A zero/negative retention would compute a horizon equal to
+		// or after now, deleting every info row in the table. That
+		// can't be what the operator wants; treat it as a no-op so a
+		// fat-fingered config can't wipe the audit trail.
+		return 0, nil
+	}
+	horizon := s.now().Add(-retention)
+	tag, err := s.db.Exec(ctx, sweepSQL, horizon)
+	if err != nil {
+		return 0, fmt.Errorf("audit: sweep: %w", err)
+	}
+	return tag.RowsAffected(), nil
 }
 
 // isValidActorKind reports whether s is one of the three actor_kind
