@@ -252,6 +252,36 @@ func builtinCapabilityDefs() []CapabilityDef {
 			Action:      "write",
 		},
 
+		// Database — gated SELECT/INSERT/UPDATE against the plugin's
+		// scoped views. The host runs each query under the plugin's
+		// own Postgres ROLE; the capability is the outer gate, the
+		// role's GRANTs are the inner one.
+		{
+			ID:          "db.read",
+			Description: "Read rows from the plugin's scoped database views.",
+			Resource:    "db",
+			Action:      "read",
+		},
+		{
+			ID:          "db.write",
+			Description: "Insert/update rows in the plugin's scoped database views.",
+			Resource:    "db",
+			Action:      "write",
+			Sensitive:   true,
+		},
+
+		// Cache — invalidate cached entries by tag. Tags are
+		// auto-namespaced (plugin:<slug>:<tag>) so a plugin can never
+		// invalidate another plugin's cache, but the privilege is
+		// still gated because cache invalidation is a load-amplifying
+		// effect (it forces re-computation downstream).
+		{
+			ID:          "cache.invalidate",
+			Description: "Invalidate cached entries by tag within the plugin's namespace.",
+			Resource:    "cache",
+			Action:      "invalidate",
+		},
+
 		// Hooks — gate the ability to subscribe to platform events.
 		// A plugin that doesn't declare this cap cannot register any
 		// hook listeners at instantiation.

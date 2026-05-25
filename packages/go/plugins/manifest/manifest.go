@@ -98,6 +98,12 @@ type Manifest struct {
 	// in v1.
 	Signature string `json:"signature,omitempty"`
 
+	// Storage declares persistent-storage budgets for the plugin. Today
+	// only the KV namespace is described; the field is optional and
+	// omitted manifests get whatever default the operator policy
+	// supplies (typically a small budget).
+	Storage *Storage `json:"storage,omitempty"`
+
 	// Raw is the original bytes the manifest was decoded from. Callers
 	// that need to persist the manifest verbatim (e.g. the lifecycle
 	// Plugin row) read this instead of re-marshalling — re-marshal
@@ -117,6 +123,29 @@ type Hooks struct {
 // object is present; the schema enforces that.
 type Requires struct {
 	Host string `json:"host"`
+}
+
+// Storage is the persistent-storage budget bag. KV is the only
+// surface in v1; future fields (DB, Blob) will land here without
+// breaking existing manifests.
+type Storage struct {
+	KV *KVStorage `json:"kv,omitempty"`
+}
+
+// KVStorage carries the per-plugin KV namespace budget. Both fields
+// are pointers so "omitted" is distinguishable from "set to zero":
+// an explicit zero means "this plugin must hold no keys" (useful for
+// disabling the namespace), while nil means "use the operator
+// default".
+type KVStorage struct {
+	// MaxBytes caps the cumulative value bytes the plugin may store
+	// across all keys. The host counts the bytes of each value at
+	// write time; the key name does NOT count against the budget.
+	MaxBytes *int64 `json:"max_bytes,omitempty"`
+
+	// MaxKeys caps the count of keys. The host evicts the oldest key
+	// when a write would push the count past the cap.
+	MaxKeys *int `json:"max_keys,omitempty"`
 }
 
 // Dependency is one entry of the manifest's depends[] array. Name is
