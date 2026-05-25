@@ -1,0 +1,114 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MarketplaceCard > uses the brand tokens for the card surface (snapshot) 1`] = `
+<DocumentFragment>
+  <a
+    class="marketplace-card"
+    data-listing-slug="akismet-clone"
+    data-testid="marketplace-card"
+    href="/marketplace/akismet-clone"
+    style="display: flex; flex-direction: column; background: var(--paper-2); border: 1px solid var(--border); border-radius: var(--r-lg); text-decoration: none; color: var(--ink); box-shadow: var(--sh-xs); transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease); overflow: hidden; min-height: 220px;"
+  >
+    <div
+      aria-hidden="true"
+      style="aspect-ratio: 16 / 9; background: var(--paper-3); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;"
+    >
+      <span
+        style="font-family: var(--font-display); font-weight: 800; font-size: 56px; letter-spacing: -0.04em; line-height: 1; color: var(--emerald-deep);"
+      >
+        A
+      </span>
+    </div>
+    <div
+      style="padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 10px; flex: 1 1 0%;"
+    >
+      <div
+        style="display: flex; align-items: flex-start; gap: 12px;"
+      >
+        <span
+          aria-hidden="true"
+          style="width: 36px; height: 36px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--paper); display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 800; font-size: 16px; color: var(--emerald-deep); flex: 0 0 auto;"
+        >
+          A
+        </span>
+        <div
+          style="min-width: 0; flex: 1 1 0%;"
+        >
+          <h3
+            style="margin: 0px; font-family: var(--font-display); font-weight: 600; font-size: var(--t-lg); letter-spacing: -0.005em; line-height: 1.2; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+          >
+            Akismet Clone
+          </h3>
+          <p
+            style="margin: 2px 0px 0px; font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-subtle);"
+          >
+            akismet-clone
+          </p>
+        </div>
+      </div>
+      <p
+        style="margin: 0px; font-family: var(--font-sans); font-size: var(--t-sm); line-height: 1.5; color: var(--fg-muted); display: -webkit-box; -webkit-line-clamp: 2; overflow: hidden;"
+      >
+        Comment spam filtering for sites that hum.
+      </p>
+      <div
+        style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border);"
+      >
+        <span
+          aria-label="4.5 out of 5 stars"
+          data-testid="rating-stars-display"
+          role="img"
+          style="display: inline-flex; align-items: center; gap: 2px; color: var(--emerald-deep); font-size: 14px; line-height: 1;"
+        >
+          <span
+            aria-hidden="true"
+            style="display: inline-block; width: 1.1em; text-align: center;"
+          >
+            ★
+          </span>
+          <span
+            aria-hidden="true"
+            style="display: inline-block; width: 1.1em; text-align: center;"
+          >
+            ★
+          </span>
+          <span
+            aria-hidden="true"
+            style="display: inline-block; width: 1.1em; text-align: center;"
+          >
+            ★
+          </span>
+          <span
+            aria-hidden="true"
+            style="display: inline-block; width: 1.1em; text-align: center;"
+          >
+            ★
+          </span>
+          <span
+            aria-hidden="true"
+            style="display: inline-block; width: 1.1em; text-align: center;"
+          >
+            ★
+          </span>
+          <span
+            aria-hidden="true"
+            style="margin-left: 6px; font-family: var(--font-mono); color: var(--fg-subtle); font-size: var(--t-xs);"
+          >
+            (22)
+          </span>
+        </span>
+        <span
+          style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: var(--r-sm); background: var(--lavender-soft); color: var(--lavender-deep); font-family: var(--font-sans); font-size: var(--t-xs); font-weight: 500;"
+        >
+          antispam
+        </span>
+        <span
+          style="font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-subtle);"
+        >
+          1,500 installs
+        </span>
+      </div>
+    </div>
+  </a>
+</DocumentFragment>
+`;

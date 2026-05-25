@@ -19,19 +19,22 @@
  *    disabled state on the activate button with a hover hint, instead
  *    of letting the operator click into a guaranteed failure
  *
- * Lives next to the server `page.tsx` like other admin lists. The
- * primitive styling matches UsersList — Tailwind + the design system
- * land in the broader admin-design issue (#34); for now inline styles
- * keep the screen self-contained and trivially reviewable.
+ * Lives next to the server `page.tsx` like other admin lists.
+ *
+ * Brand
+ * =====
+ * Page head uses the "Installed plugins." headline pattern — Archivo
+ * display weight with an italic-serif accent on "plugins". The
+ * primary CTA (Install plugin) is the ink-fill brand button to read
+ * as the dominant action on the screen. Status chips and badges share
+ * the emerald/lavender/danger semantics defined in tokens.css.
+ * Tables sit on paper-2 with sunken paper-3 header rows; row hover
+ * lifts to paper-3 to mark the hovered row.
  *
  * Why not `<ResourceList>` from #332: that shell is shaped around
- * generic CRUD rows (search, filters, sort, bulk actions, selection).
- * The plugin list needs the same toolbar shape but the per-row buttons
- * (Activate / Deactivate / Uninstall) are domain-specific and the
- * uninstall confirmation modal is too. Wiring everything through
- * `ResourceList` columns + `bulkActions` would add more glue than it
- * removes; revisit once a second domain (plugins + themes) shares
- * enough of the row UX to justify the consolidation.
+ * generic CRUD rows. The plugin list needs the same toolbar shape but
+ * the per-row buttons (Activate / Deactivate / Uninstall) are
+ * domain-specific and the uninstall confirmation modal is too.
  *
  * Tests live in PluginListClient.test.tsx; they exercise rendering,
  * filtering, the confirmation flow, and the activate-blocked path.
@@ -71,180 +74,252 @@ const STATUS_OPTIONS: ReadonlyArray<{ value: StatusFilter; label: string }> = [
 const styles: Record<string, CSSProperties> = {
   header: {
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
     gap: 16,
-    marginBottom: 16,
+    marginBottom: 24,
   },
-  title: { margin: 0, fontSize: 20, fontWeight: 600 },
+  headerMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  eyebrow: {
+    display: 'inline-block',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--t-xs)',
+    fontWeight: 500,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+    color: 'var(--emerald-deep)',
+    marginBottom: 4,
+  },
+  title: {
+    margin: 0,
+    fontFamily: 'var(--font-display)',
+    fontWeight: 800,
+    fontSize: 'clamp(40px, 5vw, 56px)',
+    lineHeight: 0.95,
+    letterSpacing: '-0.03em',
+    color: 'var(--ink)',
+  },
   installBtn: {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 6,
-    background: 'var(--color-accent, #2563eb)',
-    color: '#ffffff',
-    border: 0,
-    borderRadius: 6,
-    padding: '8px 14px',
+    background: 'var(--ink)',
+    color: 'var(--paper)',
+    border: '1px solid var(--ink)',
+    borderRadius: 'var(--r-md)',
+    padding: '10px 18px',
+    fontFamily: 'var(--font-sans)',
     fontWeight: 500,
-    fontSize: 14,
+    fontSize: 'var(--t-sm)',
     textDecoration: 'none',
+    boxShadow: 'var(--sh-xs)',
+    transition:
+      'background var(--dur) var(--ease), border-color var(--dur) var(--ease)',
   },
   toolbar: {
     display: 'flex',
     flexWrap: 'wrap',
     gap: 12,
-    marginBottom: 12,
-    padding: 12,
-    background: 'var(--color-surface, #ffffff)',
-    border: '1px solid var(--color-border, #e4e6ea)',
-    borderRadius: 6,
+    marginBottom: 16,
+    padding: 14,
+    background: 'var(--paper-2)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--r-lg)',
+    boxShadow: 'var(--sh-xs)',
   },
   searchInput: {
     flex: '1 1 240px',
     minWidth: 200,
-    padding: '6px 10px',
-    border: '1px solid var(--color-border, #e4e6ea)',
-    borderRadius: 6,
-    fontSize: 14,
+    padding: '8px 12px',
+    background: 'var(--paper)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--r-md)',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--t-sm)',
+    color: 'var(--ink)',
+    outline: 'none',
   },
-  chipGroup: { display: 'inline-flex', flexWrap: 'wrap', gap: 8 },
+  chipGroup: {
+    display: 'inline-flex',
+    flexWrap: 'wrap',
+    gap: 6,
+    alignItems: 'center',
+  },
   chip: {
-    background: 'transparent',
-    border: '1px solid var(--color-border, #e4e6ea)',
-    borderRadius: 999,
-    padding: '4px 12px',
-    fontSize: 13,
-    color: 'var(--color-text, #1c2024)',
+    background: 'var(--paper)',
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: 'var(--border)',
+    borderRadius: 'var(--r-pill)',
+    padding: '5px 12px',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--t-xs)',
+    fontWeight: 500,
+    color: 'var(--fg-muted)',
     cursor: 'pointer',
+    transition:
+      'background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease)',
   },
   chipActive: {
-    background: 'var(--color-accent, #2563eb)',
-    color: '#ffffff',
-    border: '1px solid var(--color-accent, #2563eb)',
-    borderRadius: 999,
-    padding: '4px 12px',
-    fontSize: 13,
-    cursor: 'pointer',
+    background: 'var(--emerald-soft)',
+    color: 'var(--emerald-deep)',
+    borderColor: 'var(--emerald-soft)',
   },
   tableWrap: {
-    background: 'var(--color-surface, #ffffff)',
-    border: '1px solid var(--color-border, #e4e6ea)',
-    borderRadius: 6,
+    background: 'var(--paper-2)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--r-lg)',
     overflow: 'hidden',
+    boxShadow: 'var(--sh-xs)',
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
-    fontSize: 14,
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--t-sm)',
   },
   th: {
     textAlign: 'left',
-    padding: '10px 12px',
+    padding: '12px 14px',
     fontWeight: 600,
-    color: 'var(--color-text-muted, #6b7280)',
-    background: '#fafafa',
-    borderBottom: '1px solid var(--color-border, #e4e6ea)',
-    fontSize: 12,
+    color: 'var(--fg-subtle)',
+    background: 'var(--paper-3)',
+    borderBottom: '1px solid var(--border)',
+    fontSize: 'var(--t-xs)',
     textTransform: 'uppercase',
     letterSpacing: '0.04em',
   },
   td: {
-    padding: '12px',
-    borderBottom: '1px solid var(--color-border, #e4e6ea)',
+    padding: '14px',
+    borderBottom: '1px solid var(--border-subtle)',
     verticalAlign: 'middle',
+    color: 'var(--ink)',
   },
   nameLink: {
+    fontFamily: 'var(--font-sans)',
     fontWeight: 500,
-    color: 'var(--color-text, #1c2024)',
+    fontSize: 'var(--t-sm)',
+    color: 'var(--ink)',
     textDecoration: 'none',
   },
   versionMono: {
-    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-    fontSize: 13,
-    color: 'var(--color-text-muted, #6b7280)',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 'var(--t-sm)',
+    color: 'var(--fg-muted)',
   },
   actions: { display: 'inline-flex', gap: 8 },
   actionBtn: {
-    background: '#ffffff',
-    border: '1px solid var(--color-border, #e4e6ea)',
-    borderRadius: 6,
-    padding: '4px 10px',
-    fontSize: 13,
+    background: 'var(--paper)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--r-sm)',
+    padding: '5px 12px',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--t-xs)',
+    fontWeight: 500,
+    color: 'var(--ink)',
     cursor: 'pointer',
+    boxShadow: 'var(--sh-xs)',
   },
   destructive: {
-    background: '#ffffff',
-    border: '1px solid #fecaca',
-    borderRadius: 6,
-    padding: '4px 10px',
-    fontSize: 13,
-    color: '#991b1b',
+    background: 'var(--paper)',
+    border: '1px solid var(--danger-soft)',
+    borderRadius: 'var(--r-sm)',
+    padding: '5px 12px',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--t-xs)',
+    fontWeight: 500,
+    color: 'var(--danger)',
     cursor: 'pointer',
   },
   actionDisabled: { opacity: 0.45, cursor: 'not-allowed' },
   empty: {
-    padding: '40px 16px',
+    padding: '48px 16px',
     textAlign: 'center',
-    color: 'var(--color-text-muted, #6b7280)',
+    color: 'var(--fg-muted)',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--t-sm)',
   },
   errorBanner: {
-    padding: '10px 12px',
+    padding: '12px 14px',
     marginBottom: 12,
-    border: '1px solid #fecaca',
-    background: '#fef2f2',
-    color: '#991b1b',
-    borderRadius: 6,
-    fontSize: 13,
+    border: '1px solid var(--danger-soft)',
+    background: 'var(--danger-soft)',
+    color: 'var(--danger)',
+    borderRadius: 'var(--r-md)',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--t-sm)',
   },
   actionFeedback: {
-    padding: '10px 12px',
+    padding: '12px 14px',
     marginBottom: 12,
-    border: '1px solid #bfdbfe',
-    background: '#eff6ff',
-    color: '#1e3a8a',
-    borderRadius: 6,
-    fontSize: 13,
+    border: '1px solid var(--emerald-soft)',
+    background: 'var(--emerald-soft)',
+    color: 'var(--emerald-deep)',
+    borderRadius: 'var(--r-md)',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--t-sm)',
   },
   modalBackdrop: {
     position: 'fixed',
     inset: 0,
-    background: 'rgba(15, 23, 42, 0.5)',
+    background: 'rgba(14, 26, 20, 0.55)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 50,
   },
   modal: {
-    background: '#ffffff',
-    borderRadius: 8,
+    background: 'var(--paper)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--r-lg)',
     width: 'min(440px, 90vw)',
-    padding: 20,
-    boxShadow: '0 24px 48px rgba(15, 23, 42, 0.25)',
+    padding: 24,
+    boxShadow: 'var(--sh-lg)',
   },
-  modalTitle: { margin: 0, fontSize: 18, fontWeight: 600 },
-  modalBody: { marginTop: 8, fontSize: 14, color: 'var(--color-text, #1c2024)' },
+  modalTitle: {
+    margin: 0,
+    fontFamily: 'var(--font-display)',
+    fontWeight: 700,
+    fontSize: 'var(--t-xl)',
+    letterSpacing: '-0.01em',
+    color: 'var(--ink)',
+  },
+  modalBody: {
+    marginTop: 8,
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--t-sm)',
+    lineHeight: 1.5,
+    color: 'var(--ink-soft)',
+  },
   modalActions: {
-    marginTop: 16,
+    marginTop: 18,
     display: 'flex',
     justifyContent: 'flex-end',
     gap: 8,
   },
   cancelBtn: {
-    background: '#ffffff',
-    border: '1px solid var(--color-border, #e4e6ea)',
-    borderRadius: 6,
-    padding: '6px 14px',
-    fontSize: 14,
+    background: 'var(--paper-2)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--r-md)',
+    padding: '8px 16px',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--t-sm)',
+    color: 'var(--ink)',
     cursor: 'pointer',
+    boxShadow: 'var(--sh-xs)',
   },
   confirmDestructive: {
-    background: '#dc2626',
-    color: '#ffffff',
-    border: 0,
-    borderRadius: 6,
-    padding: '6px 14px',
-    fontSize: 14,
+    background: 'var(--danger)',
+    color: 'var(--paper)',
+    border: '1px solid var(--danger)',
+    borderRadius: 'var(--r-md)',
+    padding: '8px 16px',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--t-sm)',
+    fontWeight: 500,
     cursor: 'pointer',
   },
 };
@@ -347,7 +422,12 @@ export function PluginListClient({
   return (
     <section>
       <div style={styles.header}>
-        <h1 style={styles.title}>Plugins</h1>
+        <div style={styles.headerMain}>
+          <span style={styles.eyebrow}>Plugins — sandboxed extensions</span>
+          <h1 style={styles.title}>
+            Installed <em className="italic-accent">plugins</em>.
+          </h1>
+        </div>
         <Link href="/plugins/install" style={styles.installBtn}>
           Install plugin
         </Link>
@@ -389,7 +469,7 @@ export function PluginListClient({
                 type="button"
                 aria-pressed={active}
                 onClick={() => setStatusFilter(opt.value)}
-                style={active ? styles.chipActive : styles.chip}
+                style={active ? { ...styles.chip, ...styles.chipActive } : styles.chip}
               >
                 {opt.label}
               </button>
