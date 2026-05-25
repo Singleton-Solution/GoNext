@@ -19,12 +19,14 @@ import { fireEvent, render, screen, waitFor, act } from '@testing-library/react'
 
 // Module-level mock so both the form and the test share the same spy.
 const patchMock = vi.fn();
+const fetchMock = vi.fn();
 vi.mock('../api', () => ({
   patchSettings: (patch: unknown) => patchMock(patch),
-  fetchSettings: vi.fn(),
+  fetchSettings: (group: string) => fetchMock(group),
 }));
 
 import { GeneralForm } from './GeneralForm';
+import GeneralSettingsPage from './page';
 import { GENERAL_SCHEMA } from './schema';
 
 const FIXTURE = {
@@ -43,8 +45,8 @@ describe('GeneralForm', () => {
   it('renders all 5 fields from the schema with the fixture values', () => {
     render(<GeneralForm initialValues={FIXTURE} />);
 
-    // One input/select per schema entry — assert we have exactly 5.
-    expect(GENERAL_SCHEMA).toHaveLength(5);
+    // One input/select per schema entry — assert we have exactly 6.
+    expect(GENERAL_SCHEMA).toHaveLength(6);
 
     expect(screen.getByLabelText(/Site name/i)).toHaveValue('GoNext Demo');
     expect(screen.getByLabelText(/Tagline/i)).toHaveValue('A tagline');
@@ -92,6 +94,33 @@ describe('GeneralForm', () => {
       'aria-invalid',
       'true',
     );
+  });
+
+  it('renders the brand headline, section cards, and emerald save button', async () => {
+    fetchMock.mockResolvedValueOnce({ values: FIXTURE, available: true });
+    const page = await GeneralSettingsPage();
+    render(page);
+
+    // Italic-accent rule: "General" is in Archivo, "settings" swaps to
+    // Instrument Serif italic inside the <em>.
+    const heading = screen.getByRole('heading', { level: 1, name: /General settings/i });
+    expect(heading).toBeInTheDocument();
+    expect(heading.querySelector('em')?.textContent).toMatch(/settings/i);
+
+    // The four paper-2 section cards the task spells out.
+    expect(screen.getByRole('heading', { name: /Site identity/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Locale/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Timezone/i, level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Default role/i })).toBeInTheDocument();
+
+    // Emerald save button is the form's submit.
+    const submit = screen.getByRole('button', { name: /save changes/i });
+    expect(submit).toHaveAttribute('type', 'submit');
+  });
+
+  it('matches the brand snapshot', () => {
+    const { container } = render(<GeneralForm initialValues={FIXTURE} />);
+    expect(container.firstChild).toMatchSnapshot();
   });
 
   it('auto-dismisses the success toast after 4s', async () => {

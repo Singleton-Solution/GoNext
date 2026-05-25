@@ -10,17 +10,19 @@
 import type { ReactElement } from 'react';
 import { SettingsForm } from '../SettingsForm';
 import { patchSettings } from '../api';
-import type { SettingsValues } from '../types';
+import type { SettingsSection, SettingsValues } from '../types';
 import { GENERAL_SCHEMA } from './schema';
 
 export interface GeneralFormProps {
   initialValues: SettingsValues;
   banner?: string;
+  sections?: readonly SettingsSection[];
 }
 
 export function GeneralForm({
   initialValues,
   banner,
+  sections,
 }: GeneralFormProps): ReactElement {
   return (
     <SettingsForm
@@ -28,6 +30,7 @@ export function GeneralForm({
       initialValues={initialValues}
       onSubmit={patchSettings}
       banner={banner}
+      sections={sections}
     />
   );
 }
