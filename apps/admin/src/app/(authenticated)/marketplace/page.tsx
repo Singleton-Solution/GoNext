@@ -14,6 +14,13 @@
  * Auth: the API gates every read endpoint on a logged-in principal.
  * If the fetch fails we surface a friendly inline notice and the
  * empty state so the surrounding admin shell remains navigable.
+ *
+ * Brand
+ * =====
+ * The page head uses the "living systems" Headline pattern: a heavy
+ * Archivo display word, an italic-serif accent for the emphasized
+ * noun, and an emerald eyebrow. The lead paragraph is `--fg-muted`
+ * Geist so it sits a half-step behind the headline.
  */
 import type { ReactElement } from 'react';
 import Link from 'next/link';
@@ -49,22 +56,40 @@ export default async function MarketplacePage({
 
   return (
     <section>
-      <header style={{ marginBottom: 16 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>
-          Marketplace
+      <header style={{ marginBottom: 32 }}>
+        <span className="eyebrow">Marketplace — themes &amp; extensions</span>
+        <h1
+          className="h1"
+          style={{
+            margin: '8px 0 0',
+            fontSize: 'clamp(40px, 5vw, 56px)',
+            lineHeight: 0.95,
+          }}
+        >
+          Marketplace <em>catalogue</em>.
         </h1>
         <p
+          className="lead"
           style={{
-            margin: '4px 0 0',
-            color: 'var(--color-text-muted, #6b7280)',
-            fontSize: 14,
-            maxWidth: 720,
+            margin: '12px 0 0',
+            maxWidth: 640,
           }}
         >
           Browse plugins published to your host. Pick a listing to review
           its capability request and install it — the install screen
-          mirrors the consent flow you’ll see for{' '}
-          <Link href="/plugins/install">manual installs</Link>.
+          mirrors the consent flow you&apos;ll see for{' '}
+          <Link
+            href="/plugins/install"
+            style={{
+              color: 'var(--emerald-deep)',
+              textDecoration: 'underline',
+              textDecorationColor: 'var(--emerald-soft)',
+              textUnderlineOffset: 3,
+            }}
+          >
+            manual installs
+          </Link>
+          .
         </p>
       </header>
 
@@ -72,16 +97,17 @@ export default async function MarketplacePage({
         <div
           role="alert"
           style={{
-            padding: 12,
+            padding: '12px 14px',
             marginBottom: 16,
-            background: '#fef9c3',
-            color: '#854d0e',
-            border: '1px solid #fde68a',
-            borderRadius: 6,
-            fontSize: 13,
+            background: 'var(--warning-soft)',
+            color: 'var(--warning)',
+            border: '1px solid var(--warning-soft)',
+            borderRadius: 'var(--r-md)',
+            fontFamily: 'var(--font-sans)',
+            fontSize: 'var(--t-sm)',
           }}
         >
-          Couldn’t load the catalogue ({error}). The marketplace API may
+          Couldn&apos;t load the catalogue ({error}). The marketplace API may
           not be available yet.
         </div>
       ) : null}
