@@ -13,16 +13,27 @@
  */
 import { api, apiBaseUrl, ApiError } from '@/lib/api-client';
 import type {
+  BulkRequest,
+  BulkResult,
+  CollectionListResponse,
   MediaAsset,
+  MediaCollection,
   MediaListResponse,
   MediaTypeFilter,
   MediaUpdateBody,
+  MoveMediaBody,
 } from './types';
 
 export interface ListParams {
   type?: MediaTypeFilter;
   limit?: number;
   cursor?: string;
+  /**
+   * Folder narrowing. `undefined` is "no filter"; `'root'` selects
+   * assets sitting at the implicit root (no collection_id); a UUID
+   * selects one folder. Issue #69.
+   */
+  collection?: string;
 }
 
 /**
@@ -40,6 +51,9 @@ export function listMedia(params: ListParams = {}): Promise<MediaListResponse> {
   }
   if (params.cursor) {
     search.set('cursor', params.cursor);
+  }
+  if (params.collection) {
+    search.set('collection', params.collection);
   }
   const qs = search.toString();
   const path = qs ? `/api/v1/admin/media?${qs}` : '/api/v1/admin/media';
@@ -160,4 +174,80 @@ export function uploadMedia(
     }
     xhr.send(form);
   });
+}
+
+// --- Collections + bulk operations (issues #69, #71) --------------------------
+
+/** List every media folder as a flat list ordered by path. */
+export function listCollections(): Promise<CollectionListResponse> {
+  return api.get<CollectionListResponse>('/api/v1/admin/media/collections');
+}
+
+/** Create a new folder. parentId omitted => root collection. */
+export function createCollection(input: {
+  slug: string;
+  name: string;
+  parentId?: string;
+}): Promise<MediaCollection> {
+  return api.post<MediaCollection>('/api/v1/admin/media/collections', {
+    slug: input.slug,
+    name: input.name,
+    parent_id: input.parentId,
+  });
+}
+
+/** Rename a folder. Either field can be omitted; both omitted is a 400. */
+export function renameCollection(
+  id: string,
+  input: { slug?: string; name?: string },
+): Promise<MediaCollection> {
+  return api.put<MediaCollection>(
+    `/api/v1/admin/media/collections/${encodeURIComponent(id)}`,
+    { slug: input.slug, name: input.name },
+  );
+}
+
+/**
+ * Re-parent a folder. `newParentId === null` moves to the root; the
+ * `move_parent` flag is required by the server to distinguish
+ * "client did not specify parent_id" from "client wants null".
+ */
+export function moveCollection(
+  id: string,
+  newParentId: string | null,
+): Promise<MediaCollection> {
+  return api.put<MediaCollection>(
+    `/api/v1/admin/media/collections/${encodeURIComponent(id)}`,
+    { parent_id: newParentId, move_parent: true },
+  );
+}
+
+/** Delete a folder and every descendant. Cascade on the server. */
+export function deleteCollection(id: string): Promise<void> {
+  return api
+    .delete<unknown>(
+      `/api/v1/admin/media/collections/${encodeURIComponent(id)}`,
+    )
+    .then(() => undefined);
+}
+
+/**
+ * Move a list of media into a folder. `collectionId === null` (or
+ * omitted) puts the assets at the root. Returns `{ moved, failed? }`.
+ */
+export function moveMediaToCollection(
+  body: MoveMediaBody,
+): Promise<{ moved: number; failed?: Record<string, string> }> {
+  return api.post<{ moved: number; failed?: Record<string, string> }>(
+    '/api/v1/admin/media/move',
+    body,
+  );
+}
+
+/**
+ * Fan-out bulk operation. The server validates the op and returns a
+ * count of successes plus a per-id failure map.
+ */
+export function bulkMedia(req: BulkRequest): Promise<BulkResult> {
+  return api.post<BulkResult>('/api/v1/admin/media/bulk', req);
 }
