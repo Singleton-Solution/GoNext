@@ -102,9 +102,6 @@ type SpanEventReceiver interface {
 // observability is the per-Runtime sink bundle stored in the
 // observabilityRegistry. Every field is nil-safe: the host functions
 // branch on "no sink wired" before touching the field.
-//
-// The *CardinalityDam for #226's gn_metric_observe joins this struct
-// in the next commit.
 type observability struct {
 	translator   i18n.Translator
 	auditEmitter AuditEmitter
@@ -112,6 +109,7 @@ type observability struct {
 	tracer       Tracer
 	spanReceiver SpanEventReceiver
 	spanCtxs     *spanContextRegistry
+	dam          *CardinalityDam
 }
 
 // observabilityRegistry is the side-channel state for observability
@@ -136,6 +134,7 @@ func obsFor(r *Runtime) *observability {
 	o := &observability{
 		translator: i18n.NoopTranslator{},
 		spanCtxs:   newSpanContextRegistry(),
+		dam:        NewCardinalityDam(DefaultCardinalityLimit),
 	}
 	actual, _ := observabilityRegistry.LoadOrStore(r, o)
 	return actual.(*observability)
@@ -223,6 +222,20 @@ func (b *ObservabilityBuilder) WithSpanEventReceiver(r SpanEventReceiver) *Obser
 	return b
 }
 
+// WithCardinalityDam installs the per-plugin tag-value dam consulted
+// by gn_metric_observe. Passing nil reverts to a fresh defaults-backed
+// dam — the dam is load-bearing for Prometheus stability, so we never
+// disable it entirely.
+func (b *ObservabilityBuilder) WithCardinalityDam(d *CardinalityDam) *ObservabilityBuilder {
+	mutateObs(b.rt, func(o *observability) {
+		if d == nil {
+			d = NewCardinalityDam(DefaultCardinalityLimit)
+		}
+		o.dam = d
+	})
+	return b
+}
+
 // ===========================================================================
 // Accessors.
 // ===========================================================================
@@ -244,6 +257,11 @@ func (r *Runtime) Tracer() Tracer { return obsFor(r).tracer }
 
 // SpanEventReceiver returns the configured span event receiver or nil.
 func (r *Runtime) SpanEventReceiver() SpanEventReceiver { return obsFor(r).spanReceiver }
+
+// CardinalityDam returns the runtime's per-plugin tag-value dam.
+// Never nil after the first obsFor() — a runtime built without
+// WithCardinalityDam gets a defaults-backed dam.
+func (r *Runtime) CardinalityDam() *CardinalityDam { return obsFor(r).dam }
 
 // ===========================================================================
 // Registration helper.
@@ -281,6 +299,20 @@ func (r *Runtime) registerObservabilityHost(b wazero.HostModuleBuilder) {
 			[]api.ValueType{api.ValueTypeI32}).
 		WithParameterNames("name_ptr", "name_len", "attrs_ptr", "attrs_len").
 		Export("gn_span_event")
+
+	b.NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(r.hostGnMetricObserve),
+			[]api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeF64, api.ValueTypeI32, api.ValueTypeI32},
+			[]api.ValueType{api.ValueTypeI32}).
+		WithParameterNames("name_ptr", "name_len", "value", "tags_ptr", "tags_len").
+		Export("gn_metric_observe")
+
+	b.NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(r.hostGnEventEmit),
+			[]api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32},
+			[]api.ValueType{api.ValueTypeI32}).
+		WithParameterNames("name_ptr", "name_len", "data_ptr", "data_len").
+		Export("gn_event_emit")
 }
 
 // ===========================================================================
@@ -420,6 +452,143 @@ func (r *Runtime) hostGnSpanEvent(ctx context.Context, mod api.Module, stack []u
 			slog.Any("attrs", attrs))
 	}
 	o.metrics.IncABICall(slug, "gn_span_event", "ok")
+	stack[0] = api.EncodeI32(statusOK)
+}
+
+// hostGnMetricObserve implements env.gn_metric_observe.
+// Signature: (name_ptr i32, name_len i32, value f64, tags_ptr i32, tags_len i32) -> i32.
+//
+// The host reads the metric name and a msgpack-encoded tags map from
+// guest memory, runs the (slug, metric, tags) tuple through the
+// cardinality dam, and either records the observation or drops it
+// with a `plugin.metric_cardinality_exceeded` audit warning + a
+// Prometheus counter bump.
+//
+// The dam is the load-bearing safety net: without it a misbehaving
+// plugin emitting `gn_metric_observe("requests", 1, {user_id: ...})`
+// would explode Prometheus' series count. The audit event names the
+// plugin and the offending tag so operators can react.
+//
+// Return statuses:
+//
+//	statusOK                    metric admitted
+//	statusBadName               name empty or out of bounds
+//	statusBadTags               tags blob unparseable
+//	statusCardinalityExceeded   dam dropped the metric
+func (r *Runtime) hostGnMetricObserve(ctx context.Context, mod api.Module, stack []uint64) {
+	namePtr := api.DecodeU32(stack[0])
+	nameLen := api.DecodeU32(stack[1])
+	value := api.DecodeF64(stack[2])
+	tagsPtr := api.DecodeU32(stack[3])
+	tagsLen := api.DecodeU32(stack[4])
+
+	o := obsFor(r)
+	slug := mod.Name()
+	start := time.Now()
+	defer func() {
+		o.metrics.ObserveABICallDuration(slug, "gn_metric_observe", time.Since(start).Seconds())
+	}()
+
+	nameBuf, err := readHostString("gn_metric_observe", mod, namePtr, nameLen)
+	if err != nil || len(nameBuf) == 0 {
+		o.metrics.IncABICall(slug, "gn_metric_observe", "error")
+		stack[0] = api.EncodeI32(statusBadName)
+		return
+	}
+	metricName := string(nameBuf)
+
+	tags, err := readHostTags(mod, tagsPtr, tagsLen)
+	if err != nil {
+		r.logger.Warn("gn_metric_observe: bad tags blob",
+			slog.String("plugin", slug),
+			slog.String("metric", metricName),
+			slog.String("err", err.Error()))
+		o.metrics.IncABICall(slug, "gn_metric_observe", "error")
+		stack[0] = api.EncodeI32(statusBadTags)
+		return
+	}
+
+	// Cardinality check first — admit-or-drop. The dam is per-plugin,
+	// so a noisy plugin can't damage other plugins' budgets.
+	if overTag, admitted := o.dam.Admit(slug, metricName, tags); !admitted {
+		o.metrics.IncABICall(slug, "gn_metric_observe", "cardinality_exceeded")
+		o.metrics.IncMetricCardinalityExceeded(slug, metricName)
+		_ = emitObservabilityAudit(ctx, r, slug, "plugin.metric_cardinality_exceeded", "warning", map[string]any{
+			"metric":          metricName,
+			"overflowing_tag": overTag,
+			"limit":           o.dam.Limit(),
+		})
+		stack[0] = api.EncodeI32(statusCardinalityExceeded)
+		return
+	}
+
+	// Forward to whatever downstream sink the host wired in. For now
+	// the runtime owns no general-purpose plugin-metric sink; we
+	// surface the observation via the slug-scoped Prometheus counters
+	// (slug, metric tag set) and log at debug for visibility. A
+	// follow-up commit can add a dedicated GaugeVec sink keyed by
+	// (slug, metric); the dam already covers cardinality.
+	r.logger.Debug("plugin metric observed",
+		slog.String("plugin", slug),
+		slog.String("metric", metricName),
+		slog.Float64("value", value),
+		slog.Any("tags", tags))
+	o.metrics.IncABICall(slug, "gn_metric_observe", "ok")
+	stack[0] = api.EncodeI32(statusOK)
+}
+
+// hostGnEventEmit implements env.gn_event_emit.
+// Signature: (name_ptr i32, name_len i32, data_ptr i32, data_len i32) -> i32.
+//
+// Plugins call this to emit semi-structured "plugin event" rows into
+// the audit log. The data blob is msgpack — same format as
+// gn_metric_observe's tags — so a guest SDK that builds tags can
+// reuse its encoder.
+//
+// Audit events are emitted at SeverityInfo. Plugins that want a
+// higher severity must use the audit-specific ABI (lands separately).
+func (r *Runtime) hostGnEventEmit(ctx context.Context, mod api.Module, stack []uint64) {
+	namePtr := api.DecodeU32(stack[0])
+	nameLen := api.DecodeU32(stack[1])
+	dataPtr := api.DecodeU32(stack[2])
+	dataLen := api.DecodeU32(stack[3])
+
+	o := obsFor(r)
+	slug := mod.Name()
+	start := time.Now()
+	defer func() {
+		o.metrics.ObserveABICallDuration(slug, "gn_event_emit", time.Since(start).Seconds())
+	}()
+
+	nameBuf, err := readHostString("gn_event_emit", mod, namePtr, nameLen)
+	if err != nil || len(nameBuf) == 0 {
+		o.metrics.IncABICall(slug, "gn_event_emit", "error")
+		stack[0] = api.EncodeI32(statusBadName)
+		return
+	}
+	eventName := string(nameBuf)
+
+	data, err := readHostTags(mod, dataPtr, dataLen)
+	if err != nil {
+		r.logger.Warn("gn_event_emit: bad data blob",
+			slog.String("plugin", slug),
+			slog.String("event", eventName),
+			slog.String("err", err.Error()))
+		o.metrics.IncABICall(slug, "gn_event_emit", "error")
+		stack[0] = api.EncodeI32(statusBadTags)
+		return
+	}
+
+	meta := make(map[string]any, len(data))
+	for k, v := range data {
+		meta[k] = v
+	}
+	if err := emitObservabilityAudit(ctx, r, slug, eventName, "info", meta); err != nil {
+		o.metrics.IncABICall(slug, "gn_event_emit", "error")
+		stack[0] = api.EncodeI32(statusBackendUnavailable)
+		return
+	}
+	o.metrics.IncABICall(slug, "gn_event_emit", "ok")
 	stack[0] = api.EncodeI32(statusOK)
 }
 
