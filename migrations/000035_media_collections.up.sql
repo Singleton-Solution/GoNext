@@ -77,3 +77,19 @@ ALTER TABLE media
 -- Index the FK so the "list media in collection X" query the grid
 -- issues on every folder click is a constant-cost lookup.
 CREATE INDEX media_collection_id_idx ON media (collection_id);
+
+-- Tags ride on the media row as a JSONB array of strings (rather
+-- than a separate join table) because the access pattern is "list
+-- media tagged X" via the @> containment operator, which a GIN
+-- index serves at constant cost. A join table would chatter on
+-- the grid's per-row tag list. The array is normalised on insert
+-- (lowercase, deduplicated) by the handler, so the GIN
+-- containment predicate matches case-insensitively without a
+-- custom expression index.
+ALTER TABLE media
+    ADD COLUMN tags JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+-- GIN supports the @> containment and ? key-exists operators on
+-- jsonb arrays. The "list everything tagged 'hero'" query the
+-- grid issues uses the @> path.
+CREATE INDEX media_tags_gin_idx ON media USING GIN (tags);

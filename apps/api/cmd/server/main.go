@@ -60,6 +60,7 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/jobs/taskspec"
 	"github.com/Singleton-Solution/GoNext/packages/go/log"
 	"github.com/Singleton-Solution/GoNext/packages/go/media"
+	"github.com/Singleton-Solution/GoNext/packages/go/media/collections"
 	"github.com/Singleton-Solution/GoNext/packages/go/media/imgproxy"
 	gonextmetrics "github.com/Singleton-Solution/GoNext/packages/go/metrics"
 	authmw "github.com/Singleton-Solution/GoNext/packages/go/middleware/auth"
@@ -481,13 +482,15 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 	// The store + putter are constructed here (rather than inline in
 	// adminmedia.Mount) so the public /img proxy below can read from
 	// the same in-memory state — the upload writes to mediaPutter; the
-	// proxy reads from it.
+	// proxy reads from it. mediaPol is hoisted so the collections +
+	// bulk mounts below share the same policy instance.
 	mediaStore := adminmedia.NewMemoryStore(nil, nil)
 	mediaPutter := adminmedia.NewMemoryPutter()
+	mediaPol := policy.NewBasicPolicy(policy.DefaultRoleCapabilities())
 	if err := adminmedia.Mount(mux, "/api/v1/admin/media", adminmedia.Deps{
 		Store:  mediaStore,
 		Putter: mediaPutter,
-		Policy: policy.NewBasicPolicy(policy.DefaultRoleCapabilities()),
+		Policy: mediaPol,
 		Logger: logger,
 	}); err != nil {
 		logger.Warn("admin/media: failed to mount routes", slog.Any("err", err))
@@ -524,6 +527,43 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 			slog.String("base", "/img"),
 			slog.String("cache_root", imgCache.Root()),
 			slog.String("backend", string(imgproxy.DefaultBackend())),
+		)
+	}
+
+	// Media collections (folders backed by ltree, issue #69). Shares
+	// the media store so /move can update the FK in place. The
+	// in-memory collections store mirrors the Postgres-backed one
+	// that lands alongside the data-access layer; the wire surface
+	// is identical.
+	collectionStore := collections.NewMemoryStore(nil, nil)
+	if err := adminmedia.MountCollections(mux, "/api/v1/admin/media", adminmedia.CollectionsDeps{
+		Store:   collectionStore,
+		MediaSt: mediaStore,
+		Policy:  mediaPol,
+		Logger:  logger,
+	}); err != nil {
+		logger.Warn("admin/media: failed to mount collections routes", slog.Any("err", err))
+	} else {
+		logger.Info("admin/media: collections routes mounted",
+			slog.String("base", "/api/v1/admin/media/collections"),
+		)
+	}
+
+	// Bulk operations (issue #71). The dev wiring uses the
+	// in-process StubAltGenerator that writes a deterministic
+	// "auto-generated" alt string straight into the media row so the
+	// admin UI can demonstrate the workflow without spinning up a
+	// worker. Production wires a real Asynq-backed adapter.
+	if err := adminmedia.MountBulk(mux, "/api/v1/admin/media", adminmedia.BulkDeps{
+		Store:        mediaStore,
+		Policy:       mediaPol,
+		Logger:       logger,
+		AltGenerator: &adminmedia.StubAltGenerator{Store: mediaStore},
+	}); err != nil {
+		logger.Warn("admin/media: failed to mount bulk routes", slog.Any("err", err))
+	} else {
+		logger.Info("admin/media: bulk routes mounted",
+			slog.String("base", "/api/v1/admin/media/bulk"),
 		)
 	}
 

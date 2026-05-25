@@ -7,6 +7,9 @@
 -- them, and DROP EXTENSION is destructive across the whole
 -- database.
 
+DROP INDEX IF EXISTS media_tags_gin_idx;
+ALTER TABLE media DROP COLUMN IF EXISTS tags;
+
 DROP INDEX IF EXISTS media_collection_id_idx;
 ALTER TABLE media DROP COLUMN IF EXISTS collection_id;
 
