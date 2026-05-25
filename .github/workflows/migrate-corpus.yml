@@ -1,0 +1,66 @@
+name: Migrate corpus
+
+# Runs the 10-site WordPress fixture corpus through `gonext migrate wp
+# --dry-run` and asserts the counters match each fixture's expected
+# output JSON. Failures here mean the importer's record-counting has
+# regressed — typically a parser bug or a default-handling change.
+#
+# We only trigger on PRs that touch the importer surface OR the
+# fixtures themselves so the workflow stays cheap.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/go/migrate/**'
+      - 'cli/gonext/cmd/migrate/**'
+      - 'tools/migrate-corpus/**'
+      - '.github/workflows/migrate-corpus.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'packages/go/migrate/**'
+      - 'cli/gonext/cmd/migrate/**'
+      - 'tools/migrate-corpus/**'
+      - '.github/workflows/migrate-corpus.yml'
+
+# Stop in-flight runs when a new commit pushes to the same PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  corpus-assert:
+    name: Assert 10-fixture corpus
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'cli/gonext/go.mod'
+          cache: true
+          cache-dependency-path: |
+            cli/gonext/go.sum
+            packages/go/go.sum
+
+      - name: Build gonext CLI
+        run: |
+          cd cli/gonext
+          go build -o "$GITHUB_WORKSPACE/gonext" .
+
+      - name: Build gonext-corpus
+        # The migrate-corpus tool is intentionally outside go.work
+        # (see tools/migrate-corpus/README.md), so we build it with
+        # GOWORK=off to opt out of the workspace's module set.
+        run: |
+          cd tools/migrate-corpus
+          GOWORK=off go build -o "$GITHUB_WORKSPACE/gonext-corpus" .
+
+      - name: Run corpus assertion
+        run: |
+          ./gonext-corpus assert \
+            --fixtures=tools/migrate-corpus/fixtures \
+            --bin="$GITHUB_WORKSPACE/gonext"

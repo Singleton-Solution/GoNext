@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0"
+  xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/"
+  xmlns:content="http://purl.org/rss/1.0/modules/content/"
+  xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:wp="http://wordpress.org/export/1.2/">
+<channel>
+  <title>Photo Gallery</title>
+  <link>https://photos.example.com</link>
+  <description>A photo-blog</description>
+  <wp:wxr_version>1.2</wp:wxr_version>
+  <wp:base_site_url>https://photos.example.com</wp:base_site_url>
+  <wp:base_blog_url>https://photos.example.com</wp:base_blog_url>
+
+  <wp:author>
+    <wp:author_id>1</wp:author_id>
+    <wp:author_login><![CDATA[photographer]]></wp:author_login>
+    <wp:author_email><![CDATA[photo@example.com]]></wp:author_email>
+    <wp:author_display_name><![CDATA[Photographer]]></wp:author_display_name>
+  </wp:author>
+
+  <item>
+    <title>Sunrise at the Lake</title>
+    <link>https://photos.example.com/sunrise/</link>
+    <dc:creator><![CDATA[photographer]]></dc:creator>
+    <content:encoded><![CDATA[<p>A view of the lake at dawn.</p><img src="https://photos.example.com/wp-content/uploads/sunrise.jpg" />]]></content:encoded>
+    <wp:post_id>50</wp:post_id>
+    <wp:post_date><![CDATA[2024-04-01 06:00:00]]></wp:post_date>
+    <wp:post_date_gmt><![CDATA[2024-04-01 06:00:00]]></wp:post_date_gmt>
+    <wp:comment_status><![CDATA[closed]]></wp:comment_status>
+    <wp:ping_status><![CDATA[closed]]></wp:ping_status>
+    <wp:post_name><![CDATA[sunrise]]></wp:post_name>
+    <wp:status><![CDATA[publish]]></wp:status>
+    <wp:post_parent>0</wp:post_parent>
+    <wp:menu_order>0</wp:menu_order>
+    <wp:post_type><![CDATA[post]]></wp:post_type>
+    <wp:is_sticky>0</wp:is_sticky>
+  </item>
+
+  <item>
+    <title>sunrise.jpg</title>
+    <link>https://photos.example.com/wp-content/uploads/sunrise.jpg</link>
+    <dc:creator><![CDATA[photographer]]></dc:creator>
+    <content:encoded><![CDATA[]]></content:encoded>
+    <wp:post_id>51</wp:post_id>
+    <wp:post_date><![CDATA[2024-04-01 05:50:00]]></wp:post_date>
+    <wp:post_date_gmt><![CDATA[2024-04-01 05:50:00]]></wp:post_date_gmt>
+    <wp:comment_status><![CDATA[closed]]></wp:comment_status>
+    <wp:ping_status><![CDATA[closed]]></wp:ping_status>
+    <wp:post_name><![CDATA[sunrise-jpg]]></wp:post_name>
+    <wp:status><![CDATA[inherit]]></wp:status>
+    <wp:post_parent>50</wp:post_parent>
+    <wp:menu_order>0</wp:menu_order>
+    <wp:post_type><![CDATA[attachment]]></wp:post_type>
+    <wp:is_sticky>0</wp:is_sticky>
+    <wp:attachment_url>https://photos.example.com/wp-content/uploads/sunrise.jpg</wp:attachment_url>
+  </item>
+
+  <item>
+    <title>sunset.jpg</title>
+    <link>https://photos.example.com/wp-content/uploads/sunset.jpg</link>
+    <dc:creator><![CDATA[photographer]]></dc:creator>
+    <content:encoded><![CDATA[]]></content:encoded>
+    <wp:post_id>52</wp:post_id>
+    <wp:post_date><![CDATA[2024-04-02 19:30:00]]></wp:post_date>
+    <wp:post_date_gmt><![CDATA[2024-04-02 19:30:00]]></wp:post_date_gmt>
+    <wp:comment_status><![CDATA[closed]]></wp:comment_status>
+    <wp:ping_status><![CDATA[closed]]></wp:ping_status>
+    <wp:post_name><![CDATA[sunset-jpg]]></wp:post_name>
+    <wp:status><![CDATA[inherit]]></wp:status>
+    <wp:post_parent>0</wp:post_parent>
+    <wp:menu_order>0</wp:menu_order>
+    <wp:post_type><![CDATA[attachment]]></wp:post_type>
+    <wp:is_sticky>0</wp:is_sticky>
+    <wp:attachment_url>https://photos.example.com/wp-content/uploads/sunset.jpg</wp:attachment_url>
+  </item>
+</channel>
+</rss>
