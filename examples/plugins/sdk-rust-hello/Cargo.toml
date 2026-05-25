@@ -1,0 +1,24 @@
+[package]
+name = "sdk-rust-hello"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Worked example: a minimal GoNext plugin written in Rust using the gonext-sdk crate. Mirrors examples/plugins/seo (Go/TinyGo) for parity."
+
+[lib]
+# cdylib is required for `wasm32-wasi` plugin builds — Rust's default
+# rlib doesn't produce a single .wasm. The host loads the cdylib's WASM
+# output as a wazero module.
+crate-type = ["cdylib"]
+
+[dependencies]
+gonext-sdk = { path = "../../../packages/rust/gonext-sdk" }
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
+
+# Strip and optimize for the smallest WASM module possible — guests run
+# inside a memory-capped sandbox so every kilobyte matters.
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true

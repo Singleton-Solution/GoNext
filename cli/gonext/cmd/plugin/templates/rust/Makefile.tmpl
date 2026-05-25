@@ -1,0 +1,17 @@
+TARGET ?= wasm32-wasip1
+WASM := target/$(TARGET)/release/{{ .CrateUnderscored }}.wasm
+
+.PHONY: build clean bundle test
+
+build:
+	cargo build --target $(TARGET) --release
+
+bundle: build
+	cp $(WASM) ./{{ .CrateUnderscored }}.wasm
+
+clean:
+	cargo clean
+	rm -f {{ .CrateUnderscored }}.wasm
+
+test:
+	cargo test

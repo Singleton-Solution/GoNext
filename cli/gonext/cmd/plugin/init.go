@@ -40,7 +40,7 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, initUsage)
 	}
 
-	template := fs.String("template", "go", "template name (go is the only choice today)")
+	template := fs.String("template", "go", "template name (go|rust)")
 	pluginName := fs.String("name", "", "plugin slug for the manifest (default: project dir basename)")
 	force := fs.Bool("force", false, "overwrite existing files at the target")
 
@@ -73,8 +73,11 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 		slug = sanitizeSlug(filepath.Base(projectDir))
 	}
 
-	if *template != "go" {
-		fmt.Fprintf(stderr, "gonext plugin init: unknown template %q (only \"go\" is supported)\n", *template)
+	switch *template {
+	case "go", "rust":
+		// supported
+	default:
+		fmt.Fprintf(stderr, "gonext plugin init: unknown template %q (supported: go, rust)\n", *template)
 		return ExitUsage
 	}
 
@@ -83,17 +86,29 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 		return ExitFail
 	}
 
-	if err := writeTemplateGo(projectDir, slug, *force); err != nil {
-		fmt.Fprintf(stderr, "gonext plugin init: %s\n", err)
-		return ExitFail
+	switch *template {
+	case "go":
+		if err := writeTemplateGo(projectDir, slug, *force); err != nil {
+			fmt.Fprintf(stderr, "gonext plugin init: %s\n", err)
+			return ExitFail
+		}
+		fmt.Fprintf(stdout, "Initialized GoNext Go plugin in %s\n", projectDir)
+		fmt.Fprintln(stdout, "Next steps:")
+		fmt.Fprintln(stdout, "  cd "+projectDir)
+		fmt.Fprintln(stdout, "  go mod tidy")
+		fmt.Fprintln(stdout, "  make           # builds plugin.wasm via TinyGo")
+		fmt.Fprintln(stdout, "  make bundle    # packs the .gnplugin ZIP")
+	case "rust":
+		if err := writeTemplateRust(projectDir, slug, *force); err != nil {
+			fmt.Fprintf(stderr, "gonext plugin init: %s\n", err)
+			return ExitFail
+		}
+		fmt.Fprintf(stdout, "Initialized GoNext Rust plugin in %s\n", projectDir)
+		fmt.Fprintln(stdout, "Next steps:")
+		fmt.Fprintln(stdout, "  cd "+projectDir)
+		fmt.Fprintln(stdout, "  cargo build --target wasm32-wasip1 --release")
+		fmt.Fprintln(stdout, "  make bundle    # packs the .gnplugin ZIP")
 	}
-
-	fmt.Fprintf(stdout, "Initialized GoNext Go plugin in %s\n", projectDir)
-	fmt.Fprintln(stdout, "Next steps:")
-	fmt.Fprintln(stdout, "  cd "+projectDir)
-	fmt.Fprintln(stdout, "  go mod tidy")
-	fmt.Fprintln(stdout, "  make           # builds plugin.wasm via TinyGo")
-	fmt.Fprintln(stdout, "  make bundle    # packs the .gnplugin ZIP")
 	return ExitOK
 }
 
@@ -109,17 +124,19 @@ Flags:
   --force             overwrite existing files at the target
 
 Templates:
-  go        TinyGo-targeted Go plugin using packages/go/sdk
+  go     TinyGo-targeted Go plugin using packages/go/sdk
+  rust   Rust crate compiled to wasm32-wasip1 using packages/rust/gonext-sdk
 
 Example:
-  gonext plugin init --template=go ./my-plugin`
+  gonext plugin init --template=go ./my-plugin
+  gonext plugin init --template=rust ./my-rust-plugin`
 
 // templatesFS embeds the templates directory tree. Each file is
 // rendered by trivial token substitution — {{PLUGIN_NAME}} becomes
 // the manifest slug. We deliberately don't pull in text/template
 // because the rendering is straight-line.
 //
-//go:embed templates/go/*
+//go:embed templates/go/* templates/rust/* templates/rust/src/*
 var templatesFS embed.FS
 
 // writeTemplateGo renders the Go template into dir. Returns an error
@@ -163,6 +180,55 @@ func writeTemplateGo(dir, slug string, force bool) error {
 		}
 		rendered := strings.ReplaceAll(string(data), "{{PLUGIN_NAME}}", slug)
 		rendered = strings.ReplaceAll(rendered, "{{PLUGIN_NAME_LITERAL}}", slug)
+		if err := os.WriteFile(target, []byte(rendered), 0o644); err != nil {
+			return fmt.Errorf("write %q: %w", target, err)
+		}
+		return nil
+	})
+}
+
+// writeTemplateRust renders the Rust template into dir. Mirrors
+// writeTemplateGo (walk + .tmpl rename + token substitution); a
+// dedicated function rather than a shared helper keeps the
+// per-template special cases (file extensions, dotfile renames)
+// explicit in their own scope.
+//
+// The substitution map carries one extra token beyond {{PLUGIN_NAME}}:
+// {{CRATE_UNDERSCORED}} — Cargo turns "my-plugin" into "my_plugin"
+// when producing the cdylib artefact, and Makefiles need that form to
+// reference the build output. We compute it inline since it's only
+// used here.
+func writeTemplateRust(dir, slug string, force bool) error {
+	crateUnderscored := strings.ReplaceAll(slug, "-", "_")
+	root := "templates/rust"
+	return fs.WalkDir(templatesFS, root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return fmt.Errorf("relativise template path %q: %w", path, err)
+		}
+		target := filepath.Join(dir, strings.TrimSuffix(rel, ".tmpl"))
+
+		if !force {
+			if _, err := os.Stat(target); err == nil {
+				return fmt.Errorf("file already exists: %s (use --force to overwrite)", target)
+			}
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return fmt.Errorf("create dir for %q: %w", target, err)
+		}
+		data, err := templatesFS.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("read template %q: %w", path, err)
+		}
+		rendered := strings.ReplaceAll(string(data), "{{PLUGIN_NAME}}", slug)
+		rendered = strings.ReplaceAll(rendered, "{{PLUGIN_NAME_LITERAL}}", slug)
+		rendered = strings.ReplaceAll(rendered, "{{CRATE_UNDERSCORED}}", crateUnderscored)
 		if err := os.WriteFile(target, []byte(rendered), 0o644); err != nil {
 			return fmt.Errorf("write %q: %w", target, err)
 		}

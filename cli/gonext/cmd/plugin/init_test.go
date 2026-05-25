@@ -118,7 +118,9 @@ func TestRunInitUnknownTemplate(t *testing.T) {
 	target := filepath.Join(dir, "my-plugin")
 
 	var stdout, stderr bytes.Buffer
-	code := runInit([]string{"--template=rust", target}, &stdout, &stderr)
+	// Use a clearly-not-real language so the test stays robust as new
+	// templates land (go and rust are both supported now).
+	code := runInit([]string{"--template=cobol", target}, &stdout, &stderr)
 	if code != ExitUsage {
 		t.Errorf("expected ExitUsage, got %d", code)
 	}

@@ -1,0 +1,16 @@
+[package]
+name = "gonext-sdk-macros"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.74"
+license = "Apache-2.0"
+description = "Procedural macros for the gonext-sdk crate. Plugin authors should depend on gonext-sdk; this is a thin proc-macro companion crate that re-exports through the parent."
+repository = "https://github.com/Singleton-Solution/GoNext"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "2.0", features = ["full"] }
