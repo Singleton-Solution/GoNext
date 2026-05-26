@@ -59,6 +59,16 @@ type Asset struct {
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 
+	// CollectionID names the folder the asset lives in (the
+	// media_collections.id foreign key). Nil for assets sitting at
+	// the implicit "root" view. Issue #69.
+	CollectionID *string `json:"collection_id,omitempty"`
+
+	// Tags is a JSONB array of normalised (lowercase, deduplicated)
+	// tag strings. Populated by the bulk "tag" operation and the
+	// detail-page editor. Issue #71.
+	Tags []string `json:"tags"`
+
 	// Variants is the list of generated renditions (thumbnail,
 	// medium, large, re-encoded original) the upload-time image-
 	// processing pipeline produced. Populated by the worker via
@@ -121,6 +131,12 @@ type ListFilter struct {
 	// Cursor is opaque; the store layer encodes the (created_at, id)
 	// pair and the handler treats it as a string.
 	Cursor string
+
+	// CollectionID, when non-nil, narrows the list to media whose
+	// collection_id matches. The special pointer-to-empty-string ""
+	// matches assets sitting at the implicit root (collection_id IS
+	// NULL); a pointer to a UUID matches that one folder. Issue #69.
+	CollectionID *string
 }
 
 // Page is the paginated list envelope. NextCursor is empty when there
@@ -175,6 +191,18 @@ type Store interface {
 	// previous variant list. Returns ErrNotFound if the asset has
 	// been soft-deleted between enqueue and handler.
 	SetVariants(ctx context.Context, id string, variants []Variant) error
+
+	// SetCollection re-files an asset into a collection. nil
+	// collectionID puts the asset back at the implicit root.
+	// Returns ErrNotFound if the asset has been soft-deleted.
+	// Issue #69.
+	SetCollection(ctx context.Context, id string, collectionID *string) error
+
+	// SetTags replaces the asset's tag list. The handler normalises
+	// the incoming list (lowercase, deduplicated) before calling.
+	// Returns ErrNotFound if the asset has been soft-deleted.
+	// Issue #71.
+	SetTags(ctx context.Context, id string, tags []string) error
 }
 
 // ErrNotFound is the sentinel returned by store reads when the row is

@@ -121,6 +121,9 @@ func (s *MemoryStore) Insert(_ context.Context, a AssetCreate) (Asset, error) {
 			UploaderID: a.UploaderID,
 			CreatedAt:  now,
 			UpdatedAt:  now,
+			// Tags is non-nil so JSON renders `"tags": []` rather
+			// than `"tags": null`. The grid expects an array.
+			Tags: []string{},
 		},
 		sha256: append([]byte(nil), a.SHA256...),
 	}
@@ -167,6 +170,9 @@ func (s *MemoryStore) List(_ context.Context, f ListFilter) (Page, error) {
 			continue
 		}
 		if f.MimeClass != "" && !matchesMimeClass(row.MimeType, f.MimeClass) {
+			continue
+		}
+		if f.CollectionID != nil && !collectionMatches(row.CollectionID, *f.CollectionID) {
 			continue
 		}
 		filtered = append(filtered, row.Asset)
@@ -251,6 +257,59 @@ func (s *MemoryStore) SoftDelete(_ context.Context, id string) error {
 	row.deletedAt = &now
 	row.UpdatedAt = now
 	return nil
+}
+
+// SetCollection re-files an asset into a collection. nil
+// collectionID moves the asset to the implicit root. Mutates
+// CollectionID + UpdatedAt; idempotent on a no-op move.
+func (s *MemoryStore) SetCollection(_ context.Context, id string, collectionID *string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	row, ok := s.rows[id]
+	if !ok || row.deletedAt != nil {
+		return ErrNotFound
+	}
+	if collectionID == nil {
+		row.CollectionID = nil
+	} else {
+		v := *collectionID
+		row.CollectionID = &v
+	}
+	row.UpdatedAt = s.clock().UTC()
+	return nil
+}
+
+// SetTags replaces the asset's tag list. The handler is expected to
+// normalise the list before calling (lowercase, deduplicated, no
+// leading/trailing whitespace). Idempotent.
+func (s *MemoryStore) SetTags(_ context.Context, id string, tags []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	row, ok := s.rows[id]
+	if !ok || row.deletedAt != nil {
+		return ErrNotFound
+	}
+	// Defensive copy so a caller mutating the input slice can't
+	// poison the row.
+	out := make([]string, len(tags))
+	copy(out, tags)
+	row.Tags = out
+	row.UpdatedAt = s.clock().UTC()
+	return nil
+}
+
+// collectionMatches reports whether a row's CollectionID lines up
+// with a filter value. The filter sentinel "" means "match assets
+// at the implicit root (CollectionID is nil)"; any other value is a
+// concrete UUID compared by string equality.
+func collectionMatches(rowID *string, filterID string) bool {
+	if filterID == "" {
+		return rowID == nil
+	}
+	if rowID == nil {
+		return false
+	}
+	return *rowID == filterID
 }
 
 // SetVariants replaces the variant list on the asset's row. Used by

@@ -21,6 +21,16 @@ vi.mock('next/navigation', () => ({
 const mocks = vi.hoisted(() => ({
   listMedia: vi.fn(),
   uploadMedia: vi.fn(),
+  // FolderTree + BulkActions reach for these. Default the list to
+  // an empty array so the sidebar renders an empty tree; tests that
+  // care about folder state can override per-it.
+  listCollections: vi.fn().mockResolvedValue({ data: [] }),
+  createCollection: vi.fn(),
+  renameCollection: vi.fn(),
+  moveCollection: vi.fn(),
+  deleteCollection: vi.fn(),
+  moveMediaToCollection: vi.fn(),
+  bulkMedia: vi.fn(),
 }));
 vi.mock('../actions', () => mocks);
 
@@ -39,6 +49,7 @@ const tile = (id: string, overrides: Partial<MediaAsset> = {}): MediaAsset => ({
   uploader_id: 'user-1',
   created_at: '2026-05-17T12:00:00Z',
   updated_at: '2026-05-17T12:00:00Z',
+  tags: [],
   ...overrides,
 });
 

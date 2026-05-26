@@ -48,6 +48,8 @@ import {
   useMemo,
   useRef,
   useState,
+  type ChangeEvent,
+  type DragEvent,
   type MouseEvent,
   type ReactElement,
 } from 'react';
@@ -60,11 +62,26 @@ import type {
 } from '../types';
 import { Headline } from '@/components/ui/headline';
 import { UploadDropzone } from './UploadDropzone';
+import { BulkActions } from './BulkActions';
+import { ALL_NODE_ID, FolderTree, MEDIA_DRAG_MIME, ROOT_NODE_ID } from './FolderTree';
 
 export interface MediaGridProps {
   /** Optional initial page — typically prefetched by the server
    * component so the first paint isn't blocked on a client fetch. */
   initialData?: MediaListResponse;
+  /**
+   * Optional initial folder selection. When set, the grid pre-selects
+   * this node in the FolderTree and filters its media. Sentinel values
+   * `ALL_NODE_ID` / `ROOT_NODE_ID` are accepted alongside concrete
+   * UUIDs. Used by the `/media/collections/[...slug]` route to
+   * deep-link into a folder. Issue #69.
+   */
+  initialFolderId?: string;
+  /**
+   * Optional initial flat list of collections — used by the
+   * deep-linked folder page to avoid a second round-trip on hydration.
+   */
+  initialCollections?: import('../types').MediaCollection[];
 }
 
 interface FilterChip {
@@ -99,7 +116,7 @@ function humanBytes(n: number): string {
 }
 
 export function MediaGrid(props: MediaGridProps): ReactElement {
-  const { initialData } = props;
+  const { initialData, initialFolderId, initialCollections } = props;
   const [filter, setFilter] = useState<MediaTypeFilter>('all');
   const [items, setItems] = useState<MediaAsset[]>(initialData?.data ?? []);
   const [cursor, setCursor] = useState<string>(
@@ -109,6 +126,18 @@ export function MediaGrid(props: MediaGridProps): ReactElement {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  // Folder narrowing. ALL_NODE_ID renders every asset regardless of
+  // folder; ROOT_NODE_ID renders only assets sitting at the implicit
+  // root (no collection_id); any other value is a folder UUID. The
+  // initial value is "All media" so the legacy grid behaviour is
+  // preserved out of the box. Issue #69.
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(
+    initialFolderId ?? ALL_NODE_ID,
+  );
+  // Bulk selection set. We keep the set as a plain object so React
+  // can memoise the dependency on selectedIds.length cheaply.
+  // Issue #71.
+  const [selected, setSelected] = useState<Record<string, true>>({});
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   /**
@@ -122,9 +151,16 @@ export function MediaGrid(props: MediaGridProps): ReactElement {
       setLoading(true);
       setError(null);
       try {
+        const collectionParam =
+          selectedFolder === ALL_NODE_ID || selectedFolder === null
+            ? undefined
+            : selectedFolder === ROOT_NODE_ID
+              ? 'root'
+              : selectedFolder;
         const res = await listMedia({
           type: filter,
           cursor: opts.nextCursor || undefined,
+          collection: collectionParam,
         });
         setItems((prev) => (opts.reset ? res.data : [...prev, ...res.data]));
         setCursor(res.pagination.next_cursor);
@@ -135,7 +171,7 @@ export function MediaGrid(props: MediaGridProps): ReactElement {
         setLoading(false);
       }
     },
-    [filter],
+    [filter, selectedFolder],
   );
 
   // Refetch from page 1 whenever the chip filter changes. We don't
@@ -147,10 +183,13 @@ export function MediaGrid(props: MediaGridProps): ReactElement {
       void fetchPage({ reset: true });
       return;
     }
-    // Filter changed after hydration — reset the list.
+    // Filter or folder selection changed after hydration — reset the
+    // list and clear any pending bulk selection (rows from a previous
+    // view aren't visible any more).
+    setSelected({});
     void fetchPage({ reset: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter]);
+  }, [filter, selectedFolder]);
 
   // Infinite-scroll sentinel. IntersectionObserver is the right
   // primitive here — it fires asynchronously without a scroll handler,
@@ -231,8 +270,49 @@ export function MediaGrid(props: MediaGridProps): ReactElement {
     return out;
   }, [items]);
 
+  const selectedIds = useMemo(() => Object.keys(selected), [selected]);
+
+  const toggleSelected = useCallback((id: string) => {
+    setSelected((prev) => {
+      const next = { ...prev };
+      if (next[id]) delete next[id];
+      else next[id] = true;
+      return next;
+    });
+  }, []);
+
+  // After a bulk op or a drop-to-folder, refresh the grid and clear
+  // the selection. The grid uses the same fetchPage path so the
+  // cursor + filter state stays consistent.
+  const onBulkComplete = useCallback(() => {
+    setSelected({});
+    void fetchPage({ reset: true });
+  }, [fetchPage]);
+
+  const onDragTileStart = useCallback(
+    (e: DragEvent<HTMLAnchorElement>, asset: MediaAsset) => {
+      // Drag the current selection if the dragged tile is in it;
+      // otherwise drag just the single tile. The folder tree reads
+      // the JSON payload from the custom MIME on drop.
+      const ids = selected[asset.id] ? Object.keys(selected) : [asset.id];
+      e.dataTransfer.setData(MEDIA_DRAG_MIME, JSON.stringify(ids));
+      e.dataTransfer.effectAllowed = 'move';
+    },
+    [selected],
+  );
+
   return (
-    <section data-testid="media-grid" className="flex flex-col gap-6">
+    <section
+      data-testid="media-grid"
+      className="flex flex-col lg:flex-row gap-6 items-start"
+    >
+      <FolderTree
+        selectedId={selectedFolder}
+        onSelect={setSelectedFolder}
+        onMediaMoved={onBulkComplete}
+        initialCollections={initialCollections}
+      />
+      <div className="flex-1 min-w-0 flex flex-col gap-6 w-full">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-2">
           <span
@@ -282,6 +362,12 @@ export function MediaGrid(props: MediaGridProps): ReactElement {
       </header>
 
       <UploadDropzone onUploaded={onUploaded} />
+
+      <BulkActions
+        selectedIds={selectedIds}
+        onClear={() => setSelected({})}
+        onComplete={onBulkComplete}
+      />
 
       {error && (
         <p
@@ -341,6 +427,9 @@ export function MediaGrid(props: MediaGridProps): ReactElement {
                 asset={asset}
                 onDelete={(e) => onDeleteClick(e, asset)}
                 deleting={pendingDelete === asset.id}
+                selected={Boolean(selected[asset.id])}
+                onToggleSelect={() => toggleSelected(asset.id)}
+                onDragStart={(e) => onDragTileStart(e, asset)}
               />
             </li>
           ))}
@@ -359,6 +448,7 @@ export function MediaGrid(props: MediaGridProps): ReactElement {
         // above and we don't want to push them off-screen.
         <LoadingState label="Loading more…" data-testid="grid-loading" />
       )}
+      </div>
     </section>
   );
 }
@@ -374,21 +464,67 @@ function MediaTile(props: {
   asset: MediaAsset;
   onDelete: (e: MouseEvent<HTMLButtonElement>) => void;
   deleting: boolean;
+  selected: boolean;
+  onToggleSelect: () => void;
+  onDragStart: (e: DragEvent<HTMLAnchorElement>) => void;
 }): ReactElement {
-  const { asset, onDelete, deleting } = props;
+  const { asset, onDelete, deleting, selected, onToggleSelect, onDragStart } = props;
+  const onCheckboxClick = useCallback(
+    (e: MouseEvent<HTMLLabelElement | HTMLInputElement>) => {
+      // The checkbox sits inside the anchor — stop the navigation
+      // intent so a tick doesn't take us to the detail editor.
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    [],
+  );
+  const onCheckboxChange = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      e.stopPropagation();
+      onToggleSelect();
+    },
+    [onToggleSelect],
+  );
   return (
     <Link
       href={`/media/${encodeURIComponent(asset.id)}`}
+      draggable
+      onDragStart={onDragStart}
       className={[
-        'group block bg-paper-2 border border-border rounded-lg overflow-hidden',
+        'group block bg-paper-2 border rounded-lg overflow-hidden',
         'shadow-xs no-underline text-ink',
         'transition-all duration-[160ms] ease-brand',
         'hover:shadow-md hover:-translate-y-[2px] hover:border-border-strong',
         'focus-visible:outline-none focus-visible:shadow-focus',
+        selected ? 'border-emerald shadow-md' : 'border-border',
       ].join(' ')}
     >
       <div className="relative">
         <MediaPreview asset={asset} />
+
+        {/* Selection checkbox — anchored top-left so the hover */}
+        {/* overlay's edit/delete icons (top-right) don't overlap. */}
+        <label
+          onClick={onCheckboxClick}
+          data-testid={`tile-select-${asset.id}`}
+          className={[
+            'absolute left-2 top-2 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-sm border bg-paper',
+            selected
+              ? 'border-emerald-deep bg-emerald-soft opacity-100'
+              : 'border-border opacity-0 group-hover:opacity-100 focus-within:opacity-100',
+            'transition-opacity duration-[160ms] ease-brand',
+          ].join(' ')}
+        >
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onCheckboxChange}
+            onClick={onCheckboxClick}
+            aria-label={`Select ${asset.filename}`}
+            className="h-3 w-3 cursor-pointer"
+          />
+        </label>
+
         {/* Hover overlay: emerald edit + lavender delete, per spec. */}
         <div
           className={[

@@ -35,6 +35,59 @@ export interface MediaAsset {
   uploader_id: string;
   created_at: string;
   updated_at: string;
+  /** Folder the asset is filed in; omitted for root. Issue #69. */
+  collection_id?: string;
+  /** Lowercase, deduplicated tag list. Never null; defaults to []. Issue #71. */
+  tags: string[];
+}
+
+/**
+ * A media folder, mirrors `collections.Collection` on the Go side.
+ * `path` is the dotted ltree path (e.g. "marketing.2026.q1") — the
+ * admin tree reconstructs the hierarchy by splitting on the dot.
+ */
+export interface MediaCollection {
+  id: string;
+  slug: string;
+  name: string;
+  path: string;
+  parent_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Envelope returned by `GET /admin/media/collections`. */
+export interface CollectionListResponse {
+  data: MediaCollection[];
+}
+
+/**
+ * Body shape for `POST /admin/media/move`. `collection_id` omitted /
+ * null moves the assets to the implicit root.
+ */
+export interface MoveMediaBody {
+  ids: string[];
+  collection_id?: string | null;
+}
+
+/**
+ * Body shape for `POST /admin/media/bulk`. `params` is op-specific.
+ * - delete: no params.
+ * - move:   `{ collection_id?: string | null }`.
+ * - tag:    `{ add?, remove?, set? }` — strings normalised server-side.
+ * - ai-alt: no params.
+ */
+export interface BulkRequest {
+  op: 'delete' | 'move' | 'tag' | 'ai-alt';
+  ids: string[];
+  params?: Record<string, unknown>;
+}
+
+/** Response shape for `POST /admin/media/bulk`. */
+export interface BulkResult {
+  op: string;
+  succeeded: number;
+  failed?: Record<string, string>;
 }
 
 /**

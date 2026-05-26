@@ -330,6 +330,20 @@ func (h *handlers) list(w http.ResponseWriter, r *http.Request, _ policy.Princip
 		return
 	}
 
+	// Optional collection filter. The wire surface accepts "root"
+	// (uncollected media) or a UUID (one folder); absent means "no
+	// filter". We keep "root" rather than overloading the empty
+	// string because a missing query param naturally maps to "no
+	// filter" — matching the rest of the listing endpoints.
+	// Issue #69.
+	if raw := q.Get("collection"); raw != "" {
+		var v string
+		if raw != "root" {
+			v = raw
+		}
+		filter.CollectionID = &v
+	}
+
 	page, err := h.store.List(r.Context(), filter)
 	if err != nil {
 		h.logger.ErrorContext(r.Context(), "admin/media: list failed", slog.Any("err", err))
