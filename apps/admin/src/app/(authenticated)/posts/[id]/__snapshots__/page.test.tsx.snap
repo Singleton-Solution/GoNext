@@ -54,8 +54,13 @@ exports[`Post detail page > matches the page-head snapshot 1`] = `
       </p>
     </div>
     <div
-      class="flex gap-2"
+      class="flex items-center gap-3"
     >
+      <span
+        class="text-xs text-fg-subtle"
+      >
+        Autosave: idle
+      </span>
       <a
         class="inline-flex items-center justify-center gap-[6px] whitespace-nowrap rounded-md font-display font-bold transition-shadow duration-[160ms] ease-brand focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 bg-paper-2 text-ink border border-border shadow-xs hover:bg-paper-3 hover:border-border-strong px-4 py-[9px] text-sm"
         href="/posts"
@@ -64,6 +69,7 @@ exports[`Post detail page > matches the page-head snapshot 1`] = `
       </a>
       <button
         class="inline-flex items-center justify-center gap-[6px] whitespace-nowrap rounded-md font-display font-bold transition-shadow duration-[160ms] ease-brand focus-visible:outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 bg-emerald text-emerald-ink border border-emerald shadow-xs hover:bg-emerald-deep hover:text-paper hover:border-emerald-deep px-4 py-[9px] text-sm"
+        data-testid="post-save"
       >
         <svg
           aria-hidden="true"

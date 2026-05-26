@@ -13,7 +13,7 @@ import { render, screen } from '@testing-library/react';
 import SettingsOverviewPage from './page';
 
 describe('SettingsOverviewPage', () => {
-  it('renders four cards linking to each settings group', () => {
+  it('renders cards linking to each settings group', () => {
     render(<SettingsOverviewPage />);
 
     const expected: Array<[label: string, href: string]> = [
@@ -21,6 +21,7 @@ describe('SettingsOverviewPage', () => {
       ['Reading', '/settings/reading'],
       ['Writing', '/settings/writing'],
       ['Permalinks', '/settings/permalinks'],
+      ['Account', '/settings/account'],
     ];
 
     for (const [label, href] of expected) {
@@ -30,10 +31,10 @@ describe('SettingsOverviewPage', () => {
     }
   });
 
-  it('exposes exactly four cards in the grid', () => {
+  it('exposes the expected number of cards in the grid', () => {
     render(<SettingsOverviewPage />);
     const grid = screen.getByTestId('settings-overview-grid');
     const cards = grid.querySelectorAll('a');
-    expect(cards).toHaveLength(4);
+    expect(cards).toHaveLength(5);
   });
 });

@@ -38,6 +38,11 @@ const CARDS: readonly SettingsCard[] = [
     title: 'Permalinks',
     body: 'URL structure for posts and pages.',
   },
+  {
+    href: '/settings/account',
+    title: 'Account',
+    body: 'Passkeys, password, and sign-in security.',
+  },
 ];
 
 export default function SettingsOverviewPage(): ReactElement {
