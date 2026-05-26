@@ -143,6 +143,39 @@ func (h *handlers) submit(w http.ResponseWriter, r *http.Request) {
 		AuthorUserAgent: r.Header.Get("User-Agent"),
 	}
 
+	// Duplicate-content gate. The fingerprint is normalised content
+	// SHA-256; same IP + same fingerprint within dupWindow drops the
+	// row at 422. Anonymous submissions only — logged-in users are
+	// trusted to know whether they meant to repost.
+	if h.dup != nil && !loggedIn && ip != "" {
+		fp := contentFingerprint(content)
+		if dup, err := h.dup.DuplicateContent(r.Context(), ip, fp, dupWindow); err == nil && dup {
+			router.WriteError(w, http.StatusUnprocessableEntity, "duplicate_content",
+				"identical content was submitted from this IP recently")
+			return
+		}
+	}
+
+	// pre_submit hook chain. Plugins may mutate the input, reject
+	// the row, or stamp a moderation verdict that overrides the
+	// classifier. The handler treats:
+	//   verdict.Status non-empty → use it as initialStatus.
+	//   ErrCommentRejected      → 422.
+	//   any other error         → 400 with the error message.
+	verdict, hookErr := h.runPreSubmit(r.Context(), &in)
+	if hookErr != nil {
+		if errors.Is(hookErr, ErrCommentRejected) {
+			router.WriteError(w, http.StatusUnprocessableEntity, "rejected",
+				"comment was rejected by a moderation plugin")
+			return
+		}
+		router.WriteError(w, http.StatusBadRequest, "pre_submit_error", hookErr.Error())
+		return
+	}
+	if verdict.Status != "" {
+		initialStatus = verdict.Status
+	}
+
 	// Best-effort post existence check before we record an IP
 	// submission. We want the IP rate limiter to count
 	// successful-ish submissions, not 404s.

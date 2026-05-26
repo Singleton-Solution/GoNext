@@ -79,6 +79,18 @@ type Deps struct {
 	// CurrentDisplayName, when non-nil, returns the logged-in user's
 	// display name. Mirrors the admin package's wiring point.
 	CurrentDisplayName func(*http.Request) string
+
+	// Hooks, when non-nil, is the filter-bus the submit handler
+	// fires the pre_submit hook through. Plugins register on
+	// rest.comments.pre_submit to mutate, reject, or stamp a
+	// moderation verdict on a candidate row before it lands.
+	// nil disables the hook (the default code path runs).
+	Hooks HookBus
+
+	// DupChecker, when non-nil, is consulted to drop duplicate
+	// content from the same IP inside a short window. Typically
+	// the same object as Store (the MemoryStore implements both).
+	DupChecker DupChecker
 }
 
 func (d Deps) validate() error {
@@ -96,6 +108,14 @@ type handlers struct {
 	now            func() time.Time
 	currentUID     func(*http.Request) string
 	currentDisplay func(*http.Request) string
+
+	// hooks is the optional filter bus invoked from submit() before
+	// the row hits the store. nil disables the chain.
+	hooks HookBus
+
+	// dup is the optional duplicate-content gate. nil falls through
+	// to the legacy code path (rate-limit + classify only).
+	dup DupChecker
 
 	// ipMu guards the in-process IP rate-limit table. The table is
 	// non-authoritative — it's a best-effort throttle for the case
@@ -151,6 +171,8 @@ func mountForTest(mux *http.ServeMux, base string, deps Deps) (*handlers, error)
 		now:            deps.Now,
 		currentUID:     deps.CurrentUserID,
 		currentDisplay: deps.CurrentDisplayName,
+		hooks:          deps.Hooks,
+		dup:            deps.DupChecker,
 		ips:            make(map[string][]time.Time),
 	}
 

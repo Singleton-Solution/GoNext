@@ -42,6 +42,8 @@ func MountGlobal(mux *http.ServeMux, base string, deps Deps) error {
 		store:  deps.Store,
 		logger: deps.Logger,
 		now:    deps.Now,
+		hooks:  deps.Hooks,
+		dup:    deps.DupChecker,
 	}
 	base = strings.TrimRight(base, "/")
 	mux.Handle("GET "+base, http.HandlerFunc(h.globalList))
