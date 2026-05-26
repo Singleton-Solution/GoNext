@@ -14,6 +14,7 @@ import (
 	"github.com/Singleton-Solution/GoNext/cli/gonext/cmd/bench"
 	cmdconfig "github.com/Singleton-Solution/GoNext/cli/gonext/cmd/config"
 	initcmd "github.com/Singleton-Solution/GoNext/cli/gonext/cmd/init"
+	"github.com/Singleton-Solution/GoNext/cli/gonext/cmd/jobs"
 	"github.com/Singleton-Solution/GoNext/cli/gonext/cmd/migrate"
 	"github.com/Singleton-Solution/GoNext/cli/gonext/cmd/plugin"
 	"github.com/Singleton-Solution/GoNext/cli/gonext/cmd/revisions"
@@ -50,6 +51,8 @@ func main() {
 		os.Exit(bench.RunOS(args[1:]))
 	case args[0] == "audit":
 		os.Exit(audit.RunOS(args[1:]))
+	case args[0] == "jobs":
+		os.Exit(jobs.RunOS(args[1:]))
 	default:
 		fmt.Fprintf(os.Stderr, "gonext: unknown command %q\n\n%s\n", args[0], usage)
 		os.Exit(2)
@@ -75,9 +78,11 @@ Commands (planned):
 
 Available now:
   audit verify      Walk the audit_log HMAC chain and report tampering
+  audit tail        Stream the last N audit events (optionally --follow)
   bench             Run synthetic load against a GoNext install
   config dump       Print the effective configuration with secrets masked
   init              First-run bootstrap: schema + theme + admin user
+  jobs              Inspect queues, failed tasks, DLQ, and cron schedules
   migrate           Apply / roll back / inspect database migrations
   plugin test       Run the plugin contract checks against a bundle
   theme test        Run the theme contract suite against a theme on disk
