@@ -8,6 +8,13 @@
  * CapabilityReview.tsx) — we deliberately don't duplicate the
  * consent surface so a manifest's capability description reads the
  * same regardless of how the operator reached this screen.
+ *
+ * Brand
+ * =====
+ * Headline uses the brand's italic-accent pattern: "Install <name>." —
+ * the listing name swaps to Instrument Serif italic. Crumb + lead
+ * share the emerald-deep underline and Geist muted lead used across
+ * the marketplace surface.
  */
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -20,6 +27,26 @@ import { InstallConfirm } from './InstallConfirm';
 import type { PluginManifest } from '../../../plugins/types';
 
 export const dynamic = 'force-dynamic';
+
+const backLinkStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 4,
+  marginBottom: 18,
+  fontFamily: 'var(--font-sans)',
+  fontSize: 'var(--t-sm)',
+  color: 'var(--emerald-deep)',
+  textDecoration: 'underline',
+  textDecorationColor: 'var(--emerald-soft)',
+  textUnderlineOffset: 3,
+} as const;
+
+const leadLinkStyle = {
+  color: 'var(--emerald-deep)',
+  textDecoration: 'underline',
+  textDecorationColor: 'var(--emerald-soft)',
+  textUnderlineOffset: 3,
+} as const;
 
 /**
  * Light-touch parse of the version's manifest JSON into the shape the
@@ -79,10 +106,23 @@ export default async function MarketplaceInstallPage({
     if (error === 'not_found') notFound();
     return (
       <section>
-        <p style={{ marginBottom: 12 }}>
-          <Link href="/marketplace">← Back to marketplace</Link>
-        </p>
-        <div role="alert">Couldn’t load listing ({error ?? 'unknown'}).</div>
+        <Link href="/marketplace" style={backLinkStyle}>
+          ← Back to marketplace
+        </Link>
+        <div
+          role="alert"
+          style={{
+            padding: '12px 14px',
+            background: 'var(--warning-soft)',
+            color: 'var(--warning)',
+            border: '1px solid var(--warning-soft)',
+            borderRadius: 'var(--r-md)',
+            fontFamily: 'var(--font-sans)',
+            fontSize: 'var(--t-sm)',
+          }}
+        >
+          Couldn&apos;t load listing ({error ?? 'unknown'}).
+        </div>
       </section>
     );
   }
@@ -91,27 +131,40 @@ export default async function MarketplaceInstallPage({
 
   return (
     <section>
-      <p style={{ marginBottom: 12 }}>
-        <Link href={`/marketplace/${encodeURIComponent(slug)}`}>
-          ← Back to {listing.name}
-        </Link>
-      </p>
-      <h1 style={{ marginTop: 0, fontSize: 22, fontWeight: 600 }}>
-        Install {listing.name}
-      </h1>
-      <p
-        style={{
-          margin: '4px 0 20px',
-          color: 'var(--color-text-muted, #6b7280)',
-          fontSize: 14,
-          maxWidth: 720,
-        }}
+      <Link
+        href={`/marketplace/${encodeURIComponent(slug)}`}
+        style={backLinkStyle}
       >
-        Review the capabilities this plugin requests. The host applies
-        these grants once the install completes; you can revoke them at
-        any time from the{' '}
-        <Link href="/plugins">plugins list</Link> by uninstalling.
-      </p>
+        ← Back to {listing.name}
+      </Link>
+      <header style={{ marginBottom: 28 }}>
+        <span className="eyebrow">Capability review</span>
+        <h1
+          className="h1"
+          style={{
+            margin: '8px 0 0',
+            fontSize: 'clamp(36px, 4.5vw, 52px)',
+            lineHeight: 0.95,
+          }}
+        >
+          Install <em className="italic-accent">{listing.name}</em>.
+        </h1>
+        <p
+          className="lead"
+          style={{
+            margin: '12px 0 0',
+            maxWidth: 640,
+          }}
+        >
+          Review the capabilities this plugin requests. The host applies
+          these grants once the install completes; you can revoke them at
+          any time from the{' '}
+          <Link href="/plugins" style={leadLinkStyle}>
+            plugins list
+          </Link>{' '}
+          by uninstalling.
+        </p>
+      </header>
       <InstallConfirm
         slug={listing.slug}
         listingName={listing.name}

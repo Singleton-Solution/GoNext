@@ -11,6 +11,14 @@
  *   - true: keyboard- and mouse-accessible radiogroup; each slot fires
  *     `onChange` with the chosen integer.
  *
+ * Brand
+ * =====
+ * Stars are `--emerald-deep` on cream — the "alive" green that runs
+ * across the marketplace surface. Empty slots stay at `--fg-faint` so
+ * the relative fill is legible at a glance. The trailing rating count
+ * is rendered in monospace so the per-card foot row aligns vertically
+ * across the grid.
+ *
  * Why a single component for both modes: the visual treatment is
  * identical and downstream code wants to use the same "stars look"
  * for the listing grid card AND the rating-submission form. Splitting
@@ -29,14 +37,17 @@ const styles: Record<string, CSSProperties> = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 2,
-    color: '#f59e0b',
-    fontSize: 16,
+    color: 'var(--emerald-deep)',
+    fontSize: 14,
     lineHeight: 1,
   },
   star: {
     display: 'inline-block',
     width: '1.1em',
     textAlign: 'center',
+  },
+  starEmpty: {
+    color: 'var(--fg-faint)',
   },
   button: {
     background: 'transparent',
@@ -50,8 +61,9 @@ const styles: Record<string, CSSProperties> = {
   },
   count: {
     marginLeft: 6,
-    color: 'var(--color-text-muted, #6b7280)',
-    fontSize: 13,
+    fontFamily: 'var(--font-mono)',
+    color: 'var(--fg-subtle)',
+    fontSize: 'var(--t-xs)',
   },
 };
 
@@ -88,7 +100,11 @@ export function RatingStars({
         data-testid="rating-stars-display"
       >
         {[1, 2, 3, 4, 5].map((n) => (
-          <span key={n} aria-hidden="true" style={styles.star}>
+          <span
+            key={n}
+            aria-hidden="true"
+            style={n <= rounded ? styles.star : { ...styles.star, ...styles.starEmpty }}
+          >
             {n <= rounded ? '★' : '☆'}
           </span>
         ))}
@@ -115,7 +131,11 @@ export function RatingStars({
           role="radio"
           aria-checked={n === rounded}
           aria-label={`${n} star${n === 1 ? '' : 's'}`}
-          style={styles.button}
+          style={
+            n <= rounded
+              ? styles.button
+              : { ...styles.button, color: 'var(--fg-faint)' }
+          }
           onClick={() => onChange?.(n)}
         >
           {n <= rounded ? '★' : '☆'}

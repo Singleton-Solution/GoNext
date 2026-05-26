@@ -11,6 +11,14 @@
  * We intentionally don't fan out to the API client-side: keeping the
  * fetch on the server keeps cookie forwarding straightforward and
  * lets server data take precedence over stale client state.
+ *
+ * Brand
+ * =====
+ * Search lives inside a cream `--paper-2` shell with an emerald focus
+ * halo (`--sh-focus`). Category chips toggle to emerald when active —
+ * the "alive" affordance for an applied filter. Sort chips swap to a
+ * solid ink fill (the "primary" accent) so the two chip rows don't
+ * fight each other for emphasis.
  */
 
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -30,45 +38,75 @@ const styles: Record<string, CSSProperties> = {
     gap: 12,
     alignItems: 'center',
     flexWrap: 'wrap',
-    marginBottom: 16,
+    marginBottom: 24,
   },
   search: {
     flex: '1 1 240px',
-    padding: '8px 10px',
-    border: '1px solid var(--color-border, #e4e6ea)',
-    borderRadius: 6,
-    fontSize: 14,
+    padding: '10px 12px',
+    background: 'var(--paper-2)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--r-md)',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--t-sm)',
+    color: 'var(--ink)',
+    outline: 'none',
+    transition:
+      'background var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease)',
+  },
+  chipsLabel: {
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--t-xs)',
+    color: 'var(--fg-subtle)',
+    fontWeight: 500,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+    marginRight: 4,
   },
   chips: {
     display: 'inline-flex',
     gap: 6,
     flexWrap: 'wrap',
+    alignItems: 'center',
   },
   chip: {
-    padding: '4px 10px',
-    border: '1px solid var(--color-border, #e4e6ea)',
-    borderRadius: 999,
-    background: '#ffffff',
-    fontSize: 12,
+    padding: '5px 12px',
+    background: 'var(--paper-2)',
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: 'var(--border)',
+    borderRadius: 'var(--r-pill)',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--t-xs)',
+    fontWeight: 500,
+    color: 'var(--fg-muted)',
     cursor: 'pointer',
-    color: 'var(--color-text, #1c2024)',
+    transition:
+      'background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease)',
   },
-  chipActive: {
-    background: '#3730a3',
-    color: '#ffffff',
-    borderColor: '#3730a3',
+  chipActiveEmerald: {
+    background: 'var(--emerald-soft)',
+    color: 'var(--emerald-deep)',
+    borderColor: 'var(--emerald-soft)',
+  },
+  chipActiveInk: {
+    background: 'var(--ink)',
+    color: 'var(--paper)',
+    borderColor: 'var(--ink)',
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-    gap: 16,
+    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+    gap: 18,
   },
   empty: {
-    padding: 32,
-    border: '1px dashed var(--color-border, #e4e6ea)',
-    borderRadius: 8,
+    padding: 48,
+    background: 'var(--paper-2)',
+    border: '1px dashed var(--border)',
+    borderRadius: 'var(--r-lg)',
     textAlign: 'center',
-    color: 'var(--color-text-muted, #6b7280)',
+    color: 'var(--fg-muted)',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--t-sm)',
   },
 };
 
@@ -147,16 +185,17 @@ export function MarketplaceClient({
           type="search"
           value={q}
           onChange={onSearch}
-          placeholder="Search plugins…"
+          placeholder="Search 1,240+ themes & extensions"
           aria-label="Search the marketplace"
           style={styles.search}
         />
         <div style={styles.chips} role="group" aria-label="Filter by category">
+          <span style={styles.chipsLabel}>Category</span>
           <button
             type="button"
             style={
               category === ''
-                ? { ...styles.chip, ...styles.chipActive }
+                ? { ...styles.chip, ...styles.chipActiveEmerald }
                 : styles.chip
             }
             aria-pressed={category === ''}
@@ -173,7 +212,7 @@ export function MarketplaceClient({
               key={c}
               style={
                 category === c
-                  ? { ...styles.chip, ...styles.chipActive }
+                  ? { ...styles.chip, ...styles.chipActiveEmerald }
                   : styles.chip
               }
               aria-pressed={category === c}
@@ -187,13 +226,14 @@ export function MarketplaceClient({
           ))}
         </div>
         <div style={styles.chips} role="group" aria-label="Sort listings">
+          <span style={styles.chipsLabel}>Sort</span>
           {SORT_OPTIONS.map((opt) => (
             <button
               type="button"
               key={opt.value}
               style={
                 sort === opt.value
-                  ? { ...styles.chip, ...styles.chipActive }
+                  ? { ...styles.chip, ...styles.chipActiveInk }
                   : styles.chip
               }
               aria-pressed={sort === opt.value}

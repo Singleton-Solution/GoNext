@@ -34,12 +34,18 @@ describe('PluginStatusBadge', () => {
         <PluginStatusBadge state="errored" />
       </div>,
     );
-    const active = screen.getByText(/^active$/i);
-    const errored = screen.getByText(/^errored$/i);
-    expect((active as HTMLElement).style.backgroundColor).toBeTruthy();
-    expect((errored as HTMLElement).style.backgroundColor).toBeTruthy();
-    expect((active as HTMLElement).style.backgroundColor).not.toBe(
-      (errored as HTMLElement).style.backgroundColor,
-    );
+    // Brand tokens land as CSS variables, which jsdom's style parser
+    // can't resolve to a concrete colour. Assert the per-state styling
+    // diverges via the (unparsed) `background` shorthand string and
+    // the data-state attribute the badge carries.
+    const active = screen
+      .getByLabelText(/status: active/i) as HTMLElement;
+    const errored = screen
+      .getByLabelText(/status: errored/i) as HTMLElement;
+    expect(active.dataset.state).toBe('active');
+    expect(errored.dataset.state).toBe('errored');
+    expect(active.style.background).toBeTruthy();
+    expect(errored.style.background).toBeTruthy();
+    expect(active.style.background).not.toBe(errored.style.background);
   });
 });
