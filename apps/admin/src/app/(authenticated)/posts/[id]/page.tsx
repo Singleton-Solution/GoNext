@@ -1,28 +1,25 @@
 /**
- * Post detail / edit-metadata — the meta-data side of the post-edit
- * surface. The block editor (which lives inside the same route in
- * v0.3 / N3) opens in a dedicated layout — this page covers the
- * metadata-only edit surface: title, slug, status, scheduling,
- * categories, SEO blurb.
+ * Post detail / edit screen (issue #35).
  *
- * Brand treatment ("Living systems"): 1fr / 320px split. The left
- * column carries the editable title (Headline display-type), slug
- * input, and an excerpt textarea on cream paper. The right column
- * is a sidebar inspector — Geist label / Geist Mono value pairs
- * with emerald accents on status pills and a publish CTA at the
- * bottom. Pattern mirrors the right inspector from
- * `docs/design/ui_kits/editor/index.html`.
+ * Layout: 1fr / 320px split. Left column carries the title input,
+ * slug input, status dropdown, and the BlockEditCanvas hosting the
+ * editor. Right column is the inspector sidebar (status, schedule,
+ * SEO).
  *
- * The page is intentionally a thin client component for now: it
- * renders the inspector UI without wiring back to the API. The save
- * action stubs to console; real wiring lands once the PATCH endpoint
- * (issue #76) ships. The architectural goal here is to land the
- * brand surface so subsequent feature PRs can hang real data on it.
+ * The block editor is driven by `useAutosave` from
+ * `packages/ts/blocks-editor/src/autosave` — every change is debounced
+ * + autosaved against /api/v1/posts/{id}/autosave. The "Save changes"
+ * button on top of the page promotes the autosave content into the
+ * canonical row via PATCH /api/v1/posts/{id}.
+ *
+ * Brand treatment ("Living systems") is preserved from the previous
+ * stub; the editor lives inside a paper-2 card under the title input
+ * so the surface remains coherent.
  */
 'use client';
 
 import type { ReactElement } from 'react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
@@ -30,17 +27,34 @@ import {
   ChevronLeft,
   Eye,
   Globe,
+  Loader2,
   Save,
   Tag,
   User,
 } from 'lucide-react';
+import {
+  BlockEditCanvas,
+  defaultCoreBlocks,
+  useAutosave,
+} from '@gonext/blocks-editor';
+import { BlockRegistry } from '@gonext/blocks-sdk';
+import type { BlockTree } from '@gonext/blocks-sdk';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Headline } from '@/components/ui/headline';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { api } from '@/lib/api-client';
 
 type PostStatus = 'draft' | 'publish' | 'future' | 'private';
+
+interface UpdatePostBody {
+  title?: string;
+  slug?: string;
+  status?: PostStatus;
+  content_blocks?: BlockTree;
+}
 
 export default function PostDetailPage(): ReactElement {
   const params = useParams<{ id: string }>();
@@ -50,10 +64,50 @@ export default function PostDetailPage(): ReactElement {
   const [slug, setSlug] = useState('untitled-post');
   const [excerpt, setExcerpt] = useState('');
   const [status, setStatus] = useState<PostStatus>('draft');
+  const [blocks, setBlocks] = useState<BlockTree>([]);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Build the registry once per page mount. defaultCoreBlocks
+  // registers paragraph + heading; subsequent blocks ship from the
+  // plugin layer.
+  const registry = useMemo(() => {
+    const r = new BlockRegistry();
+    defaultCoreBlocks(r);
+    return r;
+  }, []);
+
+  // Autosave wires through to /api/v1/posts/{postId}/autosave with the
+  // 30s debounced default. The hook returns a status pip we surface in
+  // the toolbar so the user knows their work is safe.
+  const autosave = useAutosave(postId, blocks);
+
+  const onSave = async () => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const body: UpdatePostBody = {
+        title,
+        slug,
+        status,
+        content_blocks: blocks,
+      };
+      // The API enforces If-Match for optimistic concurrency; this
+      // page is the first to PATCH, so we leave the header absent
+      // and let the next iteration populate it from the load
+      // response. In the meantime the autosave path is the
+      // failure-resistant write — this button just promotes it.
+      await api.patch<unknown>(`/api/v1/posts/${encodeURIComponent(postId)}`, body);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <section data-testid="post-detail" className="flex flex-col gap-6">
-      {/* ─── Crumb + page head ─── */}
+      {/* Crumb + page head */}
       <div className="flex flex-col gap-3">
         <Link
           href="/posts"
@@ -72,29 +126,40 @@ export default function PostDetailPage(): ReactElement {
               <span className="font-mono text-xs">#{postId}</span>
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-3">
+            <AutosaveStatusPip status={autosave.status} error={autosave.error} />
             <Button variant="default" asChild>
               <Link href="/posts">Cancel</Link>
             </Button>
             <Button
               variant="emerald"
-              onClick={() => {
-                // Stubbed save — wiring lands with the PATCH endpoint.
-                // eslint-disable-next-line no-console
-                console.log('[post-detail] save', { postId, title, slug, status });
-              }}
+              onClick={() => void onSave()}
+              disabled={saving}
+              data-testid="post-save"
             >
-              <Save aria-hidden="true" width={14} height={14} />
-              Save changes
+              {saving ? (
+                <Loader2 aria-hidden="true" width={14} height={14} className="animate-spin" />
+              ) : (
+                <Save aria-hidden="true" width={14} height={14} />
+              )}
+              {saving ? 'Saving…' : 'Save changes'}
             </Button>
           </div>
         </div>
+        {saveError ? (
+          <p
+            role="alert"
+            className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+            data-testid="post-save-error"
+          >
+            {saveError}
+          </p>
+        ) : null}
       </div>
 
-      {/* ─── Body — 1fr / 320px split ─── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
-        {/* Main editor column */}
         <div className="flex flex-col gap-5">
+          {/* Title + slug + excerpt + status */}
           <div className="rounded-lg border border-border bg-paper-2 p-6 shadow-xs">
             <div className="flex flex-col gap-2">
               <Label htmlFor="post-title" className="text-fg-subtle">
@@ -139,30 +204,77 @@ export default function PostDetailPage(): ReactElement {
                 className="rounded-md border border-border bg-paper p-3 font-sans text-sm text-ink outline-none transition-colors placeholder:text-fg-faint focus:border-emerald focus:shadow-focus"
               />
             </div>
+
+            <div className="mt-5 flex flex-col gap-2">
+              <Label htmlFor="status-select" className="text-fg-subtle">
+                Status
+              </Label>
+              <select
+                id="status-select"
+                value={status}
+                onChange={(e) => setStatus(e.target.value as PostStatus)}
+                className="rounded-md border border-border bg-paper px-3 py-2 font-sans text-sm text-ink transition-colors focus:border-emerald focus:shadow-focus focus:outline-none"
+                data-testid="post-status"
+              >
+                <option value="draft">Draft</option>
+                <option value="publish">Publish</option>
+                <option value="future">Scheduled</option>
+                <option value="private">Private</option>
+              </select>
+            </div>
           </div>
 
-          <div className="rounded-lg border border-border bg-paper-2 p-6 shadow-xs">
+          {/* Block editor canvas */}
+          <div
+            className="rounded-lg border border-border bg-paper-2 p-6 shadow-xs"
+            data-testid="post-editor"
+          >
             <Headline as="h2" size="sub" className="text-xl">
               Block <em>editor</em>.
             </Headline>
             <p className="mt-2 text-sm text-fg-muted">
-              The block editor opens in a focus mode — title and body live
-              there. This metadata surface stays here for quick edits.
+              Compose your post by adding blocks below. Changes are
+              autosaved every 30 seconds; "Save changes" promotes the
+              autosave to the canonical row.
             </p>
-            <Button variant="default" className="mt-4" asChild>
-              <Link href={`/posts/${postId}/edit`}>
-                Open block editor →
-              </Link>
-            </Button>
+            <div className="mt-5 border-t border-border pt-5">
+              <BlockEditCanvas
+                registry={registry}
+                blocks={blocks}
+                context={{ postId }}
+                loadingFallback={
+                  <div className="flex items-center gap-2 text-sm text-fg-muted">
+                    <Loader2 width={14} height={14} className="animate-spin" />
+                    Loading block…
+                  </div>
+                }
+              />
+              {blocks.length === 0 ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setBlocks([
+                      {
+                        type: 'paragraph',
+                        attributes: { text: '' },
+                      },
+                    ])
+                  }
+                  className="mt-4 inline-flex items-center gap-1.5 rounded-md border border-dashed border-border bg-paper px-3 py-2 text-xs font-medium text-fg-muted transition-colors hover:border-emerald hover:text-emerald-deep"
+                  data-testid="post-add-block"
+                >
+                  + Add your first block
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
 
-        {/* ─── Sidebar inspector ─── */}
+        {/* Sidebar inspector */}
         <aside
           className="flex flex-col gap-4"
           aria-label="Post metadata inspector"
         >
-          {/* Status panel */}
           <div className="rounded-lg border border-border bg-paper-2 shadow-xs">
             <div className="border-b border-border px-5 py-3">
               <h3 className="font-sans text-sm font-semibold text-ink">
@@ -174,42 +286,19 @@ export default function PostDetailPage(): ReactElement {
                 <span className="text-xs font-medium text-fg-subtle">
                   Current
                 </span>
-                {status === 'publish' ? (
-                  <Badge variant="success" dot>
-                    Published
-                  </Badge>
-                ) : status === 'future' ? (
-                  <Badge variant="lavender" dot>
-                    Scheduled
-                  </Badge>
-                ) : status === 'private' ? (
-                  <Badge variant="ink" dot>
-                    Private
-                  </Badge>
-                ) : (
-                  <Badge dot>Draft</Badge>
-                )}
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="status-select" className="text-fg-subtle">
-                  Change to
-                </Label>
-                <select
-                  id="status-select"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as PostStatus)}
-                  className="rounded-md border border-border bg-paper px-3 py-2 font-sans text-sm text-ink transition-colors focus:border-emerald focus:shadow-focus focus:outline-none"
-                >
-                  <option value="draft">Draft</option>
-                  <option value="publish">Publish now</option>
-                  <option value="future">Schedule</option>
-                  <option value="private">Private</option>
-                </select>
+                <Badge dot variant={status === 'publish' ? 'success' : status === 'future' ? 'lavender' : status === 'private' ? 'ink' : 'default'}>
+                  {status === 'publish'
+                    ? 'Published'
+                    : status === 'future'
+                      ? 'Scheduled'
+                      : status === 'private'
+                        ? 'Private'
+                        : 'Draft'}
+                </Badge>
               </div>
             </div>
           </div>
 
-          {/* Schedule panel */}
           <div className="rounded-lg border border-border bg-paper-2 shadow-xs">
             <div className="border-b border-border px-5 py-3">
               <h3 className="font-sans text-sm font-semibold text-ink">
@@ -222,9 +311,7 @@ export default function PostDetailPage(): ReactElement {
                   <Calendar aria-hidden="true" width={13} height={13} />
                   Created
                 </span>
-                <span className="font-mono text-xs text-ink-soft">
-                  2026-05-25 09:14
-                </span>
+                <span className="font-mono text-xs text-ink-soft">—</span>
               </li>
               <li className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-2 text-xs font-medium text-fg-subtle">
@@ -232,7 +319,9 @@ export default function PostDetailPage(): ReactElement {
                   Updated
                 </span>
                 <span className="font-mono text-xs text-ink-soft">
-                  Just now
+                  {autosave.lastSavedAt
+                    ? autosave.lastSavedAt.toLocaleTimeString()
+                    : '—'}
                 </span>
               </li>
               <li className="flex items-center justify-between">
@@ -247,12 +336,11 @@ export default function PostDetailPage(): ReactElement {
                   <User aria-hidden="true" width={13} height={13} />
                   Author
                 </span>
-                <span className="text-xs text-ink-soft">Mara Wills</span>
+                <span className="text-xs text-ink-soft">You</span>
               </li>
             </ul>
           </div>
 
-          {/* Tags panel */}
           <div className="rounded-lg border border-border bg-paper-2 shadow-xs">
             <div className="border-b border-border px-5 py-3">
               <h3 className="font-sans text-sm font-semibold text-ink">
@@ -265,20 +353,11 @@ export default function PostDetailPage(): ReactElement {
                   <Tag aria-hidden="true" width={10} height={10} />
                   coffee
                 </Badge>
-                <Badge variant="emerald">
-                  <Tag aria-hidden="true" width={10} height={10} />
-                  brewing
-                </Badge>
-                <Badge variant="default">
-                  <Tag aria-hidden="true" width={10} height={10} />
-                  long-read
-                </Badge>
               </div>
               <Input placeholder="Add a tag…" />
             </div>
           </div>
 
-          {/* SEO panel */}
           <div className="rounded-lg border border-border bg-paper-2 shadow-xs">
             <div className="border-b border-border px-5 py-3">
               <h3 className="font-sans text-sm font-semibold text-ink">
@@ -311,5 +390,45 @@ export default function PostDetailPage(): ReactElement {
         </aside>
       </div>
     </section>
+  );
+}
+
+interface AutosaveStatusPipProps {
+  status: 'idle' | 'saving' | 'saved' | 'error';
+  error: string | null;
+}
+
+/**
+ * AutosaveStatusPip — tiny inline indicator next to the Save button.
+ * Mirrors the AutosaveIndicator component shipped by the blocks-
+ * editor package; we render it ourselves here so the visual idiom
+ * matches the rest of the page-head row.
+ */
+function AutosaveStatusPip({ status, error }: AutosaveStatusPipProps): ReactElement {
+  if (status === 'idle') {
+    return <span className="text-xs text-fg-subtle">Autosave: idle</span>;
+  }
+  if (status === 'saving') {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-fg-muted">
+        <Loader2 width={11} height={11} className="animate-spin" />
+        Autosaving…
+      </span>
+    );
+  }
+  if (status === 'saved') {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-emerald-deep">
+        Autosaved
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-xs text-amber-700"
+      title={error ?? undefined}
+    >
+      Autosave failed
+    </span>
   );
 }

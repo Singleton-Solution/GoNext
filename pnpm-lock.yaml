@@ -14,6 +14,12 @@ importers:
 
   apps/admin:
     dependencies:
+      '@gonext/blocks-editor':
+        specifier: workspace:*
+        version: link:../../packages/ts/blocks-editor
+      '@gonext/blocks-sdk':
+        specifier: workspace:*
+        version: link:../../packages/ts/blocks-sdk
       '@radix-ui/react-avatar':
         specifier: ^1.1.2
         version: 1.1.11(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
