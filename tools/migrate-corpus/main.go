@@ -36,6 +36,9 @@ Usage:
 Subcommands:
   generate   Produce a fresh corpus on disk.
   verify     Re-parse a generated corpus and assert well-formedness.
+  assert     Run gonext migrate wp --dry-run against every fixture under
+             fixtures/wxr and compare against fixtures/expected. Used by
+             the migrate-corpus CI workflow.
 
 Run ` + "`gonext-corpus <subcommand> -h`" + ` for subcommand-specific flags.
 `
@@ -57,6 +60,11 @@ func main() {
 	case "verify":
 		if err := runVerify(args); err != nil {
 			fmt.Fprintf(os.Stderr, "verify: %v\n", err)
+			os.Exit(1)
+		}
+	case "assert":
+		if err := runAssert(args); err != nil {
+			fmt.Fprintf(os.Stderr, "assert: %v\n", err)
 			os.Exit(1)
 		}
 	case "-h", "--help", "help":

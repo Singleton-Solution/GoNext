@@ -47,6 +47,7 @@ import {
   FileText,
   Gauge,
   ImageIcon,
+  Import,
   Layout,
   LineChart,
   LogOut,
@@ -81,8 +82,8 @@ interface NavSection {
  *   • Workspace — overview + pulse (the brand's analytics surface).
  *   • Content   — posts, pages, media, comments, users (CRUD).
  *   • Studio    — appearance, customizer, marketplace, plugins,
- *                 redirects, search, settings + operator surfaces
- *                 (status, performance).
+ *                 redirects, migration, search, settings.
+ *   • Operator  — status, performance.
  * Counts are cosmetic placeholders until the real aggregate endpoint
  * lands — see issue #76.
  */
@@ -111,6 +112,9 @@ const NAV_SECTIONS: readonly NavSection[] = [
       { href: '/marketplace', label: 'Marketplace', Icon: Store },
       { href: '/plugins', label: 'Plugins', Icon: Plug },
       { href: '/redirects', label: 'Redirects', Icon: CornerDownRight },
+      // Migration wizard — one-shot WordPress import surface (#234).
+      // Sits next to Redirects (shared URL-preservation concern).
+      { href: '/migrate', label: 'Migration', Icon: Import },
       { href: '/search', label: 'Search', Icon: Search },
       { href: '/settings', label: 'Settings', Icon: Settings },
     ],
