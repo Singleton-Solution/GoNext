@@ -146,6 +146,13 @@ type Manager struct {
 	now         func() time.Time
 	dependGate  *depends.Gate
 	breaker     *Breaker
+
+	// Versioned-update fields (issue #63). nil/zero unless the Manager
+	// was constructed with EnableVersionedUpdates. See update.go.
+	versionLog   VersionLog
+	drainTracker *drainTracker
+	retainFor    time.Duration
+	drainTimeout time.Duration
 }
 
 // ManagerOption configures a Manager at construction time. Functional
