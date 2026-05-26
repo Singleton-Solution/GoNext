@@ -1,65 +1,76 @@
 /**
- * /settings/privacy — GDPR self-service surface (issue #216).
+ * Privacy settings — issue #225.
  *
- * Two actions, both irreversible to varying degrees:
+ * Fetches the current privacy-group values from the registry on the
+ * server so the form pre-fills on first paint. Mirrors the general /
+ * reading / writing pages structurally.
  *
- *   1. Download your data — kicks off an async export job. The
- *      worker assembles a ZIP and returns a download URL through the
- *      poll endpoint; this page surfaces the job id and shows a
- *      banner with the polling URL.
- *
- *   2. Delete account — anonymises the user in place and schedules a
- *      hard-delete 30 days out. Requires the current password (typed
- *      twice) so an accidental click can't destroy data. After a
- *      successful delete the API also invalidates every session, so
- *      the next page navigation kicks the user back to the login
- *      screen.
- *
- * Styled against the Living-Systems brand: cream paper, Archivo
- * headline with the italic accent, emerald CTA for export, red
- * destructive CTA for delete. See docs/design/HANDOFF.md.
- *
- * The client component is deliberately small — the heavy lifting
- * happens on the server. We do NOT pre-fetch any data on this page
- * because both actions are write-only.
+ * The GDPR self-service toggle on this page gates the public
+ * /api/v1/account/data/export endpoint — flipping it off makes the
+ * endpoint return 403 and the user-facing affordance disappear.
  */
 import type { ReactElement } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ShieldCheck } from 'lucide-react';
 
 import { Headline } from '@/components/ui/headline';
 
-import { PrivacyActions } from './components/PrivacyActions';
+import { fetchSettings } from '../api';
+import type { SettingsSection } from '../types';
+import { PrivacyForm } from './PrivacyForm';
 
-export default function PrivacyPage(): ReactElement {
+export const dynamic = 'force-dynamic';
+
+const SECTIONS: readonly SettingsSection[] = [
+  {
+    title: 'Cookie policy',
+    description: "What the site tells visitors about its use of cookies.",
+    keys: [
+      'core.privacy.cookie_policy_url',
+      'core.privacy.cookie_policy_text',
+    ],
+  },
+  {
+    title: 'Retention windows',
+    description:
+      "How long the platform keeps audit, session, and login records. Use 0 to retain indefinitely.",
+    keys: [
+      'core.privacy.retention.audit_days',
+      'core.privacy.retention.sessions_days',
+      'core.privacy.retention.login_attempts_days',
+    ],
+  },
+  {
+    title: 'GDPR self-service',
+    description:
+      "Allow signed-in users to download a JSON archive of their personal data. Disabling this returns 403 from /api/v1/account/data/export.",
+    keys: ['core.privacy.allow_gdpr_self_service'],
+  },
+];
+
+export default async function PrivacySettingsPage(): Promise<ReactElement> {
+  const { values, available } = await fetchSettings('privacy');
   return (
-    <section className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <Link
-          href="/settings"
-          className="inline-flex items-center gap-1.5 font-sans text-xs font-medium text-fg-muted transition-colors hover:text-emerald-deep"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-          Back to settings
-        </Link>
-        <div className="flex flex-col gap-2">
-          <span className="inline-flex items-center gap-1.5 font-sans text-xs font-medium uppercase tracking-[0.12em] text-emerald-deep">
-            <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-            Privacy
-          </span>
-          <Headline as="h1" size="sub">
-            Your data, your <em>call</em>.
-          </Headline>
-          <p className="max-w-[640px] font-sans text-sm text-fg-muted">
-            Export every byte we hold about you, or delete your account
-            entirely. Exports run asynchronously and arrive at a
-            one-time download URL within a few minutes. Deletion is
-            irreversible after a 30-day recovery window.
-          </p>
-        </div>
-      </div>
-
-      <PrivacyActions />
+    <section className="settings-page">
+      <Link href="/settings" className="settings-page__back">
+        ← Back to settings
+      </Link>
+      <header className="settings-page__head">
+        <Headline as="h1" size="sub">
+          Privacy <em>settings</em>.
+        </Headline>
+        <p className="settings-page__lead">
+          Cookies, retention windows, and the GDPR self-service toggle.
+        </p>
+      </header>
+      <PrivacyForm
+        initialValues={values}
+        banner={
+          available
+            ? undefined
+            : "Settings registry isn't reachable — defaults shown. Save to retry."
+        }
+        sections={SECTIONS}
+      />
     </section>
   );
 }

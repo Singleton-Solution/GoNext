@@ -78,4 +78,5 @@ export type SettingsGroup =
   | 'core.site'
   | 'core.reading'
   | 'core.writing'
-  | 'core.permalinks';
+  | 'core.permalinks'
+  | 'privacy';
