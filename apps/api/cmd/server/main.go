@@ -29,6 +29,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	goredis "github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	admincomments "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/comments"
 	adminmedia "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/media"
@@ -77,6 +78,7 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/session"
 	"github.com/Singleton-Solution/GoNext/packages/go/shutdown"
 	"github.com/Singleton-Solution/GoNext/packages/go/theme/seed"
+	"github.com/Singleton-Solution/GoNext/packages/go/tracing"
 	"github.com/Singleton-Solution/GoNext/packages/go/webhooks/revalidate"
 )
 
@@ -223,6 +225,35 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("theme seed: %w", seedErr)
 	}
 
+	// Distributed tracing (issue #186). The tracer provider is wired
+	// AFTER the DB pool + Redis client (so its Shutdown drains
+	// before they do — span exports may need outgoing HTTP and
+	// short-lived state) but BEFORE the HTTP server (so spans
+	// emitted by incoming requests have a live provider to attach
+	// to). The implementation is a no-op when GONEXT_OTLP_ENDPOINT
+	// is unset; the global W3C propagator is installed
+	// unconditionally so an upgrading deploy can land OTel exports
+	// gradually without losing the incoming traceparent header.
+	traceShutdown, traceErr := tracing.Setup(ctx, tracing.Options{
+		ServiceName:    serviceName,
+		ServiceVersion: bi.Version,
+		Insecure:       cfg.Env != "production",
+		Logger:         logger,
+	})
+	if traceErr != nil {
+		// Setup failure is non-fatal: the binary boots without
+		// tracing rather than refusing to start because of a
+		// misconfigured collector. The warning surfaces in the
+		// boot log so operators notice.
+		logger.Warn("tracing: setup failed; continuing without traces",
+			slog.Any("err", traceErr))
+	} else {
+		orch.MustRegister(logger, "tracing.provider",
+			func(stopCtx context.Context) error {
+				return traceShutdown(stopCtx)
+			})
+	}
+
 	// Metrics + audit are best-effort flush points. They're registered
 	// AFTER persistence (so they drain BEFORE persistence on LIFO) —
 	// the last audit record needs the DB pool alive when it writes.
@@ -285,6 +316,32 @@ func run(ctx context.Context) error {
 
 	mux := buildRouter(cfg, pool, rdb, sessions, themeDir, logger, redirectStore, redirectEngine, auditEmitter)
 
+	// Wrap the entire router in the otelhttp instrumentation so every
+	// incoming request gets a server span and the W3C `traceparent`
+	// header is extracted into the request context. The span name is
+	// the matched route pattern (otelhttp's default), which keeps the
+	// cardinality bounded — without this every dynamic id segment
+	// would bloat the trace UI's "operation" list.
+	//
+	// When the tracer provider is the no-op (no endpoint set), the
+	// middleware is still installed but every span is a no-op span:
+	// the cost is one function-call's worth of overhead per request,
+	// and the header extraction still runs so downstream propagation
+	// works in the partial-rollout case.
+	tracedHandler := otelhttp.NewHandler(mux, "gonext.api",
+		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
+			// Prefer the matched pattern (set by ServeMux when it
+			// dispatched) so /api/v1/posts/{id} stays one span
+			// name across a million distinct ids; fall back to the
+			// raw path for routes that didn't match (404 path,
+			// which is bounded by definition).
+			if r.Pattern != "" {
+				return r.Method + " " + r.Pattern
+			}
+			return r.Method + " " + r.URL.Path
+		}),
+	)
+
 	// Build the middleware chain. Early Hints (issue #122) sits AFTER
 	// Recovery (so a panicking hints provider doesn't crash the
 	// server) but BEFORE Logger and metrics. The 103 we emit is about
@@ -332,7 +389,7 @@ func run(ctx context.Context) error {
 	srv, err := httpx.New(httpx.Options{
 		Config:      cfg.Server,
 		Log:         logger,
-		Handler:     mux,
+		Handler:     tracedHandler,
 		Middlewares: mws,
 	})
 	if err != nil {
