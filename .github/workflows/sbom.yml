@@ -1,0 +1,112 @@
+name: SBOM
+
+# Software Bill of Materials generation (issue #142).
+#
+# Triggers:
+#   - tag push (v*):    publish CycloneDX SBOMs as release artifacts.
+#   - pull_request:     upload SBOMs as workflow artifacts only (no release).
+#   - workflow_dispatch: manual dry-run from the Actions tab.
+#
+# Scope (one SBOM per shipped surface):
+#   - apps/api               — Go module (cmd/server binary)
+#   - apps/web               — Next.js bundle (transitive npm tree)
+#   - cli/gonext             — Go module (gonext CLI binary)
+#   - examples/plugins/seo   — WASM plugin (.gnplugin) Go module
+#
+# Tool choice: anchore/syft. CycloneDX 1.5 JSON is the lingua franca our
+# downstream SOC2 evidence pipeline expects. We do NOT use SPDX here
+# because the dependency-track instance the security team runs ingests
+# CycloneDX natively; pivoting later is one --output flag away.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write    # required to attach SBOMs to the GitHub Release on tag push
+  pull-requests: read
+
+concurrency:
+  group: sbom-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sbom:
+    name: Generate SBOM (${{ matrix.target.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - name: api
+            path: apps/api
+            kind: go
+          - name: web
+            path: apps/web
+            kind: npm
+          - name: cli-gonext
+            path: cli/gonext
+            kind: go
+          - name: plugin-seo
+            path: examples/plugins/seo
+            kind: go
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # Syft is fetched as a static binary instead of relying on the
+      # action's docker image — this keeps the job cold-start under 15s
+      # and avoids the action's implicit privileges on the workflow.
+      - name: Install syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
+            | sh -s -- -b /usr/local/bin v1.18.1
+          syft version
+
+      - name: Generate CycloneDX SBOM
+        run: |
+          set -euo pipefail
+          mkdir -p sbom-out
+          syft scan "dir:${{ matrix.target.path }}" \
+            -o cyclonedx-json="sbom-out/sbom-${{ matrix.target.name }}.cdx.json" \
+            -o spdx-json="sbom-out/sbom-${{ matrix.target.name }}.spdx.json"
+          echo "::group::SBOM summary"
+          jq '{component: .metadata.component.name, components: (.components|length)}' \
+            "sbom-out/sbom-${{ matrix.target.name }}.cdx.json"
+          echo "::endgroup::"
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.target.name }}
+          path: sbom-out/
+          retention-days: 30
+          if-no-files-found: error
+
+  # On tag push, attach every SBOM to the GitHub Release. We collect the
+  # matrix outputs into a single release-upload step so the operator sees
+  # one job in the release timeline rather than four.
+  release:
+    name: Attach SBOMs to release
+    needs: sbom
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all SBOMs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: sbom-*
+          path: sbom-out
+          merge-multiple: true
+
+      - name: Attach SBOMs to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: sbom-out/*.json
+          fail_on_unmatched_files: true
+          generate_release_notes: false

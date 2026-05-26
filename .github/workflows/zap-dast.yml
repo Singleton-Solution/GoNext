@@ -1,0 +1,127 @@
+name: ZAP DAST
+
+# OWASP ZAP baseline scan against the running compose stack (issue #204).
+#
+# Triggers:
+#   - cron nightly 03:00 UTC (off-peak so the scan never collides with
+#     the daily release window)
+#   - workflow_dispatch (manual runs from the Actions tab)
+#
+# We intentionally do NOT trigger on pull_request: ZAP runs take ~5
+# minutes and the false-positive rate on a CMS API would noise the PR
+# checkers. The nightly cadence matches the security team's review SLO.
+#
+# Pipeline:
+#   1. Boot the dev compose stack via `make up`.
+#   2. Poll /readyz until the API is healthy (compose --wait covers the
+#      depends_on healthchecks, but we re-confirm against the public
+#      readiness endpoint).
+#   3. Run zap-baseline.py against http://api:8080 from inside the
+#      compose network — the ZAP container joins the same network so
+#      DNS for "api" resolves.
+#   4. Upload the HTML + JSON reports as a workflow artifact.
+#   5. Tear down the stack (always, even on failure).
+#
+# Why we don't fail the job on findings: DAST has a high false-positive
+# rate, especially against a CMS that ships permissive media endpoints
+# and a versioned plugin sandbox. The triage happens off-line against
+# the uploaded artifact; the workflow's job is to KEEP RUNNING the scan,
+# not to block deploys on it. The security team owns weekly triage.
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: Target URL to scan (defaults to the in-network API).
+        required: false
+        default: 'http://api:8080'
+
+permissions:
+  contents: read
+  issues: write   # ZAP action opens an issue when run on a public repo; we keep the permission narrow.
+
+concurrency:
+  group: zap-dast
+  cancel-in-progress: false
+
+jobs:
+  baseline:
+    name: ZAP baseline scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Boot compose stack
+        run: |
+          set -euo pipefail
+          make up
+          docker compose ps
+
+      # The compose 'depends_on: condition: service_healthy' fence is
+      # the source of truth, but we still wait against /readyz so the
+      # job log shows a clean ready line before ZAP fires.
+      - name: Wait for API /readyz
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/readyz >/dev/null 2>&1; then
+              echo "API ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API never became ready" >&2
+          docker compose logs api | tail -100 >&2
+          exit 1
+
+      - name: Create ZAP working dir
+        run: |
+          mkdir -p zap-out
+          chmod 777 zap-out
+
+      # We run ZAP inside the compose network so it can reach "api" by
+      # service name and so its outbound HTTP traffic stays off the
+      # host's localhost. zap-baseline.py is the recommended entrypoint
+      # for "passive scan + safe active checks" — full active scans live
+      # in a separate, hand-triggered workflow.
+      - name: Run ZAP baseline
+        run: |
+          set +e
+          docker run --rm \
+            --network "${COMPOSE_PROJECT_NAME:-gonext}_default" \
+            -v "${{ github.workspace }}/zap-out:/zap/wrk:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+              -t "${{ github.event.inputs.target_url || 'http://api:8080' }}" \
+              -r zap-report.html \
+              -J zap-report.json \
+              -m 5 \
+              -T 10
+          zap_status=$?
+          # zap-baseline returns:
+          #   0 = no warnings, 1 = warnings, 2 = false positives only,
+          #   3 = scan failed. We surface a non-zero only on 3 because
+          #   warnings are expected (see workflow header note).
+          if [ "$zap_status" -eq 3 ]; then
+            echo "ZAP scan itself failed (exit 3); failing job."
+            exit 3
+          fi
+          echo "ZAP exit: $zap_status (treated as success — findings triaged offline)."
+          exit 0
+
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report-${{ github.run_id }}
+          path: zap-out/
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Tear down compose stack
+        if: always()
+        run: |
+          docker compose down --volumes --remove-orphans || true
