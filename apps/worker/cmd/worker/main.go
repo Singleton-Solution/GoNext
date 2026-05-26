@@ -118,6 +118,35 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("jobs/asynq: %w", err)
 	}
 
+	// Inspector-driven queue metrics (#172). Asynq's Inspector talks
+	// to Redis and exposes the cluster-wide queue state — pending,
+	// active, retry, archived, latency. Sampling once per /metrics
+	// scrape keeps the wiring stateless; no background goroutine, no
+	// shared mutable state, no shutdown ordering surprises beyond
+	// closing the Inspector itself.
+	//
+	// The inspector owns its own Redis connection pool (separate from
+	// the asynq.Server's), so we register it with the orchestrator
+	// after the server's queue.consumer registration — LIFO drain
+	// closes the inspector before the consumer, ensuring no in-flight
+	// inspector call sees a half-closed Redis client.
+	inspector := asynq.NewInspector(redisOpt)
+	mreg.MustRegister(jobsasynq.NewInspectorCollector(inspector, jobsasynq.InspectorCollectorOptions{
+		Queues: []string{
+			jobsasynq.QueueCritical,
+			jobsasynq.QueueWebhook,
+			jobsasynq.QueueEmail,
+			jobsasynq.QueueMedia,
+			jobsasynq.QueueMigration,
+			jobsasynq.QueuePlugin,
+			jobsasynq.QueueDefault,
+		},
+		Logger: logger,
+	}))
+	orch.MustRegister(logger, "asynq.inspector", func(_ context.Context) error {
+		return inspector.Close()
+	})
+
 	// Heavy-media tasks. Registered in stub mode for the boot-time
 	// skeleton — the package consults the PATH and the wired storage
 	// handles to decide between the real handler and the stub.
