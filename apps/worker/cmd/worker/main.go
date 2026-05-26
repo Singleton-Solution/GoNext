@@ -27,7 +27,10 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/buildinfo"
 	"github.com/Singleton-Solution/GoNext/packages/go/config"
 	jobsasynq "github.com/Singleton-Solution/GoNext/packages/go/jobs/asynq"
+	"github.com/Singleton-Solution/GoNext/packages/go/jobs/cron"
+	"github.com/Singleton-Solution/GoNext/packages/go/jobs/taskspec"
 	"github.com/Singleton-Solution/GoNext/packages/go/log"
+	"github.com/Singleton-Solution/GoNext/packages/go/media/storage"
 	"github.com/Singleton-Solution/GoNext/packages/go/metrics"
 	"github.com/Singleton-Solution/GoNext/packages/go/shutdown"
 )
@@ -132,6 +135,75 @@ func run(ctx context.Context) error {
 	//   srv.Mux().HandleFunc(email.TaskTypeSend, email.HandleSend)
 	// For #256 we ship the skeleton with the NotFound default so
 	// unknown tasks NACK cleanly instead of panic'ing the worker pool.
+	//
+	// The storage abort-orphans sweep is the first task that lands
+	// here (issue #23). We build the storage driver from the same
+	// config the API uses, wire the handler onto the asynq mux via
+	// taskspec.Dispatch, and register the cron schedule on the
+	// process-wide cron registry. The scheduler itself runs in a
+	// separate cron-leader goroutine (issue #258); this main wiring
+	// only declares the spec + schedule so the leader has something
+	// to fire.
+	mediaDriver, err := storage.New(ctx, storage.Options{
+		S3: storage.S3Config{
+			Endpoint:  cfg.Storage.Endpoint,
+			Region:    cfg.Storage.Region,
+			Bucket:    cfg.Storage.Bucket,
+			AccessKey: cfg.Storage.AccessKey,
+			SecretKey: cfg.Storage.SecretKey,
+			UseSSL:    cfg.Storage.UseSSL,
+			PathStyle: cfg.Storage.PathStyle,
+		},
+	})
+	if err != nil {
+		// Non-fatal: the worker can still drain non-media tasks. We
+		// log loudly so an operator can see the misconfiguration and
+		// fix the env vars rather than wondering why orphans pile up.
+		logger.Warn("media storage driver init failed; abort-orphans task will be skipped",
+			"err", err.Error(),
+		)
+	} else {
+		spec, err := storage.NewAbortOrphansSpec(storage.AbortOrphansSpecOptions{
+			Driver: mediaDriver,
+			Logger: logger,
+		})
+		if err != nil {
+			logger.Warn("storage abort-orphans spec build failed",
+				"err", err.Error(),
+			)
+		} else {
+			reg := taskspec.Default()
+			if err := reg.Register(spec); err != nil &&
+				!errors.Is(err, taskspec.ErrAlreadyRegistered) {
+				logger.Warn("register abort-orphans task failed",
+					"err", err.Error(),
+				)
+			}
+			// Dispatch onto the asynq mux so the consumer side runs
+			// the handler when the leader enqueues it.
+			taskspec.Dispatch(srv.Mux(), reg)
+			// Cron-side registration: declare WHEN the task fires.
+			// We build a fresh registry per process — the cron
+			// package deliberately does not ship a Default()
+			// singleton; ownership is the binary's. A follow-up
+			// issue mounts the scheduler against this registry once
+			// the cron-leader lease (#258) lands.
+			cronReg := cron.NewRegistry()
+			cronSpec := storage.NewAbortOrphansCron()
+			if err := cronReg.Register(cronSpec); err != nil &&
+				!errors.Is(err, cron.ErrAlreadyRegistered) {
+				logger.Warn("register abort-orphans cron failed",
+					"err", err.Error(),
+				)
+			}
+			_ = cronReg // pinned for the scheduler hookup below
+			logger.Info("storage abort-orphans cron registered",
+				"task", storage.AbortOrphansTaskName,
+				"cron", storage.AbortOrphansCronName,
+				"schedule", storage.AbortOrphansSchedule,
+			)
+		}
+	}
 
 	logger.Info("worker started",
 		"drain_budget", workerShutdownBudget,
