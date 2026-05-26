@@ -377,4 +377,26 @@ type PublicSiteConfig struct {
 	// crawling. Defaults to (Env == EnvProduction). Honors
 	// GONEXT_PUBLIC_SITE_ALLOW_INDEX.
 	AllowIndex bool
+
+	// NextRevalidateURL is the apps/web origin used for outbound ISR
+	// cache-invalidation hooks. When a post or page is published, the
+	// REST handler POSTs to
+	// {NextRevalidateURL}/api/revalidate?path=...&secret=...
+	// so the Next.js side can clear its incremental-static-regeneration
+	// cache without waiting for the next revalidate interval.
+	//
+	// Empty disables the hook entirely — useful when the API is
+	// deployed without apps/web (a JSON-only deployment) or when the
+	// renderer is served from a static host that doesn't speak ISR.
+	// Honors GONEXT_NEXT_REVALIDATE_URL.
+	NextRevalidateURL string
+
+	// NextRevalidateSecret is the shared token the Next.js
+	// /api/revalidate route handler validates before clearing its
+	// cache. The chassis sends this as the `secret` query parameter
+	// on the outbound POST.
+	//
+	// Empty disables the hook (same shape as an empty
+	// NextRevalidateURL). Honors GONEXT_NEXT_REVALIDATE_SECRET.
+	NextRevalidateSecret string
 }

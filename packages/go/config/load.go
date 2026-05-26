@@ -340,6 +340,19 @@ func Load(opts ...LoadOption) (*Config, error) {
 		cfg.PublicSite.AllowIndex = b
 	}
 
+	// ISR revalidation webhook (issue #86). Both pieces must be set
+	// for the hook to fire; either-empty leaves the webhook client
+	// disabled and the REST handlers' Notify calls become no-ops.
+	// We deliberately do NOT validate that the URL parses — the
+	// chassis must still boot if an operator typos the env var, and
+	// the client's first call logs the parse error rather than
+	// failing the boot.
+	cfg.PublicSite.NextRevalidateURL = strings.TrimRight(
+		getString(e, "GONEXT_NEXT_REVALIDATE_URL", ""),
+		"/",
+	)
+	cfg.PublicSite.NextRevalidateSecret = getString(e, "GONEXT_NEXT_REVALIDATE_SECRET", "")
+
 	if len(errs) > 0 {
 		return cfg, joinErrs(errs)
 	}

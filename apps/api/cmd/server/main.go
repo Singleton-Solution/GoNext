@@ -74,6 +74,7 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/session"
 	"github.com/Singleton-Solution/GoNext/packages/go/shutdown"
 	"github.com/Singleton-Solution/GoNext/packages/go/theme/seed"
+	"github.com/Singleton-Solution/GoNext/packages/go/webhooks/revalidate"
 )
 
 const serviceName = "api"
@@ -785,12 +786,32 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 		postsStore = restposts.NewMemoryStore()
 	}
 	postsPolicy := policy.NewBasicPolicy(policy.DefaultRoleCapabilities())
+
+	// ISR revalidation client (#86). Both env vars must be set for the
+	// client to actually fire; an unset deployment is the
+	// chassis-without-Next.js case and the client's Notify becomes a
+	// no-op. We log enabled-ness once at boot so operators can confirm
+	// from the structured log stream whether ISR hooks are wired.
+	revalidateClient := revalidate.New(
+		cfg.PublicSite.NextRevalidateURL,
+		cfg.PublicSite.NextRevalidateSecret,
+		revalidate.WithLogger(logger),
+	)
+	if revalidateClient.Enabled() {
+		logger.Info("rest/posts: ISR revalidate hook enabled",
+			slog.String("base", cfg.PublicSite.NextRevalidateURL),
+		)
+	} else {
+		logger.Info("rest/posts: ISR revalidate hook disabled (GONEXT_NEXT_REVALIDATE_URL / _SECRET unset)")
+	}
+
 	if err := restposts.Mount(mux, "/api/v1/posts", restposts.Deps{
-		Store:    postsStore,
-		Policy:   postsPolicy,
-		Audit:    auditEmitter,
-		Logger:   logger,
-		PostType: restposts.PostTypePost,
+		Store:      postsStore,
+		Policy:     postsPolicy,
+		Audit:      auditEmitter,
+		Logger:     logger,
+		PostType:   restposts.PostTypePost,
+		Revalidate: revalidateClient,
 	}); err != nil {
 		logger.Warn("rest/posts: failed to mount", slog.Any("err", err))
 	} else {
