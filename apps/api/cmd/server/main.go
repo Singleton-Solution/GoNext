@@ -902,6 +902,9 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 			logger.Info("auth/magic-link: routes mounted",
 				slog.String("request", "/api/v1/auth/magic-link/request"),
 				slog.String("verify", "/api/v1/auth/magic-link"))
+		}
+	}
+
 	// GDPR account-data routes (issue #216):
 	//   GET  /api/v1/account/data/export — async export
 	//   POST /api/v1/account/data/delete — anonymise + schedule purge
