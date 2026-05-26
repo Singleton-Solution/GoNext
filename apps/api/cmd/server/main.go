@@ -70,6 +70,7 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/media/collections"
 	"github.com/Singleton-Solution/GoNext/packages/go/media/imgproxy"
 	gonextmetrics "github.com/Singleton-Solution/GoNext/packages/go/metrics"
+	"github.com/Singleton-Solution/GoNext/packages/go/observability/errortracker"
 	authmw "github.com/Singleton-Solution/GoNext/packages/go/middleware/auth"
 	"github.com/Singleton-Solution/GoNext/packages/go/middleware/earlyhints"
 	httpmetrics "github.com/Singleton-Solution/GoNext/packages/go/middleware/metrics"
@@ -229,6 +230,33 @@ func run(ctx context.Context) error {
 	}).EnsureDefault(ctx); seedErr != nil {
 		return fmt.Errorf("theme seed: %w", seedErr)
 	}
+
+	// Error tracking (#202). Sentry/GlitchTip wrapper that no-ops when
+	// GONEXT_SENTRY_DSN is unset. Wired BEFORE tracing + the HTTP
+	// server so any subsequent boot failure surfaces in the
+	// dashboard; registered with the orchestrator AFTER persistence
+	// so it drains BEFORE the DB pool / Redis (so an event captured
+	// during the drain still reaches the ingestion endpoint over a
+	// live network).
+	errTracker, errTrackerShutdown, errTrackerErr := errortracker.Init(errortracker.Options{
+		Environment: string(cfg.Env),
+		Release:     bi.Version,
+		ServerName:  serviceName,
+		Logger:      logger,
+	})
+	if errTrackerErr != nil {
+		// Setup failure is non-fatal: the binary boots without the
+		// error tracker rather than refusing to start because of a
+		// misconfigured DSN. The warning surfaces in the boot log so
+		// operators notice. errTracker remains nil and the package's
+		// nil-receiver tolerance keeps downstream calls safe.
+		logger.Warn("errortracker: setup failed; continuing without error reporting",
+			slog.Any("err", errTrackerErr))
+	} else {
+		orch.MustRegister(logger, "errortracker.client",
+			func(stopCtx context.Context) error { return errTrackerShutdown(stopCtx) })
+	}
+	_ = errTracker // retained for the wiring layers that grow Capture call sites in follow-ups
 
 	// Distributed tracing (issue #186). The tracer provider is wired
 	// AFTER the DB pool + Redis client (so its Shutdown drains

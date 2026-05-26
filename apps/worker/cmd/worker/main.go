@@ -33,6 +33,7 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/log"
 	"github.com/Singleton-Solution/GoNext/packages/go/media/storage"
 	"github.com/Singleton-Solution/GoNext/packages/go/metrics"
+	"github.com/Singleton-Solution/GoNext/packages/go/observability/errortracker"
 	"github.com/Singleton-Solution/GoNext/packages/go/shutdown"
 )
 
@@ -89,6 +90,25 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("shutdown: %w", err)
 	}
+
+	// Error tracking (#202). No-op when GONEXT_SENTRY_DSN is unset.
+	// Registered before the queue consumer so the consumer's drain
+	// can still report errors through a live transport. The cluster
+	// env name is the same one Asynq's dashboards filter on.
+	errTracker, errTrackerShutdown, errTrackerErr := errortracker.Init(errortracker.Options{
+		Environment: string(cfg.Env),
+		Release:     bi.Version,
+		ServerName:  serviceName,
+		Logger:      logger,
+	})
+	if errTrackerErr != nil {
+		logger.Warn("errortracker: setup failed; continuing without error reporting",
+			"err", errTrackerErr.Error())
+	} else {
+		orch.MustRegister(logger, "errortracker.client",
+			func(stopCtx context.Context) error { return errTrackerShutdown(stopCtx) })
+	}
+	_ = errTracker // retained for task handlers that grow Capture sites in follow-ups
 
 	// Metrics registry. The worker's /metrics listener lives in a
 	// follow-up issue (the dedicated port wiring already exists in
