@@ -61,6 +61,7 @@ import {
   Users,
 } from 'lucide-react';
 import { GlobalSearch } from '../../../components/GlobalSearch';
+import { PluginSidebarSection } from './PluginSidebarSection';
 
 type LucideIcon = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -236,6 +237,10 @@ export function Sidebar(): ReactElement {
             </ul>
           </div>
         ))}
+        {/* Dynamic Plugins section — fetched at runtime from
+            /api/v1/admin/plugin-pages so activating a plugin lights
+            up its sidebar entries without a redeploy. Issue #228. */}
+        {!collapsed && <PluginSidebarSection />}
       </nav>
 
       {/* Upgrade card — radial-glow forest-2 surface, emerald CTA. */}

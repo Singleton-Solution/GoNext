@@ -98,6 +98,14 @@ type Manifest struct {
 	// in v1.
 	Signature string `json:"signature,omitempty"`
 
+	// AdminPages declares admin UI pages the plugin contributes.
+	// Issue #228. The admin shell walks every active plugin's
+	// AdminPages and renders one Sidebar entry per declared page in
+	// the "Plugins" section. The plugin's frontend host lazy-loads
+	// the page module on first visit. Optional — plugins with no
+	// admin surface omit the field.
+	AdminPages []AdminPage `json:"admin_pages,omitempty"`
+
 	// Storage declares persistent-storage budgets for the plugin. Today
 	// only the KV namespace is described; the field is optional and
 	// omitted manifests get whatever default the operator policy
@@ -130,6 +138,22 @@ type Flags struct {
 	// RegisterFilter. Default false; legacy plugins keep the per-item
 	// contract.
 	ApplyFiltersBatch bool `json:"apply_filters_batch,omitempty"`
+// AdminPage describes one admin sidebar entry a plugin contributes
+// under the "Plugins" group. Issue #228.
+type AdminPage struct {
+	// Slug is the per-plugin page identifier, URL-safe. Combined with
+	// the plugin slug to form the route /plugins/{plugin}/{slug}.
+	Slug string `json:"slug"`
+	// Label is the human-readable text shown in the sidebar.
+	Label string `json:"label"`
+	// Icon is the optional Lucide icon name (e.g. "Settings",
+	// "BarChart3"). The admin shell falls back to a generic plug icon
+	// when this is missing or unknown.
+	Icon string `json:"icon,omitempty"`
+	// Capability is the optional capability the viewer must hold to
+	// see this page. Empty means "visible to anyone with access to
+	// the Plugins section".
+	Capability string `json:"capability,omitempty"`
 }
 
 // Hooks is the actions/filters split. Both arrays are optional; an

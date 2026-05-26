@@ -112,6 +112,39 @@
       "type": "string",
       "pattern": "^[0-9a-f]{128}$"
     },
+    "admin_pages": {
+      "description": "Admin UI pages the plugin contributes. Each entry creates an entry under the Plugins section of the admin sidebar; clicking it loads the plugin's frontend at /plugins/{slug}/{page-slug}. The host walks active plugins at runtime and renders one Sidebar entry per declared page, gated by the optional capability.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["slug", "label"],
+        "properties": {
+          "slug": {
+            "description": "URL-safe slug for this page. Combined with the plugin slug to form the route /plugins/{plugin}/{page-slug}.",
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,40}$"
+          },
+          "label": {
+            "description": "Display label shown in the sidebar.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "icon": {
+            "description": "Optional Lucide icon name (e.g. \"Settings\", \"BarChart3\"). The admin shell falls back to a generic plug icon when missing or unknown.",
+            "type": "string",
+            "maxLength": 32
+          },
+          "capability": {
+            "description": "Optional capability the operator must hold to see this page. When absent the page is shown to anyone who can see the Plugins section.",
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)*$"
+          }
+        }
+      }
+    },
     "storage": {
       "description": "Optional declarative budgets for the plugin's persistent-storage surface. Only the kv namespace is described today; future fields (db, blob) will land here.",
       "type": "object",
