@@ -258,3 +258,160 @@ func TestStore_SetVariantsOnDeletedRow(t *testing.T) {
 		t.Errorf("SetVariants on deleted row: err = %v, want ErrNotFound", err)
 	}
 }
+
+// newMuxWithAllProcessors mirrors newMuxWithProcessor but wires three
+// independent enqueuers: the image processor (always fired), the
+// video processor (fired only on video/*), and the PDF processor
+// (fired only on application/pdf). Used to assert the MIME routing
+// of the upload handler.
+func newMuxWithAllProcessors(t *testing.T, image, video, pdf ProcessEnqueuer) (*http.ServeMux, *MemoryStore, *MemoryPutter) {
+	t.Helper()
+	var idSeq int
+	idGen := func() string {
+		idSeq++
+		return "asset-" + strings.Repeat("0", 4-len(itoa(idSeq))) + itoa(idSeq)
+	}
+	base := time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)
+	store := NewMemoryStore(func() time.Time { return base }, idGen)
+	putter := NewMemoryPutter()
+	mux := http.NewServeMux()
+	if err := Mount(mux, "/api/v1/admin/media", Deps{
+		Store:          store,
+		Putter:         putter,
+		Policy:         policy.NewBasicPolicy(policy.DefaultRoleCapabilities()),
+		Processor:      image,
+		VideoProcessor: video,
+		PDFProcessor:   pdf,
+		Now:            func() time.Time { return base },
+		MaxBytes:       1024 * 1024,
+	}); err != nil {
+		t.Fatalf("Mount: %v", err)
+	}
+	return mux, store, putter
+}
+
+// mp4Bytes returns bytes that http.DetectContentType sniffs as a
+// video file. The 'ftyp' box at offset 4 with brand 'isom' is the
+// canonical MP4/ISO BMFF signature.
+func mp4Bytes() []byte {
+	// Box size (8 bytes), 'ftyp' (4 bytes), brand 'isom' (4 bytes),
+	// minor version (4 bytes), compatible brands. Total 20 bytes is
+	// enough for http.DetectContentType to recognise this as video.
+	return []byte{
+		0x00, 0x00, 0x00, 0x18, 'f', 't', 'y', 'p',
+		'i', 's', 'o', 'm', 0x00, 0x00, 0x00, 0x01,
+		'i', 's', 'o', 'm', 'm', 'p', '4', '1',
+	}
+}
+
+// pdfBytes returns bytes that http.DetectContentType sniffs as a PDF
+// document.
+func pdfBytes() []byte {
+	return []byte("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
+}
+
+// TestUpload_RoutesVideoToVideoProcessor confirms a video upload
+// fires the video processor and NOT the PDF processor.
+func TestUpload_RoutesVideoToVideoProcessor(t *testing.T) {
+	image := &recordingEnqueuer{}
+	video := &recordingEnqueuer{}
+	pdf := &recordingEnqueuer{}
+	mux, _, _ := newMuxWithAllProcessors(t, image, video, pdf)
+
+	body, ct := buildMultipart(t, "clip.mp4", mp4Bytes())
+	req := withAuth(httptest.NewRequest(http.MethodPost, "/api/v1/admin/media", body), authedPrincipal())
+	req.Header.Set("Content-Type", ct)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("upload status = %d, body = %s", w.Code, w.Body.String())
+	}
+
+	if len(video.Calls()) != 1 {
+		t.Errorf("video processor calls = %d, want 1", len(video.Calls()))
+	}
+	if len(pdf.Calls()) != 0 {
+		t.Errorf("pdf processor should not fire for video upload; got %d calls", len(pdf.Calls()))
+	}
+	// Image processor (the existing media.process path) still fires
+	// regardless of MIME — the image pipeline decides internally
+	// whether to skip non-images.
+	if len(image.Calls()) != 1 {
+		t.Errorf("image processor calls = %d, want 1", len(image.Calls()))
+	}
+}
+
+// TestUpload_RoutesPDFToPDFProcessor confirms a PDF upload fires the
+// PDF processor and NOT the video processor.
+func TestUpload_RoutesPDFToPDFProcessor(t *testing.T) {
+	image := &recordingEnqueuer{}
+	video := &recordingEnqueuer{}
+	pdf := &recordingEnqueuer{}
+	mux, _, _ := newMuxWithAllProcessors(t, image, video, pdf)
+
+	body, ct := buildMultipart(t, "doc.pdf", pdfBytes())
+	req := withAuth(httptest.NewRequest(http.MethodPost, "/api/v1/admin/media", body), authedPrincipal())
+	req.Header.Set("Content-Type", ct)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("upload status = %d, body = %s", w.Code, w.Body.String())
+	}
+
+	if len(pdf.Calls()) != 1 {
+		t.Errorf("pdf processor calls = %d, want 1", len(pdf.Calls()))
+	}
+	if len(video.Calls()) != 0 {
+		t.Errorf("video processor should not fire for PDF upload; got %d calls", len(video.Calls()))
+	}
+}
+
+// TestUpload_ImageDoesNotFireVideoOrPDF confirms an image upload only
+// hits the image processor.
+func TestUpload_ImageDoesNotFireVideoOrPDF(t *testing.T) {
+	image := &recordingEnqueuer{}
+	video := &recordingEnqueuer{}
+	pdf := &recordingEnqueuer{}
+	mux, _, _ := newMuxWithAllProcessors(t, image, video, pdf)
+
+	body, ct := buildMultipart(t, "logo.png", pngBytes())
+	req := withAuth(httptest.NewRequest(http.MethodPost, "/api/v1/admin/media", body), authedPrincipal())
+	req.Header.Set("Content-Type", ct)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("upload status = %d", w.Code)
+	}
+
+	if len(image.Calls()) != 1 {
+		t.Errorf("image processor calls = %d, want 1", len(image.Calls()))
+	}
+	if len(video.Calls()) != 0 {
+		t.Errorf("video processor should not fire for image; got %d calls", len(video.Calls()))
+	}
+	if len(pdf.Calls()) != 0 {
+		t.Errorf("pdf processor should not fire for image; got %d calls", len(pdf.Calls()))
+	}
+}
+
+// TestUpload_VideoEnqueueErrorDoesNotFailUpload pins the same contract
+// as TestUpload_EnqueueErrorDoesNotFailUpload but for the video path:
+// a worker outage at video-enqueue time must not lose the upload.
+func TestUpload_VideoEnqueueErrorDoesNotFailUpload(t *testing.T) {
+	image := &recordingEnqueuer{}
+	video := &recordingEnqueuer{err: errors.New("queue down")}
+	mux, store, _ := newMuxWithAllProcessors(t, image, video, nil)
+
+	body, ct := buildMultipart(t, "clip.mp4", mp4Bytes())
+	req := withAuth(httptest.NewRequest(http.MethodPost, "/api/v1/admin/media", body), authedPrincipal())
+	req.Header.Set("Content-Type", ct)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("upload should succeed even with video enqueue failure: status = %d", w.Code)
+	}
+	page, _ := store.List(context.Background(), ListFilter{})
+	if len(page.Data) != 1 {
+		t.Errorf("row not committed after video enqueue failure: rows = %d", len(page.Data))
+	}
+}

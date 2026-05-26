@@ -282,6 +282,8 @@ export function MediaDetailClient(props: MediaDetailClientProps): ReactElement {
         onCopy={onCopyUrl}
       />
 
+      <DerivativesPanel asset={asset} />
+
       <MetadataTable asset={asset} />
 
       <div className="flex justify-end pt-2 border-t border-border-subtle">
@@ -297,6 +299,86 @@ export function MediaDetailClient(props: MediaDetailClientProps): ReactElement {
         </Button>
       </div>
     </section>
+  );
+}
+
+/**
+ * Derivatives panel — surfaces the asynchronously-produced artifacts
+ * the heavy-media worker writes back to the row. Currently:
+ *
+ *   * HLS playlist URL (issue #52) — shown when `hls_url` is set;
+ *     used by the public player to stream video over HLS instead of
+ *     pulling the entire mp4.
+ *   * Extracted text link (issue #60) — shown when
+ *     `has_extracted_text` is true; opens the read-only extracted
+ *     text view in a new tab so the operator can verify what was
+ *     indexed.
+ *   * Proxied / source URL (issue #187) — shown for migration rows
+ *     in proxy mode; surfaces the origin URL with an "open" link so
+ *     an operator can trace the row back to the source site.
+ *
+ * The panel renders nothing when none of the fields are set — most
+ * assets (images uploaded directly) have no derivatives and the
+ * panel stays out of the layout.
+ */
+function DerivativesPanel({ asset }: { asset: MediaAsset }): ReactElement | null {
+  const hasHls = Boolean(asset.hls_url);
+  const hasText = Boolean(asset.has_extracted_text);
+  const hasProxy = Boolean(asset.is_proxied && asset.source_url);
+  if (!hasHls && !hasText && !hasProxy) {
+    return null;
+  }
+  return (
+    <div
+      data-testid="media-detail-derivatives"
+      className="flex flex-col gap-2"
+    >
+      <span className="font-sans text-xs font-medium uppercase tracking-[0.12em] text-fg-subtle">
+        Derivatives
+      </span>
+      <div className="flex flex-col gap-2 rounded-lg border border-border bg-paper-2 px-4 py-3 shadow-xs">
+        {hasHls && (
+          <a
+            href={asset.hls_url}
+            target="_blank"
+            rel="noreferrer"
+            data-testid="hls-link"
+            className="inline-flex items-center gap-2 font-sans text-sm text-emerald-deep hover:text-emerald no-underline"
+          >
+            <Film width={14} height={14} aria-hidden="true" />
+            HLS playlist
+            <ExternalLink width={12} height={12} aria-hidden="true" />
+          </a>
+        )}
+        {hasText && (
+          <Link
+            href={`/media/${asset.id}/text`}
+            data-testid="extracted-text-link"
+            className="inline-flex items-center gap-2 font-sans text-sm text-emerald-deep hover:text-emerald no-underline"
+          >
+            <FileText width={14} height={14} aria-hidden="true" />
+            View extracted text
+          </Link>
+        )}
+        {hasProxy && (
+          <div className="flex flex-col gap-1">
+            <span className="font-sans text-xs text-fg-subtle">
+              Proxied from origin
+            </span>
+            <a
+              href={asset.source_url}
+              target="_blank"
+              rel="noreferrer"
+              data-testid="proxy-source-link"
+              className="font-mono text-xs text-ink-soft hover:text-ink truncate no-underline"
+              title={asset.source_url}
+            >
+              {asset.source_url}
+            </a>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

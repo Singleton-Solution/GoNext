@@ -145,4 +145,50 @@ describe('MediaDetailClient', () => {
     render(<MediaDetailClient initial={asset} />);
     expect(screen.getByTestId('media-detail-storage')).toMatchSnapshot();
   });
+
+  it('hides the derivatives panel when no derivatives are present', () => {
+    render(<MediaDetailClient initial={asset} />);
+    expect(screen.queryByTestId('media-detail-derivatives')).not.toBeInTheDocument();
+  });
+
+  it('renders the HLS link when hls_url is set (issue #52)', () => {
+    const video: MediaAsset = {
+      ...asset,
+      id: 'video-1',
+      mime_type: 'video/mp4',
+      filename: 'clip.mp4',
+      hls_url: 'https://cdn.example/hls/video-1/index.m3u8',
+    };
+    render(<MediaDetailClient initial={video} />);
+    const link = screen.getByTestId('hls-link');
+    expect(link).toHaveAttribute('href', 'https://cdn.example/hls/video-1/index.m3u8');
+  });
+
+  it('renders the extracted-text link when has_extracted_text is true (issue #60)', () => {
+    const pdf: MediaAsset = {
+      ...asset,
+      id: 'pdf-1',
+      mime_type: 'application/pdf',
+      filename: 'doc.pdf',
+      has_extracted_text: true,
+    };
+    render(<MediaDetailClient initial={pdf} />);
+    const link = screen.getByTestId('extracted-text-link');
+    expect(link).toHaveAttribute('href', '/media/pdf-1/text');
+  });
+
+  it('renders the proxy source link for proxied assets (issue #187)', () => {
+    const proxied: MediaAsset = {
+      ...asset,
+      id: 'proxy-1',
+      is_proxied: true,
+      source_url: 'https://oldsite.example/uploads/2024/03/photo.jpg',
+    };
+    render(<MediaDetailClient initial={proxied} />);
+    const link = screen.getByTestId('proxy-source-link');
+    expect(link).toHaveAttribute(
+      'href',
+      'https://oldsite.example/uploads/2024/03/photo.jpg',
+    );
+  });
 });
