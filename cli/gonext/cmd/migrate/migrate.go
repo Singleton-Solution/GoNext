@@ -37,6 +37,8 @@ Subcommands:
                                                 theme (gn-hello) on first
                                                 boot. Default: true.
   down [N]         Roll back N migrations (default 1). Pass 0 to roll back ALL.
+  to <version>     Migrate up or down to reach the given version (positive
+                   integer matching the migration filename prefix).
   status           Print the current schema version and dirty flag.
   wp               Import a WordPress WXR export. See 'migrate wp --help'.
   verify           Verify a WordPress import for fidelity. See 'migrate verify --help'.
@@ -71,6 +73,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runUp(args[1:], stdout, stderr)
 	case "down":
 		return runDown(args[1:], stdout, stderr)
+	case "to":
+		return runTo(args[1:], stdout, stderr)
 	case "status":
 		return runStatus(args[1:], stdout, stderr)
 	case "wp":
@@ -189,6 +193,35 @@ func runDown(args []string, stdout, stderr io.Writer) int {
 		return ExitFail
 	}
 	fmt.Fprintf(stdout, "migrate: down %d OK\n", steps)
+	return ExitOK
+}
+
+// runTo migrates the schema to a specific target version. We accept
+// exactly one positional arg (the version) and parse it as a non-zero
+// positive integer — passing 0 is rejected here (and in pkgmigrate.To)
+// because rolling back ALL migrations should go through `migrate down 0`
+// where the destructive intent is more obvious.
+func runTo(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 1 {
+		fmt.Fprintf(stderr, "gonext migrate to: expected exactly one argument <version>\n\n%s\n", usage)
+		return ExitUsage
+	}
+	v, err := strconv.ParseUint(args[0], 10, 32)
+	if err != nil || v == 0 {
+		fmt.Fprintf(stderr, "gonext migrate to: invalid version %q (want a positive integer)\n", args[0])
+		return ExitUsage
+	}
+	cfg, logger, code := loadConfig(stderr)
+	if code != ExitOK {
+		return code
+	}
+	ctx, cancel := contextWithCancel()
+	defer cancel()
+	if err := pkgmigrate.To(ctx, cfg, logger, uint(v)); err != nil {
+		fmt.Fprintf(stderr, "gonext migrate to: %v\n", err)
+		return ExitFail
+	}
+	fmt.Fprintf(stdout, "migrate: to %d OK\n", v)
 	return ExitOK
 }
 

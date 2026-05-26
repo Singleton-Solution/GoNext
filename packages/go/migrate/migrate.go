@@ -118,6 +118,52 @@ func Down(ctx context.Context, cfg config.DatabaseConfig, logger *slog.Logger, s
 	})
 }
 
+// To migrates the schema to a specific target version, going up or
+// down as necessary. If the current version is below target, pending
+// up migrations are applied until version == target; if above, down
+// migrations are rolled back until version == target. If the current
+// version already equals target the call is a no-op.
+//
+// target must be a positive migration version (matching the
+// `NNNNNN_*.{up,down}.sql` filename prefix). Passing 0 returns an
+// error — to roll back ALL migrations, use Down(ctx, cfg, logger, 0)
+// explicitly so the destructive intent is visible at the call site.
+//
+// Like Run/Down, To acquires a Postgres advisory lock for the duration.
+func To(ctx context.Context, cfg config.DatabaseConfig, logger *slog.Logger, target uint) error {
+	logger = ensureLogger(logger)
+	if target == 0 {
+		return fmt.Errorf("migrate.To: target must be > 0 (use Down(..., 0) to roll back all)")
+	}
+	return withLock(ctx, cfg, logger, "to", func(m *migrate.Migrate) error {
+		start := time.Now()
+		err := m.Migrate(target)
+		switch {
+		case err == nil:
+			ver, dirty := currentVersion(m)
+			logger.Info("migrated to target version",
+				slog.String("op", "to"),
+				slog.Uint64("target", uint64(target)),
+				slog.Uint64("version", uint64(ver)),
+				slog.Bool("dirty", dirty),
+				slog.Duration("took", time.Since(start)),
+			)
+			return nil
+		case errors.Is(err, migrate.ErrNoChange):
+			ver, dirty := currentVersion(m)
+			logger.Info("already at target version",
+				slog.String("op", "to"),
+				slog.Uint64("target", uint64(target)),
+				slog.Uint64("version", uint64(ver)),
+				slog.Bool("dirty", dirty),
+			)
+			return nil
+		default:
+			return fmt.Errorf("migrate.To: %w", err)
+		}
+	})
+}
+
 // Status reports the current schema_migrations state.
 //
 // current is the highest applied migration version (0 if none).

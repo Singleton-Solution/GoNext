@@ -76,6 +76,37 @@ func TestRun_Down_RejectsNonNumericSteps(t *testing.T) {
 	}
 }
 
+func TestRun_To_RequiresExactlyOneArg(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://x@x/x")
+	var stdout, stderr bytes.Buffer
+	if code := Run([]string{"to"}, &stdout, &stderr); code != ExitUsage {
+		t.Errorf("no arg: got %d, want %d", code, ExitUsage)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := Run([]string{"to", "10", "20"}, &stdout, &stderr); code != ExitUsage {
+		t.Errorf("two args: got %d, want %d", code, ExitUsage)
+	}
+}
+
+func TestRun_To_RejectsZero(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://x@x/x")
+	var stdout, stderr bytes.Buffer
+	code := Run([]string{"to", "0"}, &stdout, &stderr)
+	if code != ExitUsage {
+		t.Errorf("exit: got %d, want %d", code, ExitUsage)
+	}
+}
+
+func TestRun_To_RejectsNonNumeric(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://x@x/x")
+	var stdout, stderr bytes.Buffer
+	code := Run([]string{"to", "abc"}, &stdout, &stderr)
+	if code != ExitUsage {
+		t.Errorf("exit: got %d, want %d", code, ExitUsage)
+	}
+}
+
 func TestRun_Up_RejectsTrailingArgs(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://x@x/x")
 	var stdout, stderr bytes.Buffer
