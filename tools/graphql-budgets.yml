@@ -1,0 +1,56 @@
+# GoNext GraphQL query budgets (issue #115).
+#
+# Each entry caps the database-row "cost" a single GraphQL request may
+# consume. The metric is the count of dataloader batch round-trips —
+# NOT the count of resolved fields. A query that selects 1000 posts and
+# their authors should produce 1 post batch + 1 author batch = 2 round
+# trips, not 2000. If the count blows past the budget below, either the
+# resolver lost its dataloader wiring or the schema gained an N+1.
+#
+# Editing rules:
+#  - Raise a budget only when a NEW resolver dimension is added and the
+#    PR description names the dimension. CI exists to keep "I just added
+#    one more loader" honest, not to be silently inflated away.
+#  - Operation names are matched on the literal value of the
+#    `operationName` in the persisted-query store or the `operationName`
+#    field of the request body. Anonymous operations match `_anonymous`.
+#
+# How the benchmark runs:
+#  - `go test -bench BenchmarkGraphQLBudgets -benchtime=1x ./apps/api/...`
+#    drives every operation with a representative payload and counts the
+#    dataloader.Snapshot() values.
+#  - The CI gate in .github/workflows/graphql-budgets.yml fails the run
+#    if any operation exceeds its budget.
+
+# Maximum number of dataloader batch round-trips per request. This is
+# the dominant cost component — each batch is one database round-trip
+# regardless of the size of the IN clause inside it.
+defaultMaxBatchRoundTrips: 4
+
+# Per-operation overrides. Use sparingly — every entry here is a
+# growth indicator.
+operations:
+  # The admin posts list page selects posts + authors + featured
+  # media + primary category. Four batches is the canonical cost.
+  AdminPostsList:
+    maxBatchRoundTrips: 4
+
+  # The public home feed selects posts + authors only. Two batches.
+  HomeFeed:
+    maxBatchRoundTrips: 2
+
+  # The author archive selects one user + their posts + each post's
+  # featured media. Three batches.
+  AuthorArchive:
+    maxBatchRoundTrips: 3
+
+  # The single-post page selects one post + author + comments +
+  # categories + tags. Five batches; the only operation allowed to
+  # cross the global default.
+  PostDetail:
+    maxBatchRoundTrips: 5
+
+# Total per-request wall budget. The CI gate uses this as a smoke
+# check — any operation that exceeds it indicates the dataloader
+# isn't coalescing.
+maxRequestMillis: 250

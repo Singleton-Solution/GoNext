@@ -1,0 +1,43 @@
+name: GraphQL Query Budgets
+
+# Issue #115: enforce per-operation dataloader batch round-trip ceilings
+# (tools/graphql-budgets.yml) so a resolver that loses its dataloader
+# wiring or a schema change that introduces a new N+1 dimension fails
+# CI rather than landing on main.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/api/internal/graphql/**'
+      - 'tools/graphql-budgets.yml'
+      - '.github/workflows/graphql-budgets.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/api/internal/graphql/**'
+      - 'tools/graphql-budgets.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  budgets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.work'
+          cache: true
+      - name: Run dataloader budget bench
+        run: |
+          # -benchtime=1x: each scenario runs once; the bench is an
+          # assertion harness, not a microbench. -run='^$' skips
+          # unit tests so we don't double-pay for the dataloader
+          # package's regular tests (those run in the main CI job).
+          cd apps/api
+          go test -run='^$' -bench BenchmarkGraphQLBudgets -benchtime=1x \
+            ./internal/graphql/dataloader/...
