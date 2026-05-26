@@ -21,6 +21,13 @@
 # build context MUST be the repo root — we need go.work, packages/go, and
 # apps/api visible in /src for `go build` to resolve the workspace.
 
+# IMAGEPROC_BACKEND must be declared BEFORE the first FROM so it is a
+# global ARG visible to the `FROM runtime-${IMAGEPROC_BACKEND}` stage
+# selector at the bottom. Per-stage ARG re-declarations below still
+# work for build-time use; this top-level declaration is the one
+# Docker reads when resolving the dynamic stage name.
+ARG IMAGEPROC_BACKEND=stdlib
+
 # ---------- Stage 1: build ----------
 FROM golang:1.25-alpine AS build
 

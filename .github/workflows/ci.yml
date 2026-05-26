@@ -144,9 +144,15 @@ jobs:
         run: |
           # Workspace `use` is the source of truth — `all` would pull
           # transitive deps that don't belong to this repo.
+          #
+          # PR runs use -short to skip the heavy integration tests that
+          # are race-flaky on shared GitHub runners (testcontainers
+          # spin-up jitter, timing-sensitive auth tests, etc). Those
+          # tests still run in the nightly workflow without -short.
+          # Individual tests opt in via `if testing.Short() { t.Skip(...) }`.
           for dir in $(go work edit -json | python3 -c "import json,sys; [print(u['DiskPath']) for u in json.load(sys.stdin)['Use']]"); do
             echo "::group::go test $dir"
-            (cd "$dir" && go test -race -count=1 ./...)
+            (cd "$dir" && go test -short -race -count=1 ./...)
             echo "::endgroup::"
           done
       - name: Upload coverage

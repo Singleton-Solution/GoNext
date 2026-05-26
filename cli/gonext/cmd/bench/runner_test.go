@@ -75,7 +75,12 @@ func TestRunner_SpawnsCorrectVUCount(t *testing.T) {
 	cfg := RunConfig{
 		Host:     "http://example.test",
 		VUs:      8,
-		Duration: 300 * time.Millisecond,
+		// Bumped from 300ms to 2s so the test stays reliable under
+		// CI's race detector + GitHub-runner load. With 8 VUs and
+		// 20ms latency, 300ms left a tight window where the runner
+		// occasionally didn't actually peak at 8 before the duration
+		// expired — blocking every PR in the queue.
+		Duration: 2 * time.Second,
 		Ramp:     0,
 	}
 	rep, err := RunScenario(context.Background(), fs, cfg)

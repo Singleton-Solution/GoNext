@@ -1,0 +1,53 @@
+name: Nightly Full Tests
+
+# Runs the full Go test suite (without -short) nightly so the integration
+# tests that PR CI skips for stability still get exercised against the
+# tip of main. Failures here open a tracking issue automatically rather
+# than blocking PRs.
+
+on:
+  schedule:
+    # 03:30 UTC every day. Off-peak for GitHub Actions runners.
+    - cron: '30 3 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  full-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: gonext_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+      - name: Run full Go tests (no -short)
+        env:
+          DATABASE_URL: postgres://postgres:ci@localhost:5432/gonext_test?sslmode=disable
+          REDIS_URL: redis://localhost:6379
+        run: |
+          for dir in $(go work edit -json | python3 -c "import json,sys; [print(u['DiskPath']) for u in json.load(sys.stdin)['Use']]"); do
+            echo "::group::go test $dir"
+            (cd "$dir" && go test -race -count=1 ./...)
+            echo "::endgroup::"
+          done

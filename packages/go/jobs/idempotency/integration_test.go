@@ -59,6 +59,9 @@ func makeKey(value, body string) idempotency.Key {
 // belt-and-suspenders coverage against the real query planner.
 func setupPostgres(t *testing.T) *pgxpool.Pool {
 	t.Helper()
+	if testing.Short() {
+		t.Skip("integration test: testcontainers spin-up flakes on shared CI runners; runs in nightly without -short")
+	}
 	dsn := containers.Postgres(t)
 	if dsn == "" {
 		return nil
@@ -81,6 +84,9 @@ func setupPostgres(t *testing.T) *pgxpool.Pool {
 // client. Skips on no-Docker hosts.
 func setupRedis(t *testing.T) *redis.Client {
 	t.Helper()
+	if testing.Short() {
+		t.Skip("integration test: testcontainers spin-up flakes on shared CI runners; runs in nightly without -short")
+	}
 	url := containers.Redis(t)
 	if url == "" {
 		return nil
