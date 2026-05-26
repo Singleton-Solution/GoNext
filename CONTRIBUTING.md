@@ -101,6 +101,73 @@ Good AI use looks like: you read the design doc, drafted with AI help, reviewed 
 
 If you're not sure whether your contribution will be received well, open a `design-discussion` issue first and ask.
 
+## Security review checklist
+
+Every PR that touches an authenticated endpoint, an admin surface, a
+plugin host boundary, or a SQL query must walk through this checklist
+before requesting review. Tick each item in the PR description or
+explain why it doesn't apply.
+
+The reviewer is responsible for spot-checking the answers — items
+left blank or hand-waved ("N/A" with no reason) block merge.
+
+- [ ] **Input validation.** Every request payload is validated against
+  a typed shape (Go struct + `validate` tags / TS Zod) before it
+  reaches the business logic. Unexpected fields are rejected by
+  `additionalProperties: false` at the schema layer, not silently
+  ignored. Required fields are checked explicitly. Length, range,
+  and format limits are enforced server-side regardless of any
+  client-side validation.
+- [ ] **Sanitization.** Output that lands in HTML is escaped (React
+  does this by default; raw insertions via `dangerouslySetInnerHTML`
+  use `DOMPurify` from `apps/admin/src/components/SafeHTML.tsx`).
+  SQL is parametrized — no `fmt.Sprintf` into a query. Shell
+  invocations are avoided; when unavoidable, they use `exec.Command`
+  with an explicit argv (never `bash -c`).
+- [ ] **Auth check.** The endpoint requires authentication (or has a
+  documented public-by-design reason). Mounted behind
+  `auth.RequireSession` or equivalent. Anonymous endpoints have a
+  one-line comment explaining why.
+- [ ] **Capability gate.** Beyond authentication, every privileged
+  action goes through `policy.Can(...)` with a specific capability
+  constant. No role-string comparisons in the handler body. If a
+  new capability is introduced, it's added to
+  `packages/go/policy/capabilities.go` and to the default role
+  mapping in `defaults.go`.
+- [ ] **Rate limit.** Login, password reset, email verification,
+  and any high-value mutation surface go through the limiter from
+  `packages/go/ratelimit`. If a new bucket is added, the default
+  policy is documented and conservative (fail-closed when Redis is
+  unavailable, except where the doc explicitly approves fail-open).
+- [ ] **Audit emit.** Every privileged action emits an
+  `audit.Event`. Event type uses the dotted convention
+  (`auth.login.success`, `plugin.activated`). Severity matches the
+  matrix in `docs/06-auth-permissions.md` §13. Metadata is bounded
+  (no caller-controlled blobs).
+- [ ] **CSRF.** State-changing endpoints (POST/PUT/PATCH/DELETE) are
+  same-origin via session cookies + SameSite=Lax, OR they require
+  a CSRF token from `auth/csrf`. The reviewer confirms the
+  middleware is in the chain.
+- [ ] **Secret handling.** No credentials, tokens, or PII in log
+  lines. `slog` attrs use the structured form so the redactor in
+  `packages/go/log` can mask sensitive keys. Secrets read from
+  config use the masked accessor (`cfg.Auth.Pepper` is masked when
+  the config is dumped).
+- [ ] **Dependency vulns.** New direct deps are checked against
+  `osv-scanner` / `pnpm audit`. Transitive vulns are noted in the
+  PR description with a remediation plan (or a documented accept).
+  CI runs the scanners on every PR, but humans should still look at
+  the manifest diff.
+- [ ] **Error message info leak.** Error responses don't echo
+  internal paths, SQL fragments, or stack traces. The error code
+  is a short slug (`not_found`, `internal_error`); the human
+  message is generic. Detailed diagnostics live in the structured
+  log, never in the response body.
+
+If your change is a pure documentation update, a comment-only refactor,
+or a test-only patch, this section can be skipped — say so in the PR
+description.
+
 ## Reporting bugs
 
 Open an issue with the `bug` template. Include:
