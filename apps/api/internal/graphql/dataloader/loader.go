@@ -42,20 +42,33 @@ type UserRow struct {
 // dereferencing).
 type UserBatchFn func(ctx context.Context, ids []string) ([]*UserRow, error)
 
-// Loaders holds every per-request dataloader. Right now there is one;
-// adding more (e.g., TermsByPostID, MediaByID) follows the same
-// pattern. The struct is intentionally a value type (no pointer
-// receivers needed) so it's safe to compare against a sentinel zero
-// value in FromContext.
+// Loaders holds every per-request dataloader. New() builds the
+// minimal bundle (UserByID); NewExtended() builds the full set with
+// per-loader call counters. The struct is exported so callers can
+// hand-build a partial bundle in tests.
 type Loaders struct {
-	UserByID *dataloader.Loader[string, *UserRow]
+	UserByID      *dataloader.Loader[string, *UserRow]
+	TermByID      *dataloader.Loader[string, *TermRow]
+	MediaByID     *dataloader.Loader[string, *MediaRow]
+	TermsByPostID *dataloader.Loader[string, []*TermRow]
+
+	// counters is set by NewExtended; nil for legacy New(). The
+	// Snapshot() helper returns a zero Snapshot when nil, so callers
+	// don't have to nil-check.
+	counters *counters
 }
 
 // New builds a fresh Loaders bundle wired to the given batch
 // functions. Call once per request from the GraphQL middleware.
+//
+// New only wires UserByID — callers that need the full per-resolver
+// bundle (terms, media, terms-by-post) should use NewExtended.
 func New(loadUsers UserBatchFn) *Loaders {
+	c := &counters{}
 	return &Loaders{
+		counters: c,
 		UserByID: dataloader.NewBatchedLoader[string, *UserRow](func(ctx context.Context, ids []string) []*dataloader.Result[*UserRow] {
+			c.UserBatchCalls.Add(1)
 			rows, err := loadUsers(ctx, ids)
 			out := make([]*dataloader.Result[*UserRow], len(ids))
 			if err != nil {
