@@ -135,6 +135,17 @@
           }
         }
       }
+    },
+    "flags": {
+      "description": "Opt-in capability flags. Each flag switches the plugin into a non-default dispatch mode. Unknown flags are rejected so a typo doesn't silently flip the plugin into legacy behaviour.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "apply_filters_batch": {
+          "description": "When true, the host invokes the plugin's filter handlers with a whole []any slice in one call (issue #263). The plugin SDK exposes the batched signature; the per-item ApplyFilters path remains the default for legacy plugins.",
+          "type": "boolean"
+        }
+      }
     }
   }
 }

@@ -64,6 +64,11 @@ const (
 	labelKind  = "kind"
 	labelHook  = "hook"
 	labelAsync = "async"
+	// labelBatch tags dispatch / handler metrics emitted via ApplyBatch
+	// (the issue #263 hot-path). Always "true" when present; absent for
+	// the per-item ApplyFilters path so a Grafana dashboard can split
+	// the two without inferring from a missing dimension.
+	labelBatch = "batch"
 
 	kindAction = "action"
 	kindFilter = "filter"
