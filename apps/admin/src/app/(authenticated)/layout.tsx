@@ -20,6 +20,7 @@
  * brand's signature serif-italic accent.
  */
 import type { ReactElement, ReactNode } from 'react';
+import { ImpersonationBanner } from './_components/ImpersonationBanner';
 import { Sidebar } from './_components/Sidebar';
 import { TopHeader } from './_components/TopHeader';
 
@@ -30,6 +31,7 @@ export default function AuthenticatedLayout({
 }): ReactElement {
   return (
     <div className="app-shell">
+      <ImpersonationBanner />
       <Sidebar />
       <div className="app-shell__main">
         <TopHeader />
