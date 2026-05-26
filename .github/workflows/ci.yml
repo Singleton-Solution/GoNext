@@ -118,10 +118,26 @@ jobs:
             echo "::endgroup::"
           done
 
+  # Go test suite — sharded across 2 runners (#254).
+  #
+  # The workspace has 7 first-party modules and a couple of them (auth,
+  # migrate) dominate the wall-clock budget. We split the work by
+  # deterministically partitioning the module list across 2 shards and
+  # running each on a separate runner in parallel. Sharding by module
+  # (rather than by test) keeps the per-shard setup amortised — each
+  # shard still pays for `go work sync` once.
+  #
+  # Coverage is collected per shard, uploaded as an artefact, then a
+  # follow-up `test-go-coverage` job merges the per-shard profiles and
+  # enforces the 80% project-wide gate.
   test-go:
     needs: [changes, lint-go]
     if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     services:
       postgres:
         image: postgres:16
@@ -143,10 +159,12 @@ jobs:
           cache: true
       - name: go work sync
         run: go work sync
-      - name: Run tests (workspace modules)
+      - name: Run tests (shard ${{ matrix.shard }} of 2)
         env:
           DATABASE_URL: postgres://postgres:ci@localhost:5432/gonext_test?sslmode=disable
           REDIS_URL: redis://localhost:6379
+          SHARD_INDEX: ${{ matrix.shard }}
+          SHARD_TOTAL: 2
         run: |
           # Workspace `use` is the source of truth — `all` would pull
           # transitive deps that don't belong to this repo.
@@ -156,18 +174,89 @@ jobs:
           # spin-up jitter, timing-sensitive auth tests, etc). Those
           # tests still run in the nightly workflow without -short.
           # Individual tests opt in via `if testing.Short() { t.Skip(...) }`.
+          #
+          # Module-level sharding: enumerate the workspace modules,
+          # pick the ones whose 1-based index mod SHARD_TOTAL matches
+          # this shard. Deterministic, no overlap, and the assignment
+          # only shifts when a module is added/removed from go.work.
+          mkdir -p coverage
+          shard_idx=$SHARD_INDEX
+          shard_total=$SHARD_TOTAL
+          i=0
           for dir in $(go work edit -json | python3 -c "import json,sys; [print(u['DiskPath']) for u in json.load(sys.stdin)['Use']]"); do
-            echo "::group::go test $dir"
-            (cd "$dir" && go test -short -race -count=1 ./...)
+            i=$((i + 1))
+            if [ "$(( (i - 1) % shard_total + 1 ))" != "$shard_idx" ]; then
+              continue
+            fi
+            echo "::group::go test [$shard_idx/$shard_total] $dir"
+            # Write per-module coverage profile; the merge job
+            # concatenates them later.
+            safe="$(echo "$dir" | tr '/' '_')"
+            (cd "$dir" && go test -short -race -count=1 \
+              -covermode=atomic \
+              -coverprofile="$GITHUB_WORKSPACE/coverage/${safe}.out" \
+              ./...)
             echo "::endgroup::"
           done
-      - name: Upload coverage
+      - name: Upload coverage shard
         if: success() || failure()
         uses: actions/upload-artifact@v4
         with:
-          name: go-coverage
-          path: '**/coverage.out'
+          name: go-coverage-shard-${{ matrix.shard }}
+          path: coverage/*.out
           if-no-files-found: ignore
+
+  # Merge coverage shards and enforce the 80% project-wide gate (#254).
+  #
+  # Advisory at first — `continue-on-error: true` lets the gate surface
+  # signal without blocking PRs while the codebase is still catching up
+  # to the target. Once we're above 80% consistently, a follow-up issue
+  # flips this to required in the branch protection rule.
+  test-go-coverage:
+    needs: [changes, test-go]
+    if: needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.work'
+          cache: true
+      - name: Download all shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: go-coverage-shard-*
+          path: coverage-raw
+          merge-multiple: true
+      - name: Merge coverage profiles
+        # The Go cover tool's "mode" line must appear exactly once at
+        # the top of the merged file. We strip it from every input,
+        # write a single header, then concatenate the bodies.
+        run: |
+          mkdir -p coverage
+          merged=coverage/merged.out
+          echo "mode: atomic" > "$merged"
+          for f in coverage-raw/*.out; do
+            tail -n +2 "$f" >> "$merged"
+          done
+          go tool cover -func="$merged" | tee coverage/summary.txt
+      - name: Enforce 80% coverage gate
+        run: |
+          # `go tool cover -func` ends with a line like:
+          #   total:  (statements)  76.2%
+          total="$(awk '/^total:/ {print $NF}' coverage/summary.txt | tr -d '%')"
+          echo "Project coverage: ${total}%"
+          echo "## Coverage" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Total**: ${total}%" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Threshold**: 80%" >> "$GITHUB_STEP_SUMMARY"
+          # Threshold check in awk so we don't depend on bash floats.
+          if awk -v t="$total" 'BEGIN { exit !(t+0 < 80.0) }'; then
+            echo "::warning::project coverage ${total}% is below the 80% gate"
+            exit 1
+          fi
+          echo "Coverage gate OK"
 
   lint-web:
     needs: changes
