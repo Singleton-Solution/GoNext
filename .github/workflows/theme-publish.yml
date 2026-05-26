@@ -1,0 +1,147 @@
+# Theme publishing pipeline (#139).
+#
+# Mirrors the plugin signing flow from #130 (.github/workflows/plugin-publish.yml).
+# Themes are simpler than plugins — there's no WASM bundle and no
+# capability surface to diff — but the chain of trust is identical:
+# the artefact is built from a tagged commit, signed via cosign keyless
+# (Fulcio OIDC) so the signature binds the workflow's identity, and
+# attached to the GitHub release.
+#
+# Trigger: a tag push of the form `theme/<slug>/vX.Y.Z`. The workflow:
+#   1. Builds the theme bundle (a zip of the theme directory).
+#   2. Signs the bundle with cosign keyless using the workflow's OIDC.
+#   3. Uploads the bundle + signature artefacts to the GitHub release
+#      created for the tag.
+#
+# # Artefact layout
+#
+# Three files attached to the release:
+#   - <slug>-<version>.gntheme        : the zipped theme directory
+#   - <slug>-<version>.gntheme.sig    : cosign signature (base64)
+#   - <slug>-<version>.gntheme.pem    : the Fulcio cert chain
+#
+# Operators verify with:
+#   cosign verify-blob \
+#     --certificate <slug>-<version>.gntheme.pem \
+#     --signature   <slug>-<version>.gntheme.sig \
+#     --certificate-identity-regexp 'github.com/Singleton-Solution/GoNext/.github/workflows/theme-publish.yml@.*' \
+#     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+#     <slug>-<version>.gntheme
+
+name: theme-publish
+
+on:
+  push:
+    tags:
+      - 'theme/*/v*'
+
+# Required for cosign keyless (Fulcio OIDC token) and for writing the
+# GitHub release.
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # so the release notes can reference prior tags
+
+      # The tag is theme/<slug>/vX.Y.Z; pluck the slug + version.
+      - name: Parse tag
+        id: tag
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          slug="$(echo "$tag" | cut -d'/' -f2)"
+          version="$(echo "$tag" | cut -d'/' -f3)"
+          version="${version#v}"
+          echo "slug=$slug"       >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag"         >> "$GITHUB_OUTPUT"
+
+      - name: Verify theme directory exists
+        run: |
+          theme_dir="themes/${{ steps.tag.outputs.slug }}"
+          if [ ! -d "$theme_dir" ]; then
+            echo "::error::theme directory '$theme_dir' does not exist"
+            exit 1
+          fi
+          # Required files: theme.json (manifest) and at least one
+          # template. The CLI installer rejects bundles without these,
+          # so failing here gives the publisher a faster signal.
+          if [ ! -f "$theme_dir/theme.json" ]; then
+            echo "::error::missing theme.json in '$theme_dir'"
+            exit 1
+          fi
+
+      # Build the bundle: a zip of the theme directory, named so the
+      # operator can drop it straight into the admin upload form.
+      - name: Build theme bundle
+        id: build
+        run: |
+          mkdir -p dist
+          bundle="dist/${{ steps.tag.outputs.slug }}-${{ steps.tag.outputs.version }}.gntheme"
+          (cd themes && zip -r "../$bundle" "${{ steps.tag.outputs.slug }}")
+          echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
+          # Record sha256 for the release notes — operators with paranoid
+          # download workflows can verify the artefact bit-for-bit.
+          sha="$(sha256sum "$bundle" | awk '{print $1}')"
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+
+      # Cosign keyless sign. The OIDC token comes from id-token:write
+      # above; cosign binds the Fulcio cert to the workflow's identity
+      # (e.g. github.com/Singleton-Solution/GoNext/.github/workflows/theme-publish.yml).
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3.6.0
+
+      - name: Sign bundle
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+          COSIGN_YES: "true"
+        run: |
+          bundle="${{ steps.build.outputs.bundle }}"
+          cosign sign-blob \
+            --yes \
+            --output-signature   "${bundle}.sig" \
+            --output-certificate "${bundle}.pem" \
+            "$bundle"
+
+      # Attach to the release. The release is created (or updated, if
+      # someone re-pushed the tag) with the bundle + signature artefacts.
+      # softprops/action-gh-release handles the "release already exists"
+      # case idempotently.
+      - name: Create/Update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.slug }} v${{ steps.tag.outputs.version }}
+          body: |
+            ## ${{ steps.tag.outputs.slug }} v${{ steps.tag.outputs.version }}
+
+            Signed theme bundle. Verify with cosign before installing:
+
+            ```bash
+            cosign verify-blob \
+              --certificate ${{ steps.tag.outputs.slug }}-${{ steps.tag.outputs.version }}.gntheme.pem \
+              --signature   ${{ steps.tag.outputs.slug }}-${{ steps.tag.outputs.version }}.gntheme.sig \
+              --certificate-identity-regexp 'github.com/${{ github.repository }}/.github/workflows/theme-publish.yml@.*' \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              ${{ steps.tag.outputs.slug }}-${{ steps.tag.outputs.version }}.gntheme
+            ```
+
+            **SHA-256**: `${{ steps.build.outputs.sha256 }}`
+          files: |
+            ${{ steps.build.outputs.bundle }}
+            ${{ steps.build.outputs.bundle }}.sig
+            ${{ steps.build.outputs.bundle }}.pem
+
+      - name: Summary
+        run: |
+          echo "## Published" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **slug**: ${{ steps.tag.outputs.slug }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **version**: ${{ steps.tag.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **sha256**: \`${{ steps.build.outputs.sha256 }}\`" >> "$GITHUB_STEP_SUMMARY"

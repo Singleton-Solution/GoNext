@@ -83,6 +83,21 @@ func TestDown_NegativeStepsRejected(t *testing.T) {
 	}
 }
 
+func TestTo_ZeroTargetRejected(t *testing.T) {
+	// target == 0 is reserved for "all" in Down(); To() must refuse it
+	// so the destructive case is explicit at the call site.
+	err := To(context.Background(), config.DatabaseConfig{
+		URL:          "postgres://x@x/x",
+		MigrationDir: "./migrations",
+	}, quietLogger(), 0)
+	if err == nil {
+		t.Fatal("expected error for target=0")
+	}
+	if !strings.Contains(err.Error(), "target") {
+		t.Errorf("error should mention target, got: %v", err)
+	}
+}
+
 func TestSourceURLForDir(t *testing.T) {
 	tmp := t.TempDir()
 	got, err := sourceURLForDir(tmp)
