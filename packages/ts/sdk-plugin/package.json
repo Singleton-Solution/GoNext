@@ -1,0 +1,52 @@
+{
+  "name": "@gonext/sdk-plugin",
+  "version": "0.0.1",
+  "description": "TypeScript plugin SDK for GoNext. Authors write TypeScript against typed wrappers over the host's `gn_*` ABIs; `gonext-sdk-build` compiles via tsc + Javy (Shopify's JS→WASM compiler) into a `plugin.wasm` ready to bundle. Licensed under Apache-2.0 so plugin authors are unencumbered.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./host": {
+      "types": "./src/host.ts",
+      "default": "./src/host.ts"
+    },
+    "./manifest": {
+      "types": "./src/manifest.ts",
+      "default": "./src/manifest.ts"
+    },
+    "./codec": {
+      "types": "./src/codec.ts",
+      "default": "./src/codec.ts"
+    }
+  },
+  "bin": {
+    "gonext-sdk-build": "./bin/gonext-sdk-build.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "echo '@gonext/sdk-plugin lint: not yet implemented'",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "esbuild": "^0.21.0"
+  },
+  "devDependencies": {
+    "@gonext/test-config": "workspace:*",
+    "@vitest/coverage-v8": "^1.6.0",
+    "typescript": "^5.6.0",
+    "vitest": "^1.6.0"
+  }
+}

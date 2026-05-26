@@ -1,0 +1,31 @@
+/**
+ * {{slug}} — GoNext plugin scaffolded by `gonext plugin init`.
+ *
+ * Register your hook handlers below. The dispatcher Javy emits will
+ * route the host's `gn_handle_hook` calls into these handlers based
+ * on the hook name. See `manifest.json` for the actions/filters this
+ * plugin subscribes to.
+ */
+import {
+  pluginInit,
+  registerAction,
+  registerFilter,
+  host,
+} from '@gonext/sdk-plugin';
+
+// Action: fires whenever a post is saved. Actions are fire-and-forget;
+// the return value is ignored. Use them for side effects like
+// caching, audit, or KV writes.
+registerAction('save_post', async (args) => {
+  host.log.info('{{slug}}: save_post fired with ' + JSON.stringify(args));
+  host.kv.set('last-save-ms', String(host.nowMs()));
+  host.audit.emit('plugin.{{slug}}.save_post', { args });
+});
+
+// Filter: transforms a value through the chain. The return value
+// is JSON-encoded back to the host bus.
+registerFilter('the_content', async (value) => {
+  return `<div data-plugin="{{slug}}">${value}</div>`;
+});
+
+pluginInit();

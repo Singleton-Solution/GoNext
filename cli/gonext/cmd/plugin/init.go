@@ -40,7 +40,7 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, initUsage)
 	}
 
-	template := fs.String("template", "go", "template name (go|rust)")
+	template := fs.String("template", "go", "template name (go|rust|typescript)")
 	pluginName := fs.String("name", "", "plugin slug for the manifest (default: project dir basename)")
 	force := fs.Bool("force", false, "overwrite existing files at the target")
 
@@ -74,10 +74,10 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 	}
 
 	switch *template {
-	case "go", "rust":
+	case "go", "rust", "typescript":
 		// supported
 	default:
-		fmt.Fprintf(stderr, "gonext plugin init: unknown template %q (supported: go, rust)\n", *template)
+		fmt.Fprintf(stderr, "gonext plugin init: unknown template %q (supported: go, rust, typescript)\n", *template)
 		return ExitUsage
 	}
 
@@ -108,6 +108,16 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, "  cd "+projectDir)
 		fmt.Fprintln(stdout, "  cargo build --target wasm32-wasip1 --release")
 		fmt.Fprintln(stdout, "  make bundle    # packs the .gnplugin ZIP")
+	case "typescript":
+		if err := writeTemplateTypeScript(projectDir, slug, *force); err != nil {
+			fmt.Fprintf(stderr, "gonext plugin init: %s\n", err)
+			return ExitFail
+		}
+		fmt.Fprintf(stdout, "Initialized GoNext TypeScript plugin in %s\n", projectDir)
+		fmt.Fprintln(stdout, "Next steps:")
+		fmt.Fprintln(stdout, "  cd "+projectDir)
+		fmt.Fprintln(stdout, "  npm install")
+		fmt.Fprintln(stdout, "  npx gonext-sdk-build   # compiles src/index.ts to plugin.wasm via Javy")
 	}
 	return ExitOK
 }
@@ -124,19 +134,21 @@ Flags:
   --force             overwrite existing files at the target
 
 Templates:
-  go     TinyGo-targeted Go plugin using packages/go/sdk
-  rust   Rust crate compiled to wasm32-wasip1 using packages/rust/gonext-sdk
+  go          TinyGo-targeted Go plugin using packages/go/sdk
+  rust        Rust crate compiled to wasm32-wasip1 using packages/rust/gonext-sdk
+  typescript  TypeScript plugin compiled to WASM via Javy (packages/ts/sdk-plugin)
 
 Example:
   gonext plugin init --template=go ./my-plugin
-  gonext plugin init --template=rust ./my-rust-plugin`
+  gonext plugin init --template=rust ./my-rust-plugin
+  gonext plugin init --template=typescript ./my-ts-plugin`
 
 // templatesFS embeds the templates directory tree. Each file is
 // rendered by trivial token substitution — {{PLUGIN_NAME}} becomes
 // the manifest slug. We deliberately don't pull in text/template
 // because the rendering is straight-line.
 //
-//go:embed templates/go/* templates/rust/* templates/rust/src/*
+//go:embed templates/go/* templates/rust/* templates/rust/src/* templates/typescript/* templates/typescript/src/*
 var templatesFS embed.FS
 
 // writeTemplateGo renders the Go template into dir. Returns an error
@@ -229,6 +241,46 @@ func writeTemplateRust(dir, slug string, force bool) error {
 		rendered := strings.ReplaceAll(string(data), "{{PLUGIN_NAME}}", slug)
 		rendered = strings.ReplaceAll(rendered, "{{PLUGIN_NAME_LITERAL}}", slug)
 		rendered = strings.ReplaceAll(rendered, "{{CRATE_UNDERSCORED}}", crateUnderscored)
+		if err := os.WriteFile(target, []byte(rendered), 0o644); err != nil {
+			return fmt.Errorf("write %q: %w", target, err)
+		}
+		return nil
+	})
+}
+
+// writeTemplateTypeScript renders the TypeScript template into dir.
+// Mirrors writeTemplateGo (same walk-and-rename-tmpl pattern); the
+// duplication is deliberate — the TS template uses .npmignore via
+// package.json's "files" field, so no .gitignore special-case here.
+func writeTemplateTypeScript(dir, slug string, force bool) error {
+	root := "templates/typescript"
+	return fs.WalkDir(templatesFS, root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return fmt.Errorf("relativise template path %q: %w", path, err)
+		}
+		target := filepath.Join(dir, strings.TrimSuffix(rel, ".tmpl"))
+
+		if !force {
+			if _, err := os.Stat(target); err == nil {
+				return fmt.Errorf("file already exists: %s (use --force to overwrite)", target)
+			}
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return fmt.Errorf("create dir for %q: %w", target, err)
+		}
+		data, err := templatesFS.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("read template %q: %w", path, err)
+		}
+		rendered := strings.ReplaceAll(string(data), "{{PLUGIN_NAME}}", slug)
+		rendered = strings.ReplaceAll(rendered, "{{PLUGIN_NAME_LITERAL}}", slug)
 		if err := os.WriteFile(target, []byte(rendered), 0o644); err != nil {
 			return fmt.Errorf("write %q: %w", target, err)
 		}
