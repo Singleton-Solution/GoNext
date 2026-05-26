@@ -32,6 +32,7 @@ import (
 
 	admincomments "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/comments"
 	adminmedia "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/media"
+	adminthemes "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/themes"
 	restimg "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/img"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/customizer"
 	adminredirects "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/redirects"
@@ -590,6 +591,27 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 	} else {
 		logger.Info("customizer: routes mounted",
 			slog.String("base", "/api/v1/admin/customizer"),
+		)
+	}
+
+	// Theme installer + switcher (issues #13, #18, #65). The list
+	// endpoint walks themeDir for every parseable theme.json; the
+	// install endpoint accepts a .gntheme ZIP, validates the
+	// manifest, and extracts to themeDir/<slug>/; the activate
+	// endpoint writes core.active_theme. Three sibling capabilities
+	// gate the routes — install_themes, manage_themes, switch_themes
+	// — so a deploy that only wants the switch surface can withhold
+	// install_themes without losing the list endpoint.
+	if err := adminthemes.Mount(mux, "/api/v1/admin/themes", adminthemes.Deps{
+		ThemeDir: themeDir,
+		Active:   &adminthemes.PgxActiveStore{Pool: pool},
+		Policy:   policy.NewBasicPolicy(policy.DefaultRoleCapabilities()),
+		Logger:   logger,
+	}); err != nil {
+		logger.Warn("admin/themes: failed to mount routes", slog.Any("err", err))
+	} else {
+		logger.Info("admin/themes: routes mounted",
+			slog.String("base", "/api/v1/admin/themes"),
 		)
 	}
 

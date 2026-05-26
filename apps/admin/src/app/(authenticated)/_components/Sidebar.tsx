@@ -107,7 +107,7 @@ const NAV_SECTIONS: readonly NavSection[] = [
   {
     head: 'Studio',
     items: [
-      { href: '/appearance/site-editor', label: 'Appearance', Icon: Palette },
+      { href: '/appearance/themes', label: 'Appearance', Icon: Palette },
       { href: '/appearance/customizer', label: 'Customize', Icon: Sliders },
       { href: '/marketplace', label: 'Marketplace', Icon: Store },
       { href: '/plugins', label: 'Plugins', Icon: Plug },
