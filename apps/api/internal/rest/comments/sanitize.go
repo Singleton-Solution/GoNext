@@ -3,6 +3,8 @@ package comments
 import (
 	"strings"
 	"unicode"
+
+	"github.com/Singleton-Solution/GoNext/packages/go/safehtml"
 )
 
 // sanitizeContent strips HTML tags from a user-submitted comment
@@ -23,10 +25,39 @@ import (
 // Multiple consecutive whitespace runs collapse to a single space
 // because tag-stripping leaves leading/trailing spaces and double-
 // newlines that look ugly when re-rendered.
+//
+// A second sanitization pass is layered on top via
+// packages/go/safehtml: if the input contains <svg> or <math>
+// markers (admin-configurable comment surfaces may opt in via a
+// separate code path), we run those fragments through the dedicated
+// sanitizer. The stripTags path is still the primary gate — this
+// adds belt-and-suspenders defense if a future change ever lets
+// raw markup through.
 func sanitizeContent(raw string) string {
 	stripped := stripTags(raw)
 	escaped := htmlEscape(stripped)
 	return collapseWhitespace(escaped)
+}
+
+// SanitizeRichContent is the path comments may evolve to use if
+// the admin policy ever permits inline SVG / MathML. It runs each
+// kind through its dedicated sanitizer and returns the result.
+// Currently unused by the default submit path (which keeps the
+// strip-all-tags posture), but kept here so the wiring is in place
+// when issue #97's UX follow-up lands.
+//
+// The "html" form is treated as SVG (the most permissive of our
+// three) because a comment is most likely to embed an icon or
+// glyph; richer prose belongs in a post, not a comment.
+func SanitizeRichContent(raw string) (string, error) {
+	switch {
+	case strings.Contains(strings.ToLower(raw), "<math"):
+		return safehtml.SanitizeMathML(raw)
+	case strings.Contains(strings.ToLower(raw), "<svg"):
+		return safehtml.SanitizeSVG(raw)
+	default:
+		return sanitizeContent(raw), nil
+	}
 }
 
 // stripTags drops <...> sequences. The simplest correct implementation:

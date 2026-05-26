@@ -6,6 +6,8 @@ import (
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/Singleton-Solution/GoNext/packages/go/safehttp"
 )
 
 // ClientConfig tunes the HTTP client used to deliver webhooks.
@@ -44,6 +46,14 @@ type ClientConfig struct {
 	// preserves connection reuse; abusive subscribers can't burn our
 	// memory by streaming gigabytes.
 	MaxResponseBytes int64
+
+	// DisableSSRFGuard turns off the per-dial SSRF check. The default
+	// (zero value = guard enabled) rejects any subscriber URL whose
+	// IP resolves into the private/loopback/link-local denylist, which
+	// is the right posture for production. Tests that need to talk to
+	// httptest.Server (which always binds to loopback) flip this to
+	// true. Production wiring MUST leave it false.
+	DisableSSRFGuard bool
 }
 
 // applyDefaults fills in zero fields with the production defaults
@@ -82,14 +92,28 @@ var errRedirect = errors.New("webhook delivery: redirects are not allowed")
 // safe for concurrent use and reuses connections via a hardened
 // transport. Tests can substitute the Transport (or pass an
 // http.RoundTripper override) to point at an httptest.Server.
+//
+// The dialer wraps net.Dialer.DialContext with an SSRF guard backed by
+// packages/go/safehttp: the destination address is checked against the
+// public-IP denylist before the TCP connection is opened. A subscriber
+// whose URL resolves to (say) 169.254.169.254 fails with ErrBlocked
+// rather than reaching the cloud-metadata service. This complements the
+// scheme allowlist on the subscription-creation path: defense in depth,
+// because a subscriber that was valid at creation time could have its
+// DNS pointed at a private IP later (DNS rebinding).
 func newHTTPClient(cfg ClientConfig) *http.Client {
 	cfg = cfg.applyDefaults()
+	rawDialer := &net.Dialer{
+		Timeout:   cfg.ConnectTimeout,
+		KeepAlive: 30 * time.Second,
+	}
+	dial := rawDialer.DialContext
+	if !cfg.DisableSSRFGuard {
+		dial = ssrfGuardedDial(dial)
+	}
 	transport := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   cfg.ConnectTimeout,
-			KeepAlive: 30 * time.Second,
-		}).DialContext,
+		Proxy:                 http.ProxyFromEnvironment,
+		DialContext:           dial,
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          100,
 		MaxIdleConnsPerHost:   cfg.MaxIdleConnsPerHost,
@@ -112,6 +136,29 @@ func newHTTPClient(cfg ClientConfig) *http.Client {
 			_ = via
 			return errRedirect
 		},
+	}
+}
+
+// ssrfGuardedDial wraps a DialContext function with an SSRF check on
+// the resolved address. The wrapped function still uses the host:port
+// it was given (so HTTP cares unchanged) but rejects the dial if the
+// host resolves to a private/loopback/link-local IP.
+//
+// Implementation: net.SplitHostPort the address, run AssertHostPublic,
+// then defer to the underlying dialer. The check runs synchronously
+// before the TCP connect, so a blocked subscriber fails fast.
+func ssrfGuardedDial(next func(ctx context.Context, network, addr string) (net.Conn, error)) func(ctx context.Context, network, addr string) (net.Conn, error) {
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		host, _, err := net.SplitHostPort(addr)
+		if err != nil {
+			// Malformed addr — let the underlying dialer surface the
+			// error; we'd rather not invent a parse-failure path.
+			return next(ctx, network, addr)
+		}
+		if err := safehttp.AssertHostPublic(ctx, host); err != nil {
+			return nil, err
+		}
+		return next(ctx, network, addr)
 	}
 }
 
@@ -145,6 +192,12 @@ func netClass(ctx context.Context, err error) Status {
 	}
 	// Redirect = permanent.
 	if isRedirectError(err) {
+		return StatusDeadletter
+	}
+	// SSRF guard rejection = permanent. The subscriber URL points at a
+	// private/loopback/link-local IP; no amount of retrying fixes that
+	// and we don't want to keep DOSing the cloud-metadata service.
+	if errors.Is(err, safehttp.ErrBlocked) {
 		return StatusDeadletter
 	}
 	// Caller cancellation (not deadline): pass through as retry so the

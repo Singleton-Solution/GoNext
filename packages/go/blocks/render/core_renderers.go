@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"html/template"
 	"strings"
+
+	"github.com/Singleton-Solution/GoNext/packages/go/safehtml"
 )
 
 // RegisterCoreBlocks registers the renderers for the sixteen core
@@ -42,6 +44,7 @@ func RegisterCoreBlocks(reg *Registry) error {
 		{"core/button", BlockSpec{Render: renderButton}},
 		{"core/file", BlockSpec{Render: renderFile}},
 		{"core/embed", BlockSpec{Render: renderEmbed}},
+		{"core/html", BlockSpec{Render: renderHTML}},
 	}
 	for _, e := range entries {
 		if err := reg.Register(e.name, e.spec); err != nil {
@@ -379,6 +382,32 @@ func renderFile(block Block, _ template.HTML, _ Context) (template.HTML, error) 
 		template.HTMLEscapeString(url),
 		escapeText(name),
 	)), nil
+}
+
+// renderHTML emits a sanitized HTML block. The "content" attribute
+// carries the author-supplied markup; we pipe it through
+// safehtml.SanitizeSVG to strip <script>, event handlers, and
+// javascript: URLs. SVG is the most common embed in an HTML block
+// (icons, charts) so the SVG sanitizer is the right starting point.
+//
+// Authors who want a more permissive surface (e.g. raw <p>/<span>
+// formatting) can wrap their content in <svg><foreignObject>...
+// — but that's explicitly blocked by the sanitizer, by design.
+// The HTML block is intended for SVG-shaped content; richer prose
+// belongs in core/paragraph + core/heading.
+func renderHTML(block Block, _ template.HTML, _ Context) (template.HTML, error) {
+	attrs := block.Attributes
+	content := attrString(attrs, "content", "")
+	if strings.TrimSpace(content) == "" {
+		return template.HTML(`<div class="gn-block-html gn-block-html--empty"></div>`), nil
+	}
+	clean, err := safehtml.SanitizeSVG(content)
+	if err != nil {
+		// On sanitization failure, drop to an empty container rather
+		// than reflecting the unsafe input.
+		return template.HTML(`<div class="gn-block-html gn-block-html--error"></div>`), nil
+	}
+	return template.HTML(fmt.Sprintf(`<div class="gn-block-html">%s</div>`, clean)), nil
 }
 
 // renderEmbed emits a generic embed wrapper. Specific provider

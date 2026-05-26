@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/netip"
 	"strings"
+	"sync"
 )
 
 // Emitter is the ergonomic wrapper around Store. It carries the
@@ -34,6 +35,17 @@ type Emitter struct {
 	// trust-chain semantics; an empty list means no proxies are trusted
 	// and XFF is ignored (the safe default).
 	trustedProxies []netip.Prefix
+
+	// chain carries the HMAC key + previous-row fetcher. nil disables
+	// the chain (prev_hash stays whatever the caller set, typically
+	// nil). See ChainConfig.Valid.
+	chain *ChainConfig
+
+	// chainMu is a process-global lock that serializes the
+	// "fetch prev row, hash it, insert" sequence. Stored as a
+	// pointer because Emitter is copied by value in the With* path;
+	// every derived Emitter must contend on the same lock instance.
+	chainMu *sync.Mutex
 }
 
 // NewEmitter builds the root Emitter for a process. store is required.
@@ -48,12 +60,30 @@ func NewEmitter(store Store) *Emitter {
 		// boot — a nil store is a wiring bug that should crash early.
 		panic("audit.NewEmitter: store is required")
 	}
-	return &Emitter{store: store}
+	return &Emitter{store: store, chainMu: &sync.Mutex{}}
 }
 
 // Store returns the underlying Store. Useful for admin endpoints that
 // want to List directly without an extra dependency.
 func (e *Emitter) Store() Store { return e.store }
+
+// WithChain enables the tamper-evidence chain. The receiver is
+// mutated in place because the chain is process-global state —
+// every derived Emitter (via WithActor, WithHTTP, etc) shares the
+// same chain config. Returns the receiver for chainable construction.
+//
+// Pass nil (or a ChainConfig whose Key is too short / PrevFetcher is
+// nil) to disable the chain. ChainConfig.Valid() is consulted before
+// each Emit; an invalid config silently disables chaining without
+// returning an error from Emit, because audit emission is best-effort
+// and an invalid chain config is a startup-time bug.
+func (e *Emitter) WithChain(c *ChainConfig) *Emitter {
+	if e == nil {
+		return nil
+	}
+	e.chain = c
+	return e
+}
 
 // WithTrustedProxies returns a derived Emitter that trusts the given
 // CIDR ranges to set X-Forwarded-For. The receiver is not mutated.
@@ -179,6 +209,14 @@ func WithIP(ip string) EmitOption {
 // Returns the Store's error wrapped with %w. Callers that treat audit
 // emission as best-effort (the common case for hot-path actions)
 // should log-and-continue rather than failing the user-facing request.
+//
+// Chain semantics: if the Emitter has been wired with WithChain, the
+// emitter fetches the most recent stored event, HMACs its canonical
+// bytes with the chain key, and writes the result into evt.PrevHash
+// before forwarding to the store. The chainMu mutex serializes this
+// fetch-and-emit so two concurrent calls don't chain off the same
+// predecessor. A chain-fetch failure is logged-and-ignored — we'd
+// rather emit a chain-break than drop the audit row.
 func (e *Emitter) Emit(ctx context.Context, eventType string, opts ...EmitOption) error {
 	if e == nil || e.store == nil {
 		return errors.New("audit: Emit called on nil Emitter")
@@ -196,6 +234,21 @@ func (e *Emitter) Emit(ctx context.Context, eventType string, opts ...EmitOption
 	for _, opt := range opts {
 		opt(&evt)
 	}
+
+	if e.chain.Valid() {
+		if e.chainMu != nil {
+			e.chainMu.Lock()
+			defer e.chainMu.Unlock()
+		}
+		prev, err := e.chain.PrevFetcher()
+		if err == nil {
+			evt.PrevHash = ChainHash(e.chain.Key, prev)
+		}
+		// On err we deliberately do NOT bail: emit with a nil PrevHash
+		// is preferable to dropping the row, and the verifier flags
+		// the chain break.
+	}
+
 	return e.store.Emit(ctx, evt)
 }
 

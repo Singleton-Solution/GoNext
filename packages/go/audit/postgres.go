@@ -66,6 +66,67 @@ func NewPostgresStoreWithQuerier(q PgxQuerier) *PostgresStore {
 	return &PostgresStore{db: q}
 }
 
+// mostRecentSQL pulls the single most-recent audit_log row. Used by
+// MostRecent (and, through it, the chain emitter's PrevFetcher).
+const mostRecentSQL = `
+SELECT
+    id::TEXT,
+    occurred_at,
+    COALESCE(actor_user_id::TEXT, ''),
+    COALESCE(actor_label, ''),
+    event,
+    COALESCE(target_kind, ''),
+    COALESCE(target_id, ''),
+    COALESCE(ip::TEXT, ''),
+    COALESCE(user_agent, ''),
+    metadata,
+    severity,
+    prev_hash
+FROM audit_log
+ORDER BY id DESC
+LIMIT 1
+`
+
+// MostRecent returns the most-recently-inserted row, or a zero
+// Event when the table is empty. Used as a PrevFetcher for the audit
+// chain.
+//
+// Errors: a real pgx error is returned wrapped. The pgx.ErrNoRows
+// case is normalized to a zero Event + nil error so callers treating
+// an empty table as "chain root" don't need to check for it.
+func (s *PostgresStore) MostRecent(ctx context.Context) (Event, error) {
+	row := s.db.QueryRow(ctx, mostRecentSQL)
+	var (
+		e        Event
+		metaJSON []byte
+		sev      string
+	)
+	if err := row.Scan(
+		&e.ID, &e.Time,
+		&e.ActorUserID, &e.ActorPluginSlug,
+		&e.EventType,
+		&e.ResourceType, &e.ResourceID,
+		&e.IP, &e.UserAgent,
+		&metaJSON, &sev, &e.PrevHash,
+	); err != nil {
+		// pgx returns its own sentinel; the most common case here is
+		// pgx.ErrNoRows which we want to surface as "empty table".
+		// We can't import pgx just for the sentinel check, so we
+		// match the error message — this is a known pgx pattern.
+		if err.Error() == "no rows in result set" {
+			return Event{}, nil
+		}
+		return Event{}, fmt.Errorf("audit: most-recent: %w", err)
+	}
+	if len(metaJSON) > 0 && !bytesEqual(metaJSON, []byte("null")) {
+		if err := json.Unmarshal(metaJSON, &e.Metadata); err != nil {
+			return Event{}, fmt.Errorf("audit: unmarshal metadata: %w", err)
+		}
+	}
+	e.Severity = Severity(sev)
+	return e, nil
+}
+
 func (s *PostgresStore) now() time.Time {
 	if s.NowFunc != nil {
 		return s.NowFunc()

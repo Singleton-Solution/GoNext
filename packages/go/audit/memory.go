@@ -38,6 +38,21 @@ func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{}
 }
 
+// MostRecent returns the most-recently-emitted event, or a zero
+// Event if the store is empty. Used as a PrevFetcher for the audit
+// chain — callers wire it into ChainConfig.PrevFetcher.
+//
+// The returned event is a copy; the caller may mutate it without
+// affecting the store.
+func (s *MemoryStore) MostRecent() (Event, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if len(s.events) == 0 {
+		return Event{}, nil
+	}
+	return s.events[len(s.events)-1], nil
+}
+
 func (s *MemoryStore) now() time.Time {
 	if s.NowFunc != nil {
 		return s.NowFunc()
