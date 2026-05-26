@@ -33,6 +33,7 @@ import {
   LineChartSurface,
   Sparkline,
 } from '@/components/ui/brand-chart';
+import { QuickDraftCard } from './_components/QuickDraftCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -319,6 +320,8 @@ export default function DashboardPage(): ReactElement {
           </p>
         </div>
 
+        <div className="flex flex-col gap-4">
+        <QuickDraftCard />
         <div className="flex flex-col gap-3 rounded-lg border border-border bg-paper-2 p-6 shadow-xs">
           <div className="text-xs font-medium uppercase tracking-[0.08em] text-fg-subtle">
             Recent activity
@@ -363,6 +366,7 @@ export default function DashboardPage(): ReactElement {
               </span>
             </li>
           </ul>
+        </div>
         </div>
       </div>
     </section>

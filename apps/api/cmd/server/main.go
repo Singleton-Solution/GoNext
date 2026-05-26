@@ -35,6 +35,7 @@ import (
 	accountdata "github.com/Singleton-Solution/GoNext/apps/api/internal/account/data"
 	admincomments "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/comments"
 	adminmedia "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/media"
+	adminposts "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/posts"
 	adminthemes "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/themes"
 	restimg "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/img"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/customizer"
@@ -77,6 +78,7 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/ratelimit"
 	redisclient "github.com/Singleton-Solution/GoNext/packages/go/redis"
 	"github.com/Singleton-Solution/GoNext/packages/go/redirects"
+	"github.com/Singleton-Solution/GoNext/packages/go/revisions"
 	pkgsearch "github.com/Singleton-Solution/GoNext/packages/go/search"
 	"github.com/Singleton-Solution/GoNext/packages/go/session"
 	"github.com/Singleton-Solution/GoNext/packages/go/shutdown"
@@ -1126,6 +1128,41 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 				slog.String("base", "/api/v1/posts"),
 			)
 		}
+	}
+
+	// Admin revisions browser (issue #127). Mounts the list +
+	// restore endpoints under /api/v1/admin/posts/{id}/revisions[/...].
+	// The revisions store falls back to the in-memory implementation
+	// when the pool is nil so the dev loop keeps working without a
+	// database. The PostUpdater adapter wraps the production posts
+	// store with the load-version / update-content two-step the
+	// restore handler needs; the rest/posts.Store CAS guarantees a
+	// parallel writer doesn't quietly overwrite the rollback.
+	var revisionsStore revisions.Store
+	if pool != nil {
+		revisionsStore = revisions.NewPostgresStore(pool)
+	} else {
+		revisionsStore = revisions.NewMemoryStore()
+		logger.Warn("admin/posts: pool nil; using in-memory revisions store")
+	}
+	adminPostsUpdater := adminposts.PostUpdaterFunc(func(ctx context.Context, postID string, raw json.RawMessage) error {
+		current, err := postsStore.Get(ctx, restposts.PostTypePost, postID)
+		if err != nil {
+			return err
+		}
+		_, err = postsStore.Update(ctx, restposts.PostTypePost, postID, current.Version,
+			restposts.UpdateInput{ContentBlocks: raw})
+		return err
+	})
+	if err := adminposts.Mount(mux, "/api/v1/admin/posts", adminposts.Deps{
+		Revisions: revisionsStore,
+		Posts:     adminPostsUpdater,
+		Policy:    postsPolicy,
+		Logger:    logger,
+	}); err != nil {
+		logger.Warn("admin/posts: failed to mount", slog.Any("err", err))
+	} else {
+		logger.Info("admin/posts: routes mounted", slog.String("base", "/api/v1/admin/posts"))
 	}
 
 	// Daily TTL sweep for post_autosaves (migration 000016 spec'd a

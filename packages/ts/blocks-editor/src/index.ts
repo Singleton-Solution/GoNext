@@ -44,6 +44,16 @@ export {
 } from './block-transform-toolbar.tsx';
 
 export {
+  BlockToolbar,
+  lockActionProvider,
+  transformActionProvider,
+  type ActionProvider,
+  type BlockToolbarProps,
+  type ToolbarAction,
+  type TransformProviderOptions,
+} from './block-toolbar.tsx';
+
+export {
   BlockEditCanvas,
   clearEditModuleCache,
   type BlockEditCanvasProps,
