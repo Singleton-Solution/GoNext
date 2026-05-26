@@ -17,13 +17,15 @@
 import { fetchActiveTheme, type ActiveTheme } from './api.ts';
 
 /**
- * Minimal hand-written fallback. Matches the gn-hello seed theme
- * (`packages/go/theme/seed/gn-hello/theme.json`) closely enough that
- * the public site is visually coherent when the API is offline.
+ * Minimal hand-written fallback. Mirrors the Living-Systems brand
+ * tokens (cream paper + forest ink + emerald accent) closely enough
+ * that the public site is visually coherent when the API is offline.
  *
- * The HTML strings here are deliberately tiny — the real theme parts
- * are rich block trees that the Go walker resolves. This fallback is
- * the "lights on" minimum.
+ * The HTML strings are deliberately empty — the brand chrome wired in
+ * `PublicShell` already paints the marketing nav + footer, so the
+ * fallback shouldn't double-stack a second header / footer. When a
+ * real theme is installed it ships richer header / footer HTML that
+ * the renderer happily forwards.
  */
 export function defaultActiveTheme(): ActiveTheme {
   return {
@@ -31,12 +33,12 @@ export function defaultActiveTheme(): ActiveTheme {
     title: 'gn-hello',
     cssCustomProperties: [
       ':root {',
-      '  --wp-preset--color--ink: #0f172a;',
-      '  --wp-preset--color--paper: #ffffff;',
-      '  --wp-preset--color--muted: #64748b;',
-      '  --wp-preset--color--accent: #2563eb;',
-      '  --wp-preset--font-family--sans: system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif;',
-      '  --wp-preset--font-family--serif: Iowan Old Style, Apple Garamond, Baskerville, Georgia, serif;',
+      '  --wp-preset--color--ink: #0E1A14;',
+      '  --wp-preset--color--paper: #F5F2EA;',
+      '  --wp-preset--color--muted: #4A5C52;',
+      '  --wp-preset--color--accent: #047857;',
+      '  --wp-preset--font-family--sans: var(--font-sans, Geist), system-ui, sans-serif;',
+      '  --wp-preset--font-family--serif: var(--font-serif, Instrument Serif), Georgia, serif;',
       '  --wp-preset--font-size--sm: 0.875rem;',
       '  --wp-preset--font-size--md: 1rem;',
       '  --wp-preset--font-size--lg: 1.25rem;',
@@ -45,8 +47,12 @@ export function defaultActiveTheme(): ActiveTheme {
       '  --wp-preset--layout--wide: 1180px;',
       '}',
     ].join('\n'),
+    // Minimal theme-level header / footer for the fallback path. The
+    // brand chrome in `PublicShell` paints the marketing nav + footer
+    // around these, so the theme parts here can be tiny — they act as
+    // a thin "section header" / "site colophon" within the chrome.
     headerHtml:
-      '<header class="gn-site-header"><a href="/" class="gn-site-title">gn-hello</a></header>',
+      '<header class="gn-site-header"><span class="wordmark"><span class="wm-go">Go</span><span class="wm-next">Next</span></span></header>',
     footerHtml:
       '<footer class="gn-site-footer"><p>Built with <a href="https://github.com/Singleton-Solution/GoNext">GoNext</a>.</p></footer>',
   };

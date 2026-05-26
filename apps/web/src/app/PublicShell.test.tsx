@@ -16,6 +16,7 @@ describe('PublicShell', () => {
         bodyHtml="<header>H</header><main>M</main><footer>F</footer>"
         cssCustomProperties=":root{--x:1}"
         templateBasename="single.html"
+        withChrome={false}
       />,
     );
     expect(container.querySelector('header')).not.toBeNull();
@@ -29,6 +30,7 @@ describe('PublicShell', () => {
         bodyHtml=""
         cssCustomProperties=":root{--y:2}"
         templateBasename="index.html"
+        withChrome={false}
       />,
     );
     const style = container.querySelector('style[data-gn-theme]');
@@ -41,9 +43,47 @@ describe('PublicShell', () => {
         bodyHtml="<p>hi</p>"
         cssCustomProperties=""
         templateBasename="archive-book.tsx"
+        withChrome={false}
       />,
     );
     const site = container.querySelector('.gn-site');
     expect(site?.getAttribute('data-gn-template')).toBe('archive-book.tsx');
+  });
+
+  it('renders the brand chrome (nav + footer) by default', () => {
+    const { container } = render(
+      <PublicShell
+        bodyHtml="<p>themed body</p>"
+        cssCustomProperties=""
+        templateBasename="single.html"
+      />,
+    );
+    // The marketing nav uses a sticky pill on the forest surface;
+    // checking for the aria-label keeps the assertion forward-
+    // compatible with class-name changes.
+    expect(
+      container.querySelector('nav[aria-label="Primary"]'),
+    ).not.toBeNull();
+    // The footer is a real <footer> with the brand wordmark.
+    expect(container.querySelector('footer')).not.toBeNull();
+    // The themed body is still injected verbatim within the chrome.
+    expect(container.querySelector('.gn-site')?.textContent).toContain(
+      'themed body',
+    );
+  });
+
+  it('renders children inside the chrome, after the themed body', () => {
+    const { container } = render(
+      <PublicShell
+        bodyHtml="<p>post</p>"
+        cssCustomProperties=""
+        templateBasename="single.html"
+      >
+        <aside data-testid="comments">comments</aside>
+      </PublicShell>,
+    );
+    const slot = container.querySelector('[data-testid=comments]');
+    expect(slot).not.toBeNull();
+    expect(slot?.textContent).toBe('comments');
   });
 });

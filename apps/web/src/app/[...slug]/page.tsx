@@ -197,13 +197,12 @@ export default async function CatchAllSlugPage(
   }
 
   return (
-    <>
-      <PublicShell
-        bodyHtml={result.html}
-        cssCustomProperties={result.css}
-        templateBasename={result.templateBasename}
-      />
+    <PublicShell
+      bodyHtml={result.html}
+      cssCustomProperties={result.css}
+      templateBasename={result.templateBasename}
+    >
       {commentsBlock}
-    </>
+    </PublicShell>
   );
 }

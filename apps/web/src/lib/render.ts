@@ -130,17 +130,23 @@ function escapeHtml(value: string): string {
 
 /**
  * Build the post-page main HTML when the Go-side template endpoint
- * isn't reachable. Mirrors the gn-hello single.html layout closely
- * enough that the page still feels themed.
+ * isn't reachable. Renders the single-post layout per the Living-Systems
+ * handoff: Archivo display headline, Geist 17px body, generous
+ * line-height, an optional italic-accent rule on the headline, and a
+ * Geist Mono / fg-subtle meta row above the title.
+ *
+ * The classnames map back to selectors in `globals.css` so the cascade
+ * stays predictable; nothing in this output bakes a colour or font
+ * literal — every value flows through brand tokens.
  */
 function fallbackSingularMain(post: Post, blocksHtml: string): string {
   const dateMeta = post.publishedAt
-    ? `<time datetime="${escapeHtml(post.publishedAt)}">${escapeHtml(
+    ? `<time class="gn-post-meta__date" datetime="${escapeHtml(
         post.publishedAt,
-      )}</time>`
+      )}">${escapeHtml(post.publishedAt)}</time>`
     : '';
   const authorMeta = post.authorName
-    ? `<span class="gn-author">${escapeHtml(post.authorName)}</span>`
+    ? `<span class="gn-post-meta__author">${escapeHtml(post.authorName)}</span>`
     : '';
   const meta =
     dateMeta || authorMeta
@@ -148,8 +154,8 @@ function fallbackSingularMain(post: Post, blocksHtml: string): string {
       : '';
   return [
     '<article class="gn-post">',
-    `<h1 class="gn-post-title">${escapeHtml(post.title)}</h1>`,
     meta,
+    `<h1 class="gn-post-title">${escapeHtml(post.title)}</h1>`,
     `<div class="gn-post-content">${blocksHtml}</div>`,
     '</article>',
   ].join('');
@@ -185,11 +191,16 @@ function fallbackArchiveMain(posts: Post[], heading: string): string {
 }
 
 function fallback404Main(): string {
+  // The italic-accent rule fires on the second word of the headline,
+  // matching the brand voice ("confident, quiet, alive"). The status
+  // code is surfaced as a small eyebrow above the headline so it's
+  // visible without crowding the Archivo display type.
   return [
     '<section class="gn-404">',
-    '<h1>404 &mdash; page not found</h1>',
+    '<div class="gn-404__eyebrow">404</div>',
+    '<h1>Page <em>not</em> found.</h1>',
     '<p>The page you were looking for has moved or never existed.</p>',
-    '<p><a href="/">Return home</a></p>',
+    '<p><a href="/">Return home →</a></p>',
     '</section>',
   ].join('');
 }
