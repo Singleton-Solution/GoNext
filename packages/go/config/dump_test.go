@@ -281,6 +281,8 @@ func TestDump_Golden(t *testing.T) {
 		"Plugins.DevToken=" + expectedMask(""),
 		"PublicSite.AllowIndex=true",
 		"PublicSite.BaseURL=https://example.com",
+		"PublicSite.NextRevalidateSecret=" + expectedMask(""),
+		"PublicSite.NextRevalidateURL=",
 		"RUM.Enabled=false",
 		"RUM.SampleRate=1",
 		"Redis.DialTimeout=5s",

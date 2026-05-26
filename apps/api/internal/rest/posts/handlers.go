@@ -50,12 +50,13 @@ func Mount(mux *http.ServeMux, base string, deps Deps) error {
 		deps.Logger = slog.Default()
 	}
 	h := &handlers{
-		store:    deps.Store,
-		policy:   deps.Policy,
-		audit:    deps.Audit,
-		logger:   deps.Logger,
-		postType: deps.PostType,
-		caps:     capsFor(deps.PostType),
+		store:      deps.Store,
+		policy:     deps.Policy,
+		audit:      deps.Audit,
+		logger:     deps.Logger,
+		postType:   deps.PostType,
+		caps:       capsFor(deps.PostType),
+		revalidate: deps.Revalidate,
 	}
 
 	mux.Handle("GET "+base, h.requireAuth(h.list))
@@ -69,12 +70,13 @@ func Mount(mux *http.ServeMux, base string, deps Deps) error {
 // handlers carries the resolved dependencies for a single mount. One
 // instance per call to Mount; no global state.
 type handlers struct {
-	store    Store
-	policy   policy.Policy
-	audit    *audit.Emitter
-	logger   *slog.Logger
-	postType string
-	caps     capabilitySet
+	store      Store
+	policy     policy.Policy
+	audit      *audit.Emitter
+	logger     *slog.Logger
+	postType   string
+	caps       capabilitySet
+	revalidate RevalidateNotifier
 }
 
 // requireAuth wraps a handler with the principal-presence guard.
@@ -291,6 +293,13 @@ func (h *handlers) create(w http.ResponseWriter, r *http.Request, pr policy.Prin
 
 	h.emitAudit(r.Context(), pr, post, "created")
 
+	// ISR revalidation (#86). Created posts only need a revalidation
+	// hook if they landed in "published" status — drafts and pending
+	// rows are not visible to the public renderer.
+	if post.Status == "published" {
+		h.notifyRevalidate(r.Context(), post, "created")
+	}
+
 	w.Header().Set(HeaderVersion, strconv.Itoa(post.Version))
 	router.SetETag(w, router.HashETag(post.hash))
 	router.WriteJSON(w, http.StatusCreated, post)
@@ -364,6 +373,16 @@ func (h *handlers) update(w http.ResponseWriter, r *http.Request, pr policy.Prin
 	}
 
 	h.emitAudit(r.Context(), pr, updated, "updated")
+
+	// ISR revalidation (#86). Two cases trigger the hook:
+	//   1. The row is still / now in "published" status — the public
+	//      page needs a fresh render.
+	//   2. The row WAS published and is no longer (unpublished /
+	//      trashed via a status change) — the public page needs to
+	//      transition to 404 / removed.
+	if updated.Status == "published" || existing.Status == "published" {
+		h.notifyRevalidate(r.Context(), updated, "updated")
+	}
 
 	w.Header().Set(HeaderVersion, strconv.Itoa(updated.Version))
 	router.SetETag(w, router.HashETag(updated.hash))
@@ -476,6 +495,57 @@ func (h *handlers) writeStoreError(w http.ResponseWriter, r *http.Request, err e
 	default:
 		h.logger.ErrorContext(r.Context(), tag+": store error", slog.Any("err", err))
 		router.WriteError(w, http.StatusInternalServerError, "internal_error", "internal server error")
+	}
+}
+
+// notifyRevalidate fires the ISR cache-invalidation hooks for a post
+// or page that just published / unpublished. The renderer's URL
+// convention is:
+//
+//	post type "post" → /posts/{slug}
+//	post type "page" → /{slug}
+//
+// Plus the homepage feed ("/") for "post" — a new entry on the home
+// list deserves a fresh render. Pages don't push to the home feed by
+// default; they're typically reached via the main menu and the menu
+// itself doesn't change on publish.
+//
+// All failures are logged and swallowed. A failed revalidation means
+// the renderer serves a stale page for up to its next-revalidate
+// interval, which is correct degrade behavior — failing the publish
+// (rolling back the write) because Next.js was unreachable would be
+// the wrong trade-off.
+func (h *handlers) notifyRevalidate(ctx context.Context, post Post, verb string) {
+	if h.revalidate == nil {
+		return
+	}
+	var paths []string
+	switch h.postType {
+	case PostTypePost:
+		if post.Slug != "" {
+			paths = append(paths, "/posts/"+post.Slug)
+		}
+		// The home feed always wants a refresh when a post lands or
+		// drops out — the published list is at "/", not "/posts".
+		paths = append(paths, "/")
+	case PostTypePage:
+		if post.Slug != "" {
+			paths = append(paths, "/"+post.Slug)
+		}
+	}
+	if len(paths) == 0 {
+		return
+	}
+	if err := h.revalidate.NotifyMany(ctx, paths); err != nil {
+		// Best-effort: log at Warn (not Error) — staleness is a soft
+		// failure, not a runbook-paging incident.
+		h.logger.WarnContext(ctx, "posts: revalidate notify failed",
+			slog.String("post_id", post.ID),
+			slog.String("verb", verb),
+			slog.String("post_type", h.postType),
+			slog.Any("paths", paths),
+			slog.Any("err", err),
+		)
 	}
 }
 

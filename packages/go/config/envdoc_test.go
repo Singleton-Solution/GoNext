@@ -98,6 +98,8 @@ var envExampleAllKeys = []string{
 	// PublicSite
 	"GONEXT_PUBLIC_SITE_BASE_URL",
 	"GONEXT_PUBLIC_SITE_ALLOW_INDEX",
+	"GONEXT_NEXT_REVALIDATE_URL",
+	"GONEXT_NEXT_REVALIDATE_SECRET",
 }
 
 // findRepoRoot walks upward from this test file's directory until it

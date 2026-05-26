@@ -1,12 +1,26 @@
 package posts
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 
 	"github.com/Singleton-Solution/GoNext/packages/go/audit"
 	"github.com/Singleton-Solution/GoNext/packages/go/policy"
 )
+
+// RevalidateNotifier is the surface the posts handler depends on to
+// fire ISR revalidation hooks at the public renderer (apps/web).
+// Production wires a *revalidate.Client; tests use nil (the handler
+// gracefully no-ops) or a stub that records calls.
+//
+// The interface is deliberately tiny — Notify and NotifyMany — so
+// tests don't have to import packages/go/webhooks/revalidate just to
+// build a fake. See packages/go/webhooks/revalidate for the contract.
+type RevalidateNotifier interface {
+	Notify(ctx context.Context, path string) error
+	NotifyMany(ctx context.Context, paths []string) error
+}
 
 // PostTypePost is the value for /api/v1/posts mounts.
 const PostTypePost = "post"
@@ -46,6 +60,13 @@ type Deps struct {
 	// sets PostTypePage. The discriminator is reflected in capability
 	// resolution (CapEditPosts vs CapEditPages) and in every store call.
 	PostType string
+
+	// Revalidate, when non-nil, receives best-effort ISR cache
+	// invalidation hooks after a successful publish (create or
+	// transition-to-published). nil disables the hook entirely — the
+	// handler treats this as the chassis-without-apps/web deployment
+	// case and falls back to no-op behavior. Issue #86.
+	Revalidate RevalidateNotifier
 }
 
 // validate is called by [Mount] to fail fast on misconfigured wiring.
