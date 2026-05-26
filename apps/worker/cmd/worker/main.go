@@ -33,6 +33,7 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/log"
 	"github.com/Singleton-Solution/GoNext/packages/go/media/storage"
 	"github.com/Singleton-Solution/GoNext/packages/go/metrics"
+	"github.com/Singleton-Solution/GoNext/packages/go/observability/errortracker"
 	"github.com/Singleton-Solution/GoNext/packages/go/shutdown"
 )
 
@@ -90,6 +91,25 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("shutdown: %w", err)
 	}
 
+	// Error tracking (#202). No-op when GONEXT_SENTRY_DSN is unset.
+	// Registered before the queue consumer so the consumer's drain
+	// can still report errors through a live transport. The cluster
+	// env name is the same one Asynq's dashboards filter on.
+	errTracker, errTrackerShutdown, errTrackerErr := errortracker.Init(errortracker.Options{
+		Environment: string(cfg.Env),
+		Release:     bi.Version,
+		ServerName:  serviceName,
+		Logger:      logger,
+	})
+	if errTrackerErr != nil {
+		logger.Warn("errortracker: setup failed; continuing without error reporting",
+			"err", errTrackerErr.Error())
+	} else {
+		orch.MustRegister(logger, "errortracker.client",
+			func(stopCtx context.Context) error { return errTrackerShutdown(stopCtx) })
+	}
+	_ = errTracker // retained for task handlers that grow Capture sites in follow-ups
+
 	// Metrics registry. The worker's /metrics listener lives in a
 	// follow-up issue (the dedicated port wiring already exists in
 	// packages/go/metrics); for now we just need the registerer so the
@@ -117,6 +137,35 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("jobs/asynq: %w", err)
 	}
+
+	// Inspector-driven queue metrics (#172). Asynq's Inspector talks
+	// to Redis and exposes the cluster-wide queue state — pending,
+	// active, retry, archived, latency. Sampling once per /metrics
+	// scrape keeps the wiring stateless; no background goroutine, no
+	// shared mutable state, no shutdown ordering surprises beyond
+	// closing the Inspector itself.
+	//
+	// The inspector owns its own Redis connection pool (separate from
+	// the asynq.Server's), so we register it with the orchestrator
+	// after the server's queue.consumer registration — LIFO drain
+	// closes the inspector before the consumer, ensuring no in-flight
+	// inspector call sees a half-closed Redis client.
+	inspector := asynq.NewInspector(redisOpt)
+	mreg.MustRegister(jobsasynq.NewInspectorCollector(inspector, jobsasynq.InspectorCollectorOptions{
+		Queues: []string{
+			jobsasynq.QueueCritical,
+			jobsasynq.QueueWebhook,
+			jobsasynq.QueueEmail,
+			jobsasynq.QueueMedia,
+			jobsasynq.QueueMigration,
+			jobsasynq.QueuePlugin,
+			jobsasynq.QueueDefault,
+		},
+		Logger: logger,
+	}))
+	orch.MustRegister(logger, "asynq.inspector", func(_ context.Context) error {
+		return inspector.Close()
+	})
 
 	// Heavy-media tasks. Registered in stub mode for the boot-time
 	// skeleton — the package consults the PATH and the wired storage
