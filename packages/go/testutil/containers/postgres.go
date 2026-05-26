@@ -26,6 +26,14 @@ import (
 // to accept SQL connections before returning.
 func Postgres(t testing.TB, opts ...PGOption) (dsn string) {
 	t.Helper()
+	// Integration tests are skipped under `go test -short`. PR CI uses
+	// -short for stability (testcontainers spin-up jitter on shared
+	// GitHub runners causes flakes that block the merge queue); the
+	// nightly-full-tests workflow runs without -short to keep these
+	// paths exercised against tip-of-main.
+	if testing.Short() {
+		t.Skip("integration test: skip under -short (covered by nightly-full-tests workflow)")
+	}
 	if skipIfNoDocker(t) {
 		return ""
 	}

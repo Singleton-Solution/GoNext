@@ -83,6 +83,9 @@ func TestSetup_RequiresPepper(t *testing.T) {
 // seed, then assert on the resulting rows.
 func TestSetup_HappyPath_FullFlow(t *testing.T) {
 	t.Parallel()
+	if testing.Short() {
+		t.Skip("integration test: testcontainers spin-up flakes on shared CI runners; runs in nightly")
+	}
 	dsn := containers.Postgres(t)
 	if dsn == "" {
 		t.Skip("docker not available")
