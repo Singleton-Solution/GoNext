@@ -268,6 +268,18 @@ func run(ctx context.Context) error {
 	// middleware (issue #158) registers gonext_http_* against the same
 	// registry so scrapers see them on the dedicated /metrics endpoint.
 	metricsReg := gonextmetrics.NewRegistry()
+
+	// pgx-aware Prometheus collector (#165). Surfaces pool stats
+	// (open/in-use/idle/wait), query/transaction duration histograms,
+	// and — when a replica prober is wired in a follow-up — replication
+	// lag. Registered against the same registry as the runtime
+	// collectors so the /metrics endpoint exposes gonext_db_* alongside
+	// go_* / process_*. The collector pulls pool stats at scrape time;
+	// there's no background goroutine to drain.
+	metricsReg.MustRegister(db.NewCollector(pool, db.CollectorOptions{
+		DBLabel: "primary",
+		Logger:  logger,
+	}))
 	orch.MustRegister(logger, "metrics.flusher", noopCloser("metrics"))
 
 	// Audit emitter. The PostgresStore writes to the audit_log table
