@@ -26,14 +26,18 @@ import (
 
 	workermedia "github.com/Singleton-Solution/GoNext/apps/worker/internal/media"
 	"github.com/Singleton-Solution/GoNext/packages/go/buildinfo"
+	"github.com/Singleton-Solution/GoNext/packages/go/cache/invalidator"
 	"github.com/Singleton-Solution/GoNext/packages/go/config"
+	"github.com/Singleton-Solution/GoNext/packages/go/db"
 	jobsasynq "github.com/Singleton-Solution/GoNext/packages/go/jobs/asynq"
 	"github.com/Singleton-Solution/GoNext/packages/go/jobs/cron"
+	"github.com/Singleton-Solution/GoNext/packages/go/jobs/scheduler"
 	"github.com/Singleton-Solution/GoNext/packages/go/jobs/taskspec"
 	"github.com/Singleton-Solution/GoNext/packages/go/log"
 	"github.com/Singleton-Solution/GoNext/packages/go/media/storage"
 	"github.com/Singleton-Solution/GoNext/packages/go/metrics"
 	"github.com/Singleton-Solution/GoNext/packages/go/observability/errortracker"
+	gonextredis "github.com/Singleton-Solution/GoNext/packages/go/redis"
 	"github.com/Singleton-Solution/GoNext/packages/go/shutdown"
 )
 
@@ -180,6 +184,53 @@ func run(ctx context.Context) error {
 	}); err != nil {
 		return fmt.Errorf("worker/media: register: %w", err)
 	}
+	// Postgres pool. Required for the cache-invalidation outbox
+	// poller (#94), the content-scheduler/GC jobs (#143), and any
+	// future task whose handler talks to the database. We let the
+	// pool fail-fast at boot rather than waiting for the first job:
+	// a worker that comes up green only to error every task is
+	// indistinguishable from a healthy one until somebody looks.
+	pool, err := db.New(ctx, cfg.Database, logger)
+	if err != nil {
+		return fmt.Errorf("db.New: %w", err)
+	}
+	orch.MustRegister(logger, "db.pool", func(context.Context) error {
+		pool.Close()
+		return nil
+	})
+
+	// Dedicated Redis client for the cache invalidator + content
+	// scheduler. The asynq server has its own pool managed via
+	// asynq.RedisClientOpt; we keep this one separate so the
+	// invalidator's pub/sub lifetime is uncoupled from the queue
+	// consumer's connection lifecycle.
+	rdb, err := gonextredis.New(ctx, cfg.Redis, logger)
+	if err != nil {
+		return fmt.Errorf("redis.New: %w", err)
+	}
+	orch.MustRegister(logger, "redis.client", func(context.Context) error {
+		return rdb.Close()
+	})
+
+	// Cache invalidator: drains the cache_invalidations outbox
+	// shipped by 000030 and republishes each row on the
+	// gonext:cache:invalidate pub/sub channel. We start the worker
+	// in a goroutine and shut it down via the orchestrator so the
+	// drain budget covers an in-flight poll cycle.
+	invWorker := invalidator.New(pool, rdb, invalidator.WithLogger(logger))
+	invCtx, invCancel := context.WithCancel(ctx)
+	invDone := make(chan struct{})
+	go func() {
+		defer close(invDone)
+		if err := invWorker.Run(invCtx); err != nil {
+			logger.Warn("cache invalidator exited with error", "err", err.Error())
+		}
+	}()
+	orch.MustRegister(logger, "cache.invalidator", func(context.Context) error {
+		invCancel()
+		<-invDone
+		return nil
+	})
 
 	// Registration order (locked in by issue #112):
 	//
@@ -266,6 +317,32 @@ func run(ctx context.Context) error {
 				"cron", storage.AbortOrphansCronName,
 				"schedule", storage.AbortOrphansSchedule,
 			)
+
+			// Content scheduler + GC (#143). Both tasks share the
+			// worker's pgx pool. The publisher fires every minute
+			// and flips status=scheduled rows whose scheduled_for
+			// has elapsed; the GC fires daily at 03:30 UTC and
+			// hard-deletes trash older than 30 days.
+			//
+			// We register against the same cronReg as the storage
+			// sweep so the eventual cron-leader (#258) sees one
+			// merged schedule, and against taskspec.Default() so
+			// the asynq mux dispatch already in place handles the
+			// task type.
+			if err := scheduler.SeedDefaults(taskspec.Default(), cronReg, scheduler.SeedOptions{
+				Pool:   pool,
+				Logger: logger,
+			}); err != nil {
+				logger.Warn("scheduler seed failed", "err", err.Error())
+			} else {
+				taskspec.Dispatch(srv.Mux(), taskspec.Default())
+				logger.Info("content scheduler + gc registered",
+					"publisher_task", scheduler.PublisherTaskName,
+					"publisher_schedule", scheduler.PublisherSchedule,
+					"gc_task", scheduler.GCTaskName,
+					"gc_schedule", scheduler.GCSchedule,
+				)
+			}
 		}
 	}
 
