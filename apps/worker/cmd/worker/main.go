@@ -31,6 +31,7 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/db"
 	jobsasynq "github.com/Singleton-Solution/GoNext/packages/go/jobs/asynq"
 	"github.com/Singleton-Solution/GoNext/packages/go/jobs/cron"
+	"github.com/Singleton-Solution/GoNext/packages/go/jobs/scheduler"
 	"github.com/Singleton-Solution/GoNext/packages/go/jobs/taskspec"
 	"github.com/Singleton-Solution/GoNext/packages/go/log"
 	"github.com/Singleton-Solution/GoNext/packages/go/media/storage"
@@ -316,6 +317,32 @@ func run(ctx context.Context) error {
 				"cron", storage.AbortOrphansCronName,
 				"schedule", storage.AbortOrphansSchedule,
 			)
+
+			// Content scheduler + GC (#143). Both tasks share the
+			// worker's pgx pool. The publisher fires every minute
+			// and flips status=scheduled rows whose scheduled_for
+			// has elapsed; the GC fires daily at 03:30 UTC and
+			// hard-deletes trash older than 30 days.
+			//
+			// We register against the same cronReg as the storage
+			// sweep so the eventual cron-leader (#258) sees one
+			// merged schedule, and against taskspec.Default() so
+			// the asynq mux dispatch already in place handles the
+			// task type.
+			if err := scheduler.SeedDefaults(taskspec.Default(), cronReg, scheduler.SeedOptions{
+				Pool:   pool,
+				Logger: logger,
+			}); err != nil {
+				logger.Warn("scheduler seed failed", "err", err.Error())
+			} else {
+				taskspec.Dispatch(srv.Mux(), taskspec.Default())
+				logger.Info("content scheduler + gc registered",
+					"publisher_task", scheduler.PublisherTaskName,
+					"publisher_schedule", scheduler.PublisherSchedule,
+					"gc_task", scheduler.GCTaskName,
+					"gc_schedule", scheduler.GCSchedule,
+				)
+			}
 		}
 	}
 
