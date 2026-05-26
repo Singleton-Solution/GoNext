@@ -104,12 +104,32 @@ type Manifest struct {
 	// supplies (typically a small budget).
 	Storage *Storage `json:"storage,omitempty"`
 
+	// Flags is the opt-in capability flag bag. Each flag is a small
+	// boolean toggle that switches the plugin into a non-default
+	// dispatch mode. New flags land here without breaking existing
+	// manifests; unknown flags are accepted (additionalProperties is
+	// false at the top level but Flags is its own object).
+	Flags *Flags `json:"flags,omitempty"`
+
 	// Raw is the original bytes the manifest was decoded from. Callers
 	// that need to persist the manifest verbatim (e.g. the lifecycle
 	// Plugin row) read this instead of re-marshalling — re-marshal
 	// would lose key order and any future round-trip-relevant
 	// formatting.
 	Raw json.RawMessage `json:"-"`
+}
+
+// Flags is the manifest's flags bag — currently only one entry, set
+// to opt the plugin into the issue #263 ApplyBatch hot path. Future
+// flags will accumulate here without breaking compatibility.
+type Flags struct {
+	// ApplyFiltersBatch, when true, signals that the plugin's filter
+	// handlers want to be invoked with a whole []any slice in one call
+	// rather than once per item. The host wiring layer reads this flag
+	// and dispatches RegisterBatchFilter on the hook bus rather than
+	// RegisterFilter. Default false; legacy plugins keep the per-item
+	// contract.
+	ApplyFiltersBatch bool `json:"apply_filters_batch,omitempty"`
 }
 
 // Hooks is the actions/filters split. Both arrays are optional; an

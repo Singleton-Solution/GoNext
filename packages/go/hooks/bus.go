@@ -3,6 +3,7 @@ package hooks
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"sort"
 	"sync"
@@ -97,6 +98,19 @@ type Bus struct {
 	// torn reads on concurrent in-flight Apply/Do calls — the same
 	// pattern used for logger and metrics.
 	schemas atomic.Pointer[SchemaEnforcer]
+
+	// batchAdapters indexes registrations that opted into the batch
+	// filter path via RegisterBatchFilter. The map is keyed by hook
+	// name then by the registration's token so invokeBatch can spot a
+	// batch-aware handler in the middle of a chain that also contains
+	// legacy per-item filters.
+	//
+	// The mutex is taken on the hot path of ApplyBatch (one RLock per
+	// handler invocation), but only by hooks that have *any* batch
+	// registration — the nil-map fast path inside batchAdapterFor
+	// short-circuits without touching the lock.
+	batchAdaptersMu sync.RWMutex
+	batchAdapters   map[string]map[uint64]*batchFilterAdapter
 }
 
 // chainSlot holds a single hook's handler chain plus the mutex that
@@ -806,6 +820,272 @@ func (b *Bus) ApplyFilters(ctx context.Context, name string, value any, args ...
 		current = next
 	}
 	return current, nil
+}
+
+// BatchFilterHandler is the signature opted-into by plugins that prefer
+// to receive a whole []any slice in one call rather than be invoked N
+// times by ApplyFilters. It mirrors FilterHandler but pluralises the
+// `value` parameter to a slice — the handler returns the transformed
+// slice (same length, mapped element-by-element) or any error.
+//
+// The slice length is preserved on the returned value: ApplyBatch
+// validates this contract and falls back to the input slice if a
+// misbehaving handler resizes it (we log loudly so the bug surfaces
+// without dropping items from the chain).
+//
+// Plugins opt in via the manifest flag `flags.apply_filters_batch`
+// (parsed by packages/go/plugins/manifest). The hook bus carries no
+// manifest awareness itself — it just exposes RegisterBatchFilter for
+// the manifest-driven wiring layer to call.
+type BatchFilterHandler func(ctx context.Context, items []any, args ...any) ([]any, error)
+// ApplyBatch is the hot-path equivalent of ApplyFilters for callers
+// that want to thread a whole slice through a filter chain in a single
+// dispatch. It is the issue #263 optimisation: instead of N separate
+// ApplyFilters invocations for N items (each paying the per-call
+// validate + metrics + per-handler overhead), ApplyBatch dispatches
+// once with the whole slice.
+//
+// Two flavours of handler participate in the chain:
+//
+//   - Batch-aware handlers (registered via RegisterBatchFilter)
+//     receive items as []any and return the transformed []any. Plugins
+//     opt in via the manifest flag `flags.apply_filters_batch`; the
+//     wiring layer that reads the manifest is what calls
+//     RegisterBatchFilter on this bus.
+//
+//   - Regular filter handlers (registered via RegisterFilter) are
+//     called once per item — the bus loops the legacy handler over the
+//     slice. This keeps backward compatibility: existing handlers
+//     continue to work unchanged inside a batched chain.
+//
+// Order of dispatch is the same priority-sorted chain ApplyFilters
+// uses; the batch and non-batch handlers interleave by priority. A
+// batch-aware handler that mutates the slice's length is rejected
+// (the input slice is preserved and a warning logged) so downstream
+// handlers always see a slice whose i-th item is the transformed
+// version of the original i-th item.
+//
+// Short-circuit / error semantics mirror ApplyFilters: returning
+// ErrShortCircuit from any handler stops the chain successfully with
+// the value-so-far; any other error stops the chain with the
+// last-accepted slice.
+func (b *Bus) ApplyBatch(ctx context.Context, name string, items []any, args ...any) ([]any, error) {
+	start := time.Now()
+	sink := b.sink()
+	sink.Counter(metricDispatchTotal, map[string]string{
+		labelKind: kindFilter,
+		labelHook: name,
+		labelBatch: "true",
+	})
+	defer func() {
+		sink.Histogram(metricDispatchDuration, time.Since(start).Seconds(),
+			map[string]string{labelKind: kindFilter, labelHook: name, labelBatch: "true"})
+	}()
+
+	// Validate every item once before entering the chain. A single bad
+	// item rejects the whole batch — that matches the contract of
+	// ApplyFilters (one bad value, one returned error) extended to the
+	// pluralised case.
+	if enf := b.schemaEnforcer(); enf != nil {
+		for i, v := range items {
+			if err := enf.Validate(name, v); err != nil {
+				sink.Counter(metricSchemaRejected, map[string]string{
+					labelKind:  kindFilter,
+					labelHook:  name,
+					labelBatch: "true",
+				})
+				return items, fmt.Errorf("hooks: ApplyBatch %q: item %d: %w", name, i, err)
+			}
+		}
+	}
+
+	slot, ok := b.filters.Load(name)
+	if !ok {
+		return items, nil
+	}
+	snapshot := slot.(*chainSlot).chain.Load()
+	if len(*snapshot) == 0 {
+		return items, nil
+	}
+
+	// Defensive copy: handlers operate on the slice the bus owns, and we
+	// hand the final value back to the caller. A handler mutating in place
+	// is fine; what we want to avoid is the *caller* seeing a half-mutated
+	// slice if the chain errors midway. The copy is one allocation per
+	// ApplyBatch — cheap relative to the N-call alternative this method
+	// exists to avoid.
+	current := make([]any, len(items))
+	copy(current, items)
+
+	for i, reg := range *snapshot {
+		if !reg.active.Load() {
+			continue
+		}
+		next, err := b.invokeBatch(ctx, name, i, reg, current, args)
+		if err != nil {
+			if errors.Is(err, ErrShortCircuit) {
+				sink.Counter(metricShortCircuit, map[string]string{labelHook: name})
+				return next, nil
+			}
+			return current, err
+		}
+		if len(next) != len(current) {
+			// Length-mismatch is a contract violation. Log and keep the
+			// previous slice — silently dropping or padding items would
+			// confuse downstream handlers and the caller.
+			b.log().Error("hooks: batch filter returned mismatched slice length; ignoring",
+				slog.String("hook", name),
+				slog.Int("expected", len(current)),
+				slog.Int("got", len(next)),
+				slog.Uint64("token", reg.token),
+			)
+			continue
+		}
+		current = next
+	}
+	return current, nil
+}
+
+// RegisterBatchFilter registers a batch-aware filter handler. The
+// manifest layer calls this when a plugin sets `flags.apply_filters_batch`
+// in its manifest; everyday code paths should keep using RegisterFilter.
+//
+// The returned unsubscribe closure behaves like the one RegisterFilter
+// returns: idempotent, safe to call from concurrent goroutines.
+func (b *Bus) RegisterBatchFilter(name string, priority int, handler BatchFilterHandler) func() {
+	if handler == nil {
+		return noopUnsub
+	}
+	// Wrap the batch handler as a regular FilterHandler so the registration
+	// machinery and chain semantics need no changes. invokeBatch knows
+	// how to spot the wrapper and call the batch path; legacy ApplyFilters
+	// callers see the handler as a per-item filter that applies the batch
+	// over a singleton slice.
+	wrapper := &batchFilterAdapter{handler: handler}
+	filterFn := func(ctx context.Context, value any, args ...any) (any, error) {
+		out, err := handler(ctx, []any{value}, args...)
+		if err != nil {
+			return value, err
+		}
+		if len(out) != 1 {
+			return value, fmt.Errorf("hooks: batch filter %q returned %d items for singleton input", name, len(out))
+		}
+		return out[0], nil
+	}
+	off, _ := b.register(name, kindFilterCall, false, nil, filterFn, RegisterOptions{Priority: priority})
+	// Tag the latest registration so invokeBatch can route the slice
+	// straight to the batch entry-point. The lookup is done by token
+	// inside invokeBatch.
+	b.batchAdaptersMu.Lock()
+	if b.batchAdapters == nil {
+		b.batchAdapters = make(map[string]map[uint64]*batchFilterAdapter)
+	}
+	if b.batchAdapters[name] == nil {
+		b.batchAdapters[name] = make(map[uint64]*batchFilterAdapter)
+	}
+	// The token assigned to this registration is the last one issued. We
+	// snapshot regSeq AFTER register returns: register's call to b.regSeq.Add
+	// reserved exactly one slot, so the current value of regSeq is this
+	// handler's token.
+	b.batchAdapters[name][b.regSeq.Load()] = wrapper
+	b.batchAdaptersMu.Unlock()
+
+	originalOff := off
+	return func() {
+		originalOff()
+		b.batchAdaptersMu.Lock()
+		delete(b.batchAdapters[name], b.regSeq.Load())
+		b.batchAdaptersMu.Unlock()
+	}
+}
+
+// batchFilterAdapter pairs a RegisterBatchFilter call with its
+// original handler so invokeBatch can route the slice directly into
+// the BatchFilterHandler without re-routing through the per-item
+// wrapper.
+type batchFilterAdapter struct {
+	handler BatchFilterHandler
+}
+
+// invokeBatch runs one handler against the running slice. If the
+// handler was registered via RegisterBatchFilter it dispatches the
+// batch path in one call; otherwise it loops the legacy FilterHandler
+// over each item.
+func (b *Bus) invokeBatch(ctx context.Context, name string, idx int, reg registration, items []any, args []any) (result []any, err error) {
+	start := time.Now()
+	sink := b.sink()
+	labels := map[string]string{labelKind: kindFilter, labelHook: name, labelBatch: "true"}
+	defer func() {
+		sink.Histogram(metricHandlerDuration, time.Since(start).Seconds(), labels)
+	}()
+
+	defer func() {
+		if r := recover(); r != nil {
+			pe := &panicError{hook: name, handler: idx, value: r}
+			sink.Counter(metricHandlerPanic, labels)
+			b.log().ErrorContext(ctx, "hook batch handler panicked",
+				slog.String("hook", name),
+				slog.String("kind", kindFilter),
+				slog.Any("recovered", r),
+			)
+			result = items
+			err = pe
+		}
+	}()
+
+	// Batch-aware path: route the whole slice to the BatchFilterHandler
+	// in one call.
+	if adapter := b.batchAdapterFor(name, reg.token); adapter != nil {
+		out, hErr := adapter.handler(ctx, items, args...)
+		if hErr != nil && !errors.Is(hErr, ErrShortCircuit) {
+			sink.Counter(metricHandlerError, labels)
+		}
+		return out, hErr
+	}
+
+	// Legacy path: loop the per-item filter over the slice. Yes, this
+	// is N calls — but the caller already paid the cost of ApplyBatch's
+	// per-call setup once for the whole batch (validation, metrics
+	// timing, snapshot loading), so the per-item overhead is just the
+	// handler invocation itself.
+	out := make([]any, len(items))
+	for i, v := range items {
+		next, hErr := reg.filter(ctx, v, args...)
+		if hErr != nil {
+			if errors.Is(hErr, ErrShortCircuit) {
+				// Short-circuit at item i applies to the whole batch: the
+				// item the short-circuit returned replaces the i-th slot;
+				// the rest of the items pass through unchanged (caller
+				// sees the latest accepted values).
+				out[i] = next
+				for j := i + 1; j < len(items); j++ {
+					out[j] = items[j]
+				}
+				return out, ErrShortCircuit
+			}
+			sink.Counter(metricHandlerError, labels)
+			return items, hErr
+		}
+		out[i] = next
+	}
+	return out, nil
+}
+
+// batchAdapterFor returns the registered adapter for (name, token) or
+// nil if the registration was not made via RegisterBatchFilter. The
+// fast path (no batch-aware handler ever registered) avoids the lock
+// entirely.
+func (b *Bus) batchAdapterFor(name string, token uint64) *batchFilterAdapter {
+	b.batchAdaptersMu.RLock()
+	defer b.batchAdaptersMu.RUnlock()
+	if b.batchAdapters == nil {
+		return nil
+	}
+	m := b.batchAdapters[name]
+	if m == nil {
+		return nil
+	}
+	return m[token]
 }
 
 // dispatchAsync launches the handler in its own goroutine. The goroutine

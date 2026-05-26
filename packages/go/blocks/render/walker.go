@@ -147,6 +147,48 @@ func (e WalkError) Error() string {
 // Unwrap exposes the underlying error for errors.Is / errors.As.
 func (e WalkError) Unwrap() error { return e.Err }
 
+// PluginBlockDispatcher is the seam through which the walker resolves
+// a `plugin/<slug>/<handler>` block to its plugin-supplied HTML. The
+// production wiring satisfies it by calling into the host hook bus
+// (issue #222): the walker fires the ApplyFilters call
+// "block.render:{slug}/{handler}", the plugin's WASM handler returns
+// the rendered HTML, and the result is spliced into the output stream
+// in place of the block's normal renderer output.
+//
+// Dispatch is called once per plugin block encountered during a walk.
+// slug is the plugin owning the block; handler is the per-plugin block
+// name. The req payload carries the block's attributes, the inner
+// HTML already rendered for children, and the consumed context — JSON
+// shape documented in PluginBlockRequest.
+//
+// Returning an error degrades the block to a render-error placeholder
+// the same way a regular renderer error does. The returned bytes are
+// trusted as already-safe HTML; the dispatcher contract is that the
+// plugin sandbox produces only host-allowed markup (SafeHTML policies
+// live in packages/go/safehtml and are applied INSIDE the WASM host
+// shim, not by the walker).
+type PluginBlockDispatcher interface {
+	Dispatch(slug, handler string, req PluginBlockRequest) (template.HTML, error)
+}
+
+// PluginBlockRequest is the wire payload sent to a plugin's
+// block-render handler. Mirrors the editor-side BlockRenderProps so
+// plugin authors writing both halves see one shape.
+type PluginBlockRequest struct {
+	// BlockType is the full namespaced type ("plugin/seo/sitemap-link").
+	BlockType string `json:"blockType"`
+	// Attributes is the block's persisted attribute bag.
+	Attributes map[string]any `json:"attributes,omitempty"`
+	// Inner is the already-rendered HTML for the block's children.
+	// Plugins compose this with their own markup; the walker has
+	// already escaped it so the plugin must NOT re-escape.
+	Inner string `json:"inner,omitempty"`
+	// Context is the consumed-context map (filtered by the spec's
+	// UsesContext list). Empty when the block didn't opt into any
+	// context keys.
+	Context map[string]any `json:"context,omitempty"`
+}
+
 // Walker renders a BlockTree against a Registry.
 //
 // Walker is stateless besides its Registry pointer — Walk may be
@@ -155,7 +197,8 @@ func (e WalkError) Unwrap() error { return e.Err }
 // mutating it while a walk is in flight, but doing so is not a data
 // race in the Go memory-model sense.
 type Walker struct {
-	registry *Registry
+	registry         *Registry
+	pluginDispatcher PluginBlockDispatcher
 }
 
 // New constructs a Walker bound to the given Registry. The registry
@@ -167,6 +210,15 @@ func New(reg *Registry) *Walker {
 		panic("render.New: registry is nil")
 	}
 	return &Walker{registry: reg}
+}
+
+// WithPluginDispatcher attaches a PluginBlockDispatcher so the walker
+// can resolve `plugin/<slug>/<handler>` block types. Without one, plugin
+// blocks fall through to the ErrUnknownBlockType placeholder — the
+// same behaviour callers see for any unregistered type.
+func (w *Walker) WithPluginDispatcher(d PluginBlockDispatcher) *Walker {
+	w.pluginDispatcher = d
+	return w
 }
 
 // Walk renders the given tree with the supplied root context.
@@ -210,6 +262,16 @@ func (w *Walker) Walk(tree BlockTree, ctx Context) WalkResult {
 // renderer. This mirrors the TS canvas's filterConsumedContext /
 // resolveProvidedContext flow.
 func (w *Walker) walkBlock(block Block, inherited Context, path string) (template.HTML, []WalkError) {
+	// Plugin-block fast path. Block types of the form
+	// `plugin/<slug>/<handler>` are dispatched to the plugin's WASM
+	// handler via the hook bus rather than through the local registry.
+	// We still recurse into InnerBlocks first so the plugin handler
+	// receives already-rendered children, matching the semantics of
+	// normal block renderers.
+	if slug, handler, ok := parsePluginBlockType(block.Type); ok && w.pluginDispatcher != nil {
+		return w.dispatchPluginBlock(block, inherited, path, slug, handler)
+	}
+
 	spec, ok := w.registry.Get(block.Type)
 	if !ok {
 		err := WalkError{
@@ -251,6 +313,71 @@ func (w *Walker) walkBlock(block Block, inherited Context, path string) (templat
 		return renderErrorHTML(block.Type, err), errs
 	}
 	return out, errs
+}
+
+// parsePluginBlockType cracks "plugin/<slug>/<handler>" into its two
+// parts. The split returns ok=false for any non-plugin block type so
+// the walker's fast-path bailout is a single string-compare in the
+// common case.
+//
+// The handler part may itself contain "/"; we split on the first two
+// segments only so a plugin block named "plugin/seo/listing/card" is
+// dispatched as slug="seo", handler="listing/card".
+func parsePluginBlockType(blockType string) (slug, handler string, ok bool) {
+	const prefix = "plugin/"
+	if !strings.HasPrefix(blockType, prefix) {
+		return "", "", false
+	}
+	rest := blockType[len(prefix):]
+	slash := strings.IndexByte(rest, '/')
+	if slash <= 0 || slash == len(rest)-1 {
+		return "", "", false
+	}
+	return rest[:slash], rest[slash+1:], true
+}
+
+// dispatchPluginBlock walks InnerBlocks depth-first (so the plugin
+// handler receives already-rendered children), assembles the
+// PluginBlockRequest, and routes it through the configured
+// PluginBlockDispatcher. The returned HTML replaces the block's
+// position in the output stream; errors degrade to the same
+// render-error placeholder a regular renderer error produces, so the
+// page stays alive when one plugin block misbehaves.
+func (w *Walker) dispatchPluginBlock(block Block, inherited Context, path, slug, handler string) (template.HTML, []WalkError) {
+	// Render inner blocks first so the plugin receives them already
+	// composed. We do NOT pass plugin-provided context here because
+	// the manifest's ProvidesContext mechanism doesn't apply to plugin
+	// blocks (they own their entire render); children inherit the
+	// upstream context unchanged.
+	var innerHTML template.HTML
+	var errs []WalkError
+	if len(block.InnerBlocks) > 0 {
+		var inner strings.Builder
+		for i, child := range block.InnerBlocks {
+			childPath := fmt.Sprintf("%s/innerBlocks/%d", path, i)
+			out, childErrs := w.walkBlock(child, inherited, childPath)
+			inner.WriteString(string(out))
+			errs = append(errs, childErrs...)
+		}
+		innerHTML = template.HTML(inner.String())
+	}
+
+	req := PluginBlockRequest{
+		BlockType:  block.Type,
+		Attributes: block.Attributes,
+		Inner:      string(innerHTML),
+		Context:    inherited,
+	}
+	html, err := w.pluginDispatcher.Dispatch(slug, handler, req)
+	if err != nil {
+		errs = append(errs, WalkError{
+			Path:      path,
+			BlockType: block.Type,
+			Err:       err,
+		})
+		return renderErrorHTML(block.Type, err), errs
+	}
+	return html, errs
 }
 
 // mergeProvidedContext layers the block's ProvidesContext values on
