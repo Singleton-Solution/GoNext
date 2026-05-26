@@ -145,6 +145,7 @@ type Manager struct {
 	logger      *slog.Logger
 	now         func() time.Time
 	dependGate  *depends.Gate
+	breaker     *Breaker
 }
 
 // ManagerOption configures a Manager at construction time. Functional
@@ -349,6 +350,15 @@ func (m *Manager) Activate(ctx context.Context, slug string) error {
 			current.State)
 	}
 
+	// Refuse activation while the breaker is Open. The operator has to
+	// inspect the trip history (the row's audit trail surfaces it) and
+	// call ResetBreaker before the plugin can come back online. This
+	// keeps a wedged plugin from auto-recovering into an immediate
+	// re-trip loop.
+	if m.breaker != nil && m.breaker.State(slug) == BreakerOpen {
+		return fmt.Errorf("lifecycle: Activate %q: %w", slug, ErrBreakerOpen)
+	}
+
 	// Dependency gate runs BEFORE Runtime.Load so a failing gate
 	// doesn't waste a WASM instantiation. We parse the manifest
 	// blob the row carries; if it isn't a gonext.io/v1 manifest the
@@ -506,6 +516,15 @@ func (m *Manager) Reset(ctx context.Context, slug string) error {
 	}
 	if err := m.storage.UpdateState(ctx, slug, StateErrored, StateInactive, fields); err != nil {
 		return err
+	}
+
+	// Reset the breaker so a recovered plugin starts fresh. If the
+	// operator went straight from Errored to Reset (e.g. they fixed a
+	// migration issue without ever crossing the trip threshold), this
+	// is a no-op; the safety is on the path where Errored coincided
+	// with an Open breaker from a separate Trip flow.
+	if m.breaker != nil {
+		m.breaker.Reset(slug)
 	}
 
 	m.audit(ctx, slug, "plugin.reset", audit.SeverityInfo, map[string]any{
