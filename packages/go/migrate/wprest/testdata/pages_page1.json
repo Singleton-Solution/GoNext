@@ -1,0 +1,18 @@
+[
+  {
+    "id": 50,
+    "date": "2024-01-01T00:00:00",
+    "date_gmt": "2024-01-01T00:00:00",
+    "slug": "about",
+    "status": "publish",
+    "type": "page",
+    "link": "https://example.com/about/",
+    "title": {"rendered": "About", "raw": "About"},
+    "content": {"rendered": "<p>About us</p>", "raw": "<p>About us</p>"},
+    "author": 1,
+    "parent": 0,
+    "menu_order": 0,
+    "categories": [],
+    "tags": []
+  }
+]

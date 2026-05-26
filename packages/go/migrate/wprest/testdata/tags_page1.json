@@ -1,0 +1,11 @@
+[
+  {
+    "id": 10,
+    "count": 3,
+    "description": "Stuff",
+    "link": "https://example.com/tag/news",
+    "name": "News",
+    "slug": "news",
+    "taxonomy": "post_tag"
+  }
+]
