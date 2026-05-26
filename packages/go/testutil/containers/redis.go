@@ -21,6 +21,9 @@ import (
 // via the URL path).
 func Redis(t testing.TB, opts ...RedisOption) (url string) {
 	t.Helper()
+	if testing.Short() {
+		t.Skip("integration test: skip under -short (covered by nightly-full-tests workflow)")
+	}
 	if skipIfNoDocker(t) {
 		return ""
 	}

@@ -29,6 +29,9 @@ import (
 // just add a layer of dereferencing for no gain.
 func MinIO(t testing.TB, opts ...MinIOOption) (endpoint, accessKey, secretKey string) {
 	t.Helper()
+	if testing.Short() {
+		t.Skip("integration test: skip under -short (covered by nightly-full-tests workflow)")
+	}
 	if skipIfNoDocker(t) {
 		return "", "", ""
 	}

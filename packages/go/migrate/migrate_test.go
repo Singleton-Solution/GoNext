@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -112,9 +114,13 @@ func TestSourceURLForDir_Relative(t *testing.T) {
 
 // --- Integration tests below: require a real Postgres + migrations dir ---
 
-// countMigrations returns the number of up-migration files in dir. The
-// canonical migration runner picks them up in lexical order, so this
-// is the version we expect Status() to report after a successful Run().
+// countMigrations returns the highest version number among the
+// up-migration files in dir. The canonical migration runner uses the
+// numeric prefix as the version; we parse the prefix off the last
+// (lexically-greatest) file and report that. Using the max version
+// rather than len() makes the test robust against gaps (parallel
+// branches can each take their own slot without forcing every PR to
+// rebase on every other).
 func countMigrations(t *testing.T, dir string) uint {
 	t.Helper()
 	matches, err := filepath.Glob(filepath.Join(dir, "*.up.sql"))
@@ -124,7 +130,16 @@ func countMigrations(t *testing.T, dir string) uint {
 	if len(matches) == 0 {
 		t.Fatalf("no *.up.sql files found in %s", dir)
 	}
-	return uint(len(matches)) //nolint:gosec // file count, can't overflow
+	// Lexical sort puts the highest 000NNN_ prefix last.
+	sort.Strings(matches)
+	last := filepath.Base(matches[len(matches)-1])
+	// "000033_foo.up.sql" → "000033"
+	prefix := strings.SplitN(last, "_", 2)[0]
+	n, err := strconv.ParseUint(prefix, 10, 64)
+	if err != nil {
+		t.Fatalf("parse version prefix %q from %q: %v", prefix, last, err)
+	}
+	return uint(n) //nolint:gosec
 }
 
 func TestRun_IntegrationApplyAndRollback(t *testing.T) {
