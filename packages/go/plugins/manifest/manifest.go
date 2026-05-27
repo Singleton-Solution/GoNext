@@ -138,6 +138,8 @@ type Flags struct {
 	// RegisterFilter. Default false; legacy plugins keep the per-item
 	// contract.
 	ApplyFiltersBatch bool `json:"apply_filters_batch,omitempty"`
+}
+
 // AdminPage describes one admin sidebar entry a plugin contributes
 // under the "Plugins" group. Issue #228.
 type AdminPage struct {
