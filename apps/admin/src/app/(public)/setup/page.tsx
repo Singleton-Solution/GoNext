@@ -20,6 +20,7 @@
  */
 import type { ReactElement } from 'react';
 import { redirect } from 'next/navigation';
+import { serverApiGet } from '@/lib/server-api';
 import SetupWizard from './SetupWizard';
 import type { SetupStatus } from './types';
 
@@ -29,31 +30,20 @@ import type { SetupStatus } from './types';
 // should have closed.
 export const dynamic = 'force-dynamic';
 
-// Resolve the API base for server-side fetch. NEXT_PUBLIC_API_URL is
-// the canonical client-side var; for SSR we fall back to the API
-// service's intra-cluster name. In `make up` both line up at
-// `http://localhost:8080`.
-function apiBaseURL(): string {
-  return (
-    process.env.GONEXT_API_URL ??
-    process.env.NEXT_PUBLIC_API_URL ??
-    'http://localhost:8080'
-  );
-}
-
 /**
  * Server-side fetch of the install status. Returns either the parsed
  * payload or null when the API is unreachable / responds non-200.
+ *
+ * Uses `serverApiGet` for a consistent code path with the rest of the
+ * admin's server-side fetches — no cookie is expected on `/setup`
+ * (the user isn't signed in yet) but the helper happily forwards an
+ * empty cookie store and the API ignores it.
  */
 async function fetchStatus(): Promise<SetupStatus | null> {
   try {
-    const res = await fetch(`${apiBaseURL()}/api/v1/setup/status`, {
-      method: 'GET',
-      cache: 'no-store',
-      headers: { Accept: 'application/json' },
-    });
-    if (!res.ok) return null;
-    const json = (await res.json()) as Partial<SetupStatus>;
+    const json = await serverApiGet<Partial<SetupStatus>>(
+      '/api/v1/setup/status',
+    );
     if (typeof json.installation_completed !== 'boolean') return null;
     if (typeof json.user_count !== 'number') return null;
     return {

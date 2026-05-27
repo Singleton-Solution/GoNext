@@ -10,11 +10,10 @@
  * instrument-panel feel as the DLQ surface — Headline ("Webhook
  * *subscriptions*."), eyebrow, Geist body, primary CTA to create.
  */
-import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { Suspense, type ReactElement } from 'react';
-import { apiBaseUrl } from '@/lib/api-client';
+import { serverApiFetch } from '@/lib/server-api';
 import { Headline } from '@/components/ui/headline';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,26 +26,8 @@ async function fetchInitialSubscriptions(): Promise<{
   data: SubscriptionListResponse | null;
   error: string | null;
 }> {
-  let cookieHeader = '';
   try {
-    const store = await cookies();
-    cookieHeader = store
-      .getAll()
-      .map((c) => `${c.name}=${c.value}`)
-      .join('; ');
-  } catch {
-    cookieHeader = '';
-  }
-  const url = `${apiBaseUrl}/api/v1/admin/webhooks?limit=30`;
-  try {
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-      },
-      cache: 'no-store',
-    });
+    const res = await serverApiFetch('/api/v1/admin/webhooks?limit=30');
     if (!res.ok) {
       return { data: null, error: `HTTP ${res.status}` };
     }

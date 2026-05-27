@@ -16,12 +16,11 @@
  * island so the server component stays free of mutation logic.
  */
 import { ArrowLeft } from 'lucide-react';
-import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { type ReactElement } from 'react';
 
 import { Headline } from '@/components/ui/headline';
-import { apiBaseUrl } from '@/lib/api-client';
+import { serverApiFetch } from '@/lib/server-api';
 import { cn } from '@/lib/utils';
 
 import { StatusBadge } from '../components/StatusBadge';
@@ -41,23 +40,6 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-async function authHeaders(): Promise<HeadersInit> {
-  let cookieHeader = '';
-  try {
-    const store = await cookies();
-    cookieHeader = store
-      .getAll()
-      .map((c) => `${c.name}=${c.value}`)
-      .join('; ');
-  } catch {
-    cookieHeader = '';
-  }
-  return {
-    Accept: 'application/json',
-    ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-  };
-}
-
 async function fetchComment(id: string): Promise<Comment | null> {
   // We fetch via the list endpoint filtered by a single post — the
   // detail endpoint isn't strictly required for the first cut.
@@ -65,12 +47,8 @@ async function fetchComment(id: string): Promise<Comment | null> {
   // (status-filtered out), we widen and re-fetch. The cost is
   // bounded and the code stays simple until a dedicated GET-by-id
   // lands.
-  const headers = await authHeaders();
   try {
-    const res = await fetch(
-      `${apiBaseUrl}/api/v1/admin/comments?limit=100`,
-      { method: 'GET', headers, cache: 'no-store' },
-    );
+    const res = await serverApiFetch('/api/v1/admin/comments?limit=100');
     if (!res.ok) return null;
     const wire = (await res.json()) as WireListResponse;
     const found = wire.data.find((c) => c.id === id);
@@ -81,11 +59,9 @@ async function fetchComment(id: string): Promise<Comment | null> {
 }
 
 async function fetchThread(postId: string): Promise<CommentListResponse | null> {
-  const headers = await authHeaders();
   try {
-    const res = await fetch(
-      `${apiBaseUrl}/api/v1/admin/comments?post_id=${encodeURIComponent(postId)}&limit=100`,
-      { method: 'GET', headers, cache: 'no-store' },
+    const res = await serverApiFetch(
+      `/api/v1/admin/comments?post_id=${encodeURIComponent(postId)}&limit=100`,
     );
     if (!res.ok) return null;
     const wire = (await res.json()) as WireListResponse;

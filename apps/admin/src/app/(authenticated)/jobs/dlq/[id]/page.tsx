@@ -11,11 +11,10 @@
  * italic accent so an operator immediately sees what kind of failure
  * they're inspecting.
  */
-import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
 import { Suspense, type ReactElement } from 'react';
-import { apiBaseUrl } from '@/lib/api-client';
+import { serverApiFetch } from '@/lib/server-api';
 import { Card } from '@/components/ui/card';
 import { DLQDetailClient } from './DLQDetailClient';
 import type { ArchivedTask } from '../types';
@@ -26,27 +25,10 @@ async function fetchTask(
   id: string,
   queue: string,
 ): Promise<{ data: ArchivedTask | null; error: string | null }> {
-  let cookieHeader = '';
   try {
-    const store = await cookies();
-    cookieHeader = store
-      .getAll()
-      .map((c) => `${c.name}=${c.value}`)
-      .join('; ');
-  } catch {
-    cookieHeader = '';
-  }
-
-  const url = `${apiBaseUrl}/api/v1/admin/jobs/dlq/${encodeURIComponent(id)}?queue=${encodeURIComponent(queue)}`;
-  try {
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-      },
-      cache: 'no-store',
-    });
+    const res = await serverApiFetch(
+      `/api/v1/admin/jobs/dlq/${encodeURIComponent(id)}?queue=${encodeURIComponent(queue)}`,
+    );
     if (!res.ok) {
       return { data: null, error: `HTTP ${res.status}` };
     }

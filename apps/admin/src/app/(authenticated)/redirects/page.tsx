@@ -7,10 +7,9 @@
  * delegates to <RedirectsListClient> which now wears the brand-token
  * card / tab / mono-path styling.
  */
-import { cookies } from 'next/headers';
 import { Suspense, type ReactElement } from 'react';
 import Link from 'next/link';
-import { apiBaseUrl } from '@/lib/api-client';
+import { serverApiFetch } from '@/lib/server-api';
 import { Headline } from '@/components/ui/headline';
 import { Button } from '@/components/ui/button';
 import { RedirectsListClient } from './RedirectsListClient';
@@ -19,26 +18,8 @@ import type { RedirectListResponse } from './types';
 export const dynamic = 'force-dynamic';
 
 async function fetchInitial(): Promise<{ data: RedirectListResponse | null; error: string | null }> {
-  let cookieHeader = '';
   try {
-    const store = await cookies();
-    cookieHeader = store
-      .getAll()
-      .map((c) => `${c.name}=${c.value}`)
-      .join('; ');
-  } catch {
-    cookieHeader = '';
-  }
-  const url = `${apiBaseUrl}/api/v1/admin/redirects?limit=30`;
-  try {
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-      },
-      cache: 'no-store',
-    });
+    const res = await serverApiFetch('/api/v1/admin/redirects?limit=30');
     if (!res.ok) {
       return { data: null, error: `HTTP ${res.status}` };
     }

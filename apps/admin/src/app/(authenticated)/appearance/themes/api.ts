@@ -1,12 +1,14 @@
 /**
  * Themes admin API client — small fetch wrappers over the
  * /api/v1/admin/themes surface. Server-side calls forward the
- * inbound cookie header so the API auth middleware sees the
- * session; client-side calls rely on `credentials: 'include'` to
- * carry the cookie cross-origin (admin runs on :3001, api on :8080).
+ * inbound cookie header via `serverApiFetch` so the API auth
+ * middleware sees the session; client-side calls (install/activate)
+ * rely on `credentials: 'include'` to carry the cookie cross-origin
+ * (admin runs on :3001, api on :8080).
  */
 
 import { apiBaseUrl } from '@/lib/api-client';
+import { serverApiFetch } from '@/lib/server-api';
 import type { InstallResponse, ThemesListResponse } from './types';
 
 const LIST_URL = '/api/v1/admin/themes';
@@ -16,17 +18,11 @@ const ACTIVATE_URL = '/api/v1/admin/themes/activate';
 /**
  * Server-side list fetch. Returns `null` on any non-2xx so the
  * caller can render an empty-state without short-circuiting the
- * whole page render.
+ * whole page render. Cookie forwarding is handled by `serverApiFetch`.
  */
-export async function fetchThemesList(cookieHeader: string): Promise<ThemesListResponse | null> {
+export async function fetchThemesList(): Promise<ThemesListResponse | null> {
   try {
-    const res = await fetch(`${apiBaseUrl}${LIST_URL}`, {
-      headers: {
-        Accept: 'application/json',
-        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-      },
-      cache: 'no-store',
-    });
+    const res = await serverApiFetch(LIST_URL);
     if (!res.ok) {
       return null;
     }

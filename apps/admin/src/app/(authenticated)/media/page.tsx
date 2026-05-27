@@ -9,9 +9,8 @@
  *
  * Issue: media library.
  */
-import { cookies } from 'next/headers';
 import type { ReactElement } from 'react';
-import { apiBaseUrl } from '@/lib/api-client';
+import { serverApiFetch } from '@/lib/server-api';
 import { MediaGrid } from './components/MediaGrid';
 import type { MediaListResponse } from './types';
 
@@ -24,25 +23,8 @@ export const dynamic = 'force-dynamic';
  * blip.
  */
 async function fetchInitial(): Promise<MediaListResponse | null> {
-  let cookieHeader = '';
   try {
-    const store = await cookies();
-    cookieHeader = store
-      .getAll()
-      .map((c) => `${c.name}=${c.value}`)
-      .join('; ');
-  } catch {
-    cookieHeader = '';
-  }
-  try {
-    const res = await fetch(`${apiBaseUrl}/api/v1/admin/media?limit=30`, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-      },
-      cache: 'no-store',
-    });
+    const res = await serverApiFetch('/api/v1/admin/media?limit=30');
     if (!res.ok) return null;
     return (await res.json()) as MediaListResponse;
   } catch {
