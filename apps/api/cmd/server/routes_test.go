@@ -70,6 +70,33 @@ func TestBuildRouter_DocumentedRoutesAreMounted(t *testing.T) {
 		// rest/render — block preview endpoint backing the editor's
 		// preview pane. Stateless, mounts unconditionally.
 		{"render.preview", http.MethodPost, "/api/v1/render/preview"},
+
+		// Newly-wired public REST surfaces. Each route uses a memory-
+		// backed store so the smoke test runs without a pool. We use
+		// the list endpoint rather than the get-by-id form because the
+		// list returns 200 + empty page for an empty store, whereas
+		// get-by-id returns 404 (not_found) — indistinguishable from
+		// the "route not mounted" 404 at this layer of the test.
+		{"rest.users.list", http.MethodGet, "/api/v1/users"},
+		{"rest.comments.global.list", http.MethodGet, "/api/v1/comments"},
+		{"rest.media.list", http.MethodGet, "/api/v1/media"},
+		{"rest.terms.list", http.MethodGet, "/api/v1/terms"},
+		{"rest.taxonomies.list", http.MethodGet, "/api/v1/taxonomies"},
+
+		// Newly-wired admin surfaces. menus + pluginpages + status
+		// mount unconditionally; webhooks runs against the in-memory
+		// store. impersonate's POST/{id} pattern requires a path
+		// segment so we hit an arbitrary id.
+		{"admin.menus.list", http.MethodGet, "/api/v1/admin/menus"},
+		{"admin.pluginpages.list", http.MethodGet, "/api/v1/admin/plugin-pages"},
+		{"admin.status", http.MethodGet, "/api/v1/admin/status"},
+		{"admin.webhooks.list", http.MethodGet, "/api/v1/admin/webhooks"},
+		{"admin.impersonate", http.MethodPost, "/api/v1/admin/users/abc/impersonate"},
+		{"auth.impersonation.banner", http.MethodGet, "/api/v1/auth/impersonation"},
+
+		// WebAuthn / passkeys. The begin/finish routes only mount
+		// when sessions is non-nil (it is in this test).
+		{"auth.webauthn.credentials", http.MethodGet, "/api/v1/auth/webauthn/credentials"},
 	}
 
 	// Pass a non-nil session manager so the login + sessions blocks

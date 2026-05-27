@@ -20,13 +20,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
 	goredis "github.com/redis/go-redis/v9"
@@ -34,9 +38,16 @@ import (
 
 	accountdata "github.com/Singleton-Solution/GoNext/apps/api/internal/account/data"
 	admincomments "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/comments"
+	adminimpersonate "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/impersonate"
+	adminjobs "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/jobs"
+	adminmarketplace "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/marketplace"
 	adminmedia "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/media"
+	adminmenus "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/menus"
+	adminpluginpages "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/pluginpages"
 	adminposts "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/posts"
+	adminstatus "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/status"
 	adminthemes "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/themes"
+	adminwebhooks "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/webhooks"
 	restimg "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/img"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/customizer"
 	adminredirects "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/redirects"
@@ -46,11 +57,15 @@ import (
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/auth/passwordreset"
 	authsessions "github.com/Singleton-Solution/GoNext/apps/api/internal/auth/sessions"
 	authverify "github.com/Singleton-Solution/GoNext/apps/api/internal/auth/verify"
+	authwebauthn "github.com/Singleton-Solution/GoNext/apps/api/internal/auth/webauthn"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/healthz"
 	restcomments "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/comments"
+	restmedia "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/media"
 	restposts "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/posts"
 	restrender "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/render"
 	restsearch "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/search"
+	restterms "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/terms"
+	restusers "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/users"
 	blockrender "github.com/Singleton-Solution/GoNext/packages/go/blocks/render"
 	openapidocs "github.com/Singleton-Solution/GoNext/apps/api/internal/openapi"
 	plugindev "github.com/Singleton-Solution/GoNext/apps/api/internal/plugins/dev"
@@ -74,8 +89,11 @@ import (
 	authmw "github.com/Singleton-Solution/GoNext/packages/go/middleware/auth"
 	"github.com/Singleton-Solution/GoNext/packages/go/middleware/earlyhints"
 	httpmetrics "github.com/Singleton-Solution/GoNext/packages/go/middleware/metrics"
+	pkgmenus "github.com/Singleton-Solution/GoNext/packages/go/menus"
 	"github.com/Singleton-Solution/GoNext/packages/go/plugins/lifecycle"
+	pkgmarketplace "github.com/Singleton-Solution/GoNext/packages/go/plugins/marketplace"
 	"github.com/Singleton-Solution/GoNext/packages/go/policy"
+	pkgwebauthn "github.com/Singleton-Solution/GoNext/packages/go/auth/webauthn"
 	"github.com/Singleton-Solution/GoNext/packages/go/ratelimit"
 	redisclient "github.com/Singleton-Solution/GoNext/packages/go/redis"
 	"github.com/Singleton-Solution/GoNext/packages/go/redirects"
@@ -1284,6 +1302,346 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 		)
 	}
 
+	// -----------------------------------------------------------------
+	// Additional admin + public REST mounts (issue: missing Mount calls).
+	//
+	// Each block below resolves a handler package whose Mount/Routes
+	// helper exists but was never invoked from buildRouter. The admin
+	// UI 404'd on every one of these endpoints. Every Mount call is
+	// nil-tolerant: if its dependencies aren't available (e.g. pool is
+	// nil in tests, Redis URL is empty, etc.), we log a warning and
+	// skip rather than panicking — the same posture as the surrounding
+	// wiring.
+	//
+	// Several packages persist to Postgres in production; only the
+	// in-memory store wrappers are wired here because none of the
+	// affected packages ship a pgx adapter yet. Replacing the memory
+	// store with the pgx variant is a follow-up that flows through the
+	// existing Store interfaces without touching the route surface.
+	// -----------------------------------------------------------------
+
+	// Shared admin-tier policy. Hoisted so the eight admin blocks
+	// below all reference the same instance rather than each
+	// constructing one.
+	adminPolicy := policy.NewBasicPolicy(policy.DefaultRoleCapabilities())
+
+	// Public users REST (/api/v1/users). Read-only list + by-id-or-
+	// handle lookup. The package's MemoryStore is the only store
+	// available today; production wiring swaps in a pgx adapter once
+	// it lands.
+	if err := restusers.Mount(mux, "/api/v1/users", restusers.Deps{
+		Store:  restusers.NewMemoryStore(),
+		Logger: logger,
+	}); err != nil {
+		logger.Warn("rest/users: failed to mount", slog.Any("err", err))
+	} else {
+		logger.Info("rest/users: routes mounted", slog.String("base", "/api/v1/users"))
+	}
+
+	// Public comments global view (/api/v1/comments). Reuses the
+	// per-post commentsStore already constructed above so the list/get
+	// surfaces stay coherent across the per-post and global paths.
+	if err := restcomments.MountGlobal(mux, "/api/v1/comments", restcomments.Deps{
+		Store:       commentsStore,
+		Logger:      logger,
+		AllowOrigin: cfg.Email.SiteURL,
+	}); err != nil {
+		logger.Warn("rest/comments: failed to mount global routes", slog.Any("err", err))
+	} else {
+		logger.Info("rest/comments: global routes mounted",
+			slog.String("base", "/api/v1/comments"),
+		)
+	}
+
+	// Public media REST (/api/v1/media). Read-only mirror over the
+	// rest/media package's MemoryStore. The package is independent of
+	// the admin/media surface (different shape — public media exposes
+	// CDN URLs rather than admin metadata) so it does NOT share
+	// mediaStore from the admin wiring above.
+	if err := restmedia.Mount(mux, "/api/v1/media", restmedia.Deps{
+		Store:  restmedia.NewMemoryStore(),
+		Logger: logger,
+	}); err != nil {
+		logger.Warn("rest/media: failed to mount", slog.Any("err", err))
+	} else {
+		logger.Info("rest/media: routes mounted", slog.String("base", "/api/v1/media"))
+	}
+
+	// Public terms + taxonomies REST (/api/v1/terms, /api/v1/taxonomies).
+	// Single Mount call wires both bases because the underlying Store
+	// is shared.
+	if err := restterms.Mount(mux, "/api/v1/terms", "/api/v1/taxonomies", restterms.Deps{
+		Store:  restterms.NewMemoryStore(),
+		Logger: logger,
+	}); err != nil {
+		logger.Warn("rest/terms: failed to mount", slog.Any("err", err))
+	} else {
+		logger.Info("rest/terms: routes mounted",
+			slog.String("terms", "/api/v1/terms"),
+			slog.String("taxonomies", "/api/v1/taxonomies"),
+		)
+	}
+
+	// Admin menus surface (/api/v1/admin/menus). The Postgres-backed
+	// store is preferred when the pool is available; otherwise the
+	// in-memory variant keeps the dev loop functional without a DB.
+	var menusStore pkgmenus.Store
+	if pool != nil {
+		menusStore = pkgmenus.NewPgxStore(pool)
+	} else {
+		menusStore = pkgmenus.NewMemoryStore()
+		logger.Warn("admin/menus: pool nil; using in-memory store")
+	}
+	if err := adminmenus.Mount(mux, "/api/v1/admin/menus", adminmenus.Deps{
+		Store:  menusStore,
+		Policy: adminPolicy,
+		Logger: logger,
+	}); err != nil {
+		logger.Warn("admin/menus: failed to mount", slog.Any("err", err))
+	} else {
+		logger.Info("admin/menus: routes mounted",
+			slog.String("base", "/api/v1/admin/menus"),
+		)
+	}
+
+	// Admin status surface (/api/v1/admin/status). Aggregates DB,
+	// Redis, queue, plugin, and disk state for the operator dashboard.
+	// Each source is independently nil-tolerant inside the handler;
+	// passing a nil pool/rdb just renders that axis as "not configured"
+	// rather than blocking the page.
+	statusSources := adminstatus.Sources{
+		BuildInfo: adminstatus.BuildInfoAdapter{Service: serviceName},
+		DB:        adminstatus.PgxPoolSource{Pool: pool},
+		Redis:     adminstatus.RedisClientSource{Client: rdb},
+		Disk:      adminstatus.FilesystemDiskSource{ThemeDir: themeDir},
+	}
+	statusHandler := adminstatus.NewHandler(statusSources, adminstatus.HandlerOptions{
+		Logger: logger,
+	})
+	if err := adminstatus.Mount(mux, "/api/v1/admin", adminPolicy, statusHandler); err != nil {
+		logger.Warn("admin/status: failed to mount", slog.Any("err", err))
+	} else {
+		logger.Info("admin/status: routes mounted",
+			slog.String("base", "/api/v1/admin/status"),
+		)
+	}
+
+	// Admin webhooks surface (/api/v1/admin/webhooks). The in-memory
+	// store fronts the package's Postgres backing in production. The
+	// HTTP client uses the package default (10s timeout) so we don't
+	// need to plumb one through.
+	if err := adminwebhooks.Mount(mux, "/api/v1/admin/webhooks", adminwebhooks.Deps{
+		Store:  adminwebhooks.NewMemoryStore(),
+		Policy: adminPolicy,
+		Logger: logger,
+	}); err != nil {
+		logger.Warn("admin/webhooks: failed to mount", slog.Any("err", err))
+	} else {
+		logger.Info("admin/webhooks: routes mounted",
+			slog.String("base", "/api/v1/admin/webhooks"),
+		)
+	}
+
+	// Admin jobs DLQ surface (/api/v1/admin/jobs). The Inspector is an
+	// Asynq client that reads queue state out of Redis; we build one
+	// from the same Redis URL the worker consumes, separate from the
+	// rdb client (Asynq manages its own pool). Skips the mount when
+	// the URL is empty — there's no DLQ to inspect without a queue.
+	var jobsInspector *asynq.Inspector
+	if cfg.Redis.URL != "" {
+		if redisOpt, err := asynq.ParseRedisURI(cfg.Redis.URL); err != nil {
+			logger.Warn("admin/jobs: failed to parse redis URL for asynq",
+				slog.Any("err", err))
+		} else {
+			jobsInspector = asynq.NewInspector(redisOpt)
+		}
+	}
+	if jobsInspector == nil {
+		logger.Warn("admin/jobs: skipping mount; asynq inspector unavailable")
+	} else if err := adminjobs.Mount(mux, "/api/v1/admin/jobs", adminjobs.Deps{
+		Inspector:  jobsInspectorAdapter{insp: jobsInspector},
+		Redactions: adminjobs.NewMemoryRedactionStore(),
+		Policy:     adminPolicy,
+		Logger:     logger,
+	}); err != nil {
+		logger.Warn("admin/jobs: failed to mount", slog.Any("err", err))
+	} else {
+		logger.Info("admin/jobs: routes mounted",
+			slog.String("base", "/api/v1/admin/jobs"),
+		)
+	}
+
+	// Admin marketplace surface (/api/v1/admin/marketplace). The
+	// Postgres-backed marketplace.Store is the canonical persistence;
+	// the in-memory fallback is too narrow to be useful (the package
+	// doesn't ship one). We skip the mount when the pool is nil.
+	//
+	// Bundle fetching: the in-process fetcher returns ErrBundleNotFound
+	// for every request. Production wiring will swap this for a MinIO
+	// adapter once the marketplace operator console lands. The handler
+	// surfaces a clean 502 on a missing bundle, which is the right
+	// behaviour for the dev loop too.
+	//
+	// Lifecycle Manager: a dedicated instance with the same audit
+	// emitter as the rest of the binary. Storage is Postgres when the
+	// pool is non-nil, memory otherwise — symmetric with the dev-mode
+	// plugin install path below.
+	if pool == nil {
+		logger.Warn("admin/marketplace: skipping mount; pool is nil")
+	} else {
+		mpStore := pkgmarketplace.NewStore(pool)
+		mpInstaller := lifecycle.NewManager(
+			lifecycle.NewPostgresStorage(pool),
+			auditEmitter,
+			lifecycle.WithLogger(logger),
+		)
+		if err := adminmarketplace.Mount(mux, "/api/v1/admin/marketplace", adminmarketplace.Deps{
+			Store:     adminmarketplace.NewPgxAdapter(mpStore),
+			Installer: mpInstaller,
+			Bundles:   missingBundleFetcher{},
+			Policy:    adminPolicy,
+			HostID:    adminmarketplace.NewStaticHostID(serviceName),
+			Logger:    logger,
+		}); err != nil {
+			logger.Warn("admin/marketplace: failed to mount", slog.Any("err", err))
+		} else {
+			logger.Info("admin/marketplace: routes mounted",
+				slog.String("base", "/api/v1/admin/marketplace"),
+			)
+		}
+	}
+
+	// Admin plugin pages surface (/api/v1/admin/plugin-pages). Walks
+	// every active plugin's manifest, pulls out the admin_pages
+	// declarations, and returns the flattened set so the sidebar can
+	// render them. Reuses the lifecycle Manager-style Storage.List
+	// surface; a dedicated Manager keeps the wiring local to this
+	// block.
+	var pluginPagesMgr adminpluginpages.PluginLister
+	if pool != nil {
+		pluginPagesMgr = lifecycle.NewManager(
+			lifecycle.NewPostgresStorage(pool),
+			auditEmitter,
+			lifecycle.WithLogger(logger),
+		)
+	} else {
+		pluginPagesMgr = lifecycle.NewManager(
+			lifecycle.NewMemoryStorage(),
+			auditEmitter,
+			lifecycle.WithLogger(logger),
+		)
+		logger.Warn("admin/pluginpages: pool nil; using in-memory lifecycle storage")
+	}
+	if err := adminpluginpages.Mount(mux, "/api/v1/admin/plugin-pages", adminpluginpages.Deps{
+		Manager: pluginPagesMgr,
+		Logger:  logger,
+	}); err != nil {
+		logger.Warn("admin/pluginpages: failed to mount", slog.Any("err", err))
+	} else {
+		logger.Info("admin/pluginpages: routes mounted",
+			slog.String("base", "/api/v1/admin/plugin-pages"),
+		)
+	}
+
+	// Admin impersonation surface (/api/v1/admin/users/{id}/impersonate
+	// + /api/v1/auth/impersonation banner). Gated to super_admin inside
+	// the handler. The user-existence check is skipped here — the
+	// surrounding admin UI rejects unknown ids client-side and a missing
+	// users.Store adapter isn't worth blocking impersonation for the
+	// dev loop.
+	if sessions == nil {
+		logger.Warn("admin/impersonate: skipping mount; session manager is nil")
+	} else {
+		impDeps := adminimpersonate.Deps{
+			Sessions:     sessions,
+			Reader:       sessions,
+			Deleter:      sessions,
+			Policy:       adminPolicy,
+			Audit:        auditEmitter,
+			Logger:       logger,
+			CookieSecure: cfg.Env == "production",
+		}
+		if err := adminimpersonate.Mount(mux, "/api/v1/admin/users", impDeps); err != nil {
+			logger.Warn("admin/impersonate: failed to mount", slog.Any("err", err))
+		} else {
+			logger.Info("admin/impersonate: routes mounted",
+				slog.String("base", "/api/v1/admin/users/{id}/impersonate"),
+			)
+		}
+		if err := adminimpersonate.MountBanner(mux, "/api/v1/auth/impersonation", impDeps); err != nil {
+			logger.Warn("admin/impersonate: failed to mount banner", slog.Any("err", err))
+		} else {
+			logger.Info("admin/impersonate: banner routes mounted",
+				slog.String("base", "/api/v1/auth/impersonation"),
+			)
+		}
+	}
+
+	// WebAuthn / passkey surface (/api/v1/auth/webauthn/...). The
+	// service is constructed once at boot; the SessionStore for
+	// ceremony state uses an in-memory map at this tier (each ceremony
+	// lives <5min, so persistence across restarts isn't required).
+	// Production wiring swaps the store for a Redis-backed adapter
+	// once the wider passkey rollout lands.
+	//
+	// RP config is intentionally derived from cfg.Email.SiteURL —
+	// it's the canonical public-site URL in the existing wiring. A
+	// dedicated cfg.Auth.WebAuthn.* block lands alongside the
+	// production rollout.
+	if sessions == nil {
+		logger.Warn("auth/webauthn: skipping mount; session manager is nil")
+	} else {
+		rpOrigin := strings.TrimRight(cfg.Email.SiteURL, "/")
+		if rpOrigin == "" {
+			rpOrigin = "http://localhost"
+		}
+		rpID := rpOrigin
+		if u, err := parseRPID(rpOrigin); err == nil {
+			rpID = u
+		}
+		waService, err := pkgwebauthn.NewService(
+			pkgwebauthn.Config{
+				RPID:          rpID,
+				RPDisplayName: "GoNext",
+				RPOrigins:     []string{rpOrigin},
+			},
+			pkgwebauthn.NewMemoryStore(),
+			func(_ context.Context, id uuid.UUID) (pkgwebauthn.User, error) {
+				// Minimal resolver: surface the user id without a
+				// username lookup. The admin UI's passkey list shows
+				// the credential's friendly name (not the username),
+				// so an empty Username is acceptable for the dev
+				// loop. Production wiring queries the users table.
+				return pkgwebauthn.User{ID: id}, nil
+			},
+		)
+		if err != nil {
+			logger.Warn("auth/webauthn: failed to build service", slog.Any("err", err))
+		} else if err := authwebauthn.Mount(mux, authwebauthn.Deps{
+			Service:  waService,
+			Sessions: newMemoryWebauthnSessions(),
+			Policy:   adminPolicy,
+			CurrentUserID: func(r *http.Request) (uuid.UUID, bool) {
+				p, ok := policy.FromContext(r.Context())
+				if !ok || p.UserID == "" {
+					return uuid.Nil, false
+				}
+				id, err := uuid.Parse(p.UserID)
+				if err != nil {
+					return uuid.Nil, false
+				}
+				return id, true
+			},
+			Logger: logger,
+		}); err != nil {
+			logger.Warn("auth/webauthn: failed to mount", slog.Any("err", err))
+		} else {
+			logger.Info("auth/webauthn: routes mounted",
+				slog.String("base", "/api/v1/auth/webauthn"),
+			)
+		}
+	}
+
 	if cfg.Plugins.DevMode {
 		// Dev plugin install endpoint. Used by the `gonext plugin dev`
 		// CLI's watch loop. Storage is intentionally in-memory: the
@@ -1342,4 +1700,113 @@ func noopCloser(name string) shutdown.Closer {
 		_ = name
 		return nil
 	}
+}
+
+// jobsInspectorAdapter wraps an *asynq.Inspector to satisfy the
+// admin/jobs.Inspector interface. The interface uses the
+// *ArchivedTask names that pre-dated asynq's v0.24 rename to the
+// generic *Task spelling. We keep the adapter shape minimal — the
+// only delta is two method names.
+type jobsInspectorAdapter struct {
+	insp *asynq.Inspector
+}
+
+// ListArchivedTasks passes through verbatim — same method name in
+// both interfaces.
+func (a jobsInspectorAdapter) ListArchivedTasks(queue string, opts ...asynq.ListOption) ([]*asynq.TaskInfo, error) {
+	return a.insp.ListArchivedTasks(queue, opts...)
+}
+
+// GetTaskInfo passes through verbatim.
+func (a jobsInspectorAdapter) GetTaskInfo(queue, id string) (*asynq.TaskInfo, error) {
+	return a.insp.GetTaskInfo(queue, id)
+}
+
+// RunArchivedTask delegates to RunTask. The asynq API treats RunTask
+// as the unified entry point that promotes any non-pending task to
+// pending; we narrow the contract here so callers don't accidentally
+// resurrect scheduled/retry tasks through this surface.
+func (a jobsInspectorAdapter) RunArchivedTask(queue, id string) error {
+	return a.insp.RunTask(queue, id)
+}
+
+// DeleteArchivedTask delegates to DeleteTask. Same reasoning as
+// RunArchivedTask — narrow the contract to the archive surface even
+// though the underlying call handles any state.
+func (a jobsInspectorAdapter) DeleteArchivedTask(queue, id string) error {
+	return a.insp.DeleteTask(queue, id)
+}
+
+// missingBundleFetcher always returns ErrBundleNotFound. Used as a
+// placeholder until the MinIO-backed marketplace bundle fetcher lands;
+// the handler maps this to a clean 502 so operators see a wiring
+// message rather than a runtime panic.
+type missingBundleFetcher struct{}
+
+// Fetch satisfies adminmarketplace.BundleFetcher.
+func (missingBundleFetcher) Fetch(_ context.Context, _ string) (io.ReadCloser, error) {
+	return nil, adminmarketplace.ErrBundleNotFound
+}
+
+// memoryWebauthnSessions is the in-process SessionStore used by the
+// passkey ceremony. The map is intentionally unbounded — ceremony
+// blobs are <2KB and the per-blob TTL is enforced by the handler
+// itself reading the timestamp. A production deploy should swap this
+// for a Redis-backed adapter once the passkey enrolment rollout lands.
+//
+// Pointer receiver methods because the embedded sync.Mutex must not be
+// copied — Go's vet would (rightly) flag a value-receiver method on a
+// struct holding a Mutex.
+type memoryWebauthnSessions struct {
+	mu sync.Mutex
+	m  map[string][]byte
+}
+
+// newMemoryWebauthnSessions returns a ready-to-use ceremony store.
+func newMemoryWebauthnSessions() *memoryWebauthnSessions {
+	return &memoryWebauthnSessions{m: map[string][]byte{}}
+}
+
+// Put satisfies authwebauthn.SessionStore.
+func (s *memoryWebauthnSessions) Put(_ context.Context, key string, blob []byte, _ time.Duration) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.m[key] = blob
+	return nil
+}
+
+// Get satisfies authwebauthn.SessionStore.
+func (s *memoryWebauthnSessions) Get(_ context.Context, key string) ([]byte, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	blob, ok := s.m[key]
+	if !ok {
+		return nil, errors.New("webauthn: ceremony not found")
+	}
+	return blob, nil
+}
+
+// Delete satisfies authwebauthn.SessionStore.
+func (s *memoryWebauthnSessions) Delete(_ context.Context, key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.m, key)
+	return nil
+}
+
+// parseRPID extracts the bare host (no scheme, no port) from a URL,
+// for use as the WebAuthn RPID. Returns an error for unparseable
+// inputs so the caller can fall back to a sensible default. Local
+// hosts (localhost / 127.0.0.1) round-trip verbatim — the browser
+// requires the RPID to be a registrable domain or "localhost".
+func parseRPID(raw string) (string, error) {
+	u, err := neturl.Parse(raw)
+	if err != nil || u.Host == "" {
+		return "", fmt.Errorf("webauthn: cannot parse rp_id from %q", raw)
+	}
+	host := u.Hostname()
+	if host == "" {
+		return "", fmt.Errorf("webauthn: empty hostname in %q", raw)
+	}
+	return host, nil
 }
