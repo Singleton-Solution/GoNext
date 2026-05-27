@@ -5,37 +5,18 @@
  * off to the client-side editor for alt-text + caption editing,
  * deletion, and storage-URL display.
  */
-import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import type { ReactElement } from 'react';
-import { apiBaseUrl } from '@/lib/api-client';
+import { serverApiFetch } from '@/lib/server-api';
 import { MediaDetailClient } from './MediaDetailClient';
 import type { MediaAsset } from '../types';
 
 export const dynamic = 'force-dynamic';
 
 async function fetchAsset(id: string): Promise<MediaAsset | null> {
-  let cookieHeader = '';
   try {
-    const store = await cookies();
-    cookieHeader = store
-      .getAll()
-      .map((c) => `${c.name}=${c.value}`)
-      .join('; ');
-  } catch {
-    cookieHeader = '';
-  }
-  try {
-    const res = await fetch(
-      `${apiBaseUrl}/api/v1/admin/media/${encodeURIComponent(id)}`,
-      {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-          ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-        },
-        cache: 'no-store',
-      },
+    const res = await serverApiFetch(
+      `/api/v1/admin/media/${encodeURIComponent(id)}`,
     );
     if (res.status === 404) return null;
     if (!res.ok) return null;

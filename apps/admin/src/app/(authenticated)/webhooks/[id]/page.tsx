@@ -11,11 +11,10 @@
  * the italic accent so the operator immediately sees which endpoint
  * they're editing.
  */
-import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
 import { Suspense, type ReactElement } from 'react';
-import { apiBaseUrl } from '@/lib/api-client';
+import { serverApiFetch } from '@/lib/server-api';
 import { Card } from '@/components/ui/card';
 import { WebhookDetailClient } from './WebhookDetailClient';
 import type { DeliveryListResponse, Subscription } from '../types';
@@ -28,26 +27,12 @@ async function fetchSubscription(
   data: { subscription: Subscription; deliveries: DeliveryListResponse } | null;
   error: string | null;
 }> {
-  let cookieHeader = '';
-  try {
-    const store = await cookies();
-    cookieHeader = store
-      .getAll()
-      .map((c) => `${c.name}=${c.value}`)
-      .join('; ');
-  } catch {
-    cookieHeader = '';
-  }
-  const headers: HeadersInit = {
-    Accept: 'application/json',
-    ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-  };
-  const subUrl = `${apiBaseUrl}/api/v1/admin/webhooks/${encodeURIComponent(id)}`;
-  const delUrl = `${apiBaseUrl}/api/v1/admin/webhooks/${encodeURIComponent(id)}/deliveries?limit=30`;
+  const subPath = `/api/v1/admin/webhooks/${encodeURIComponent(id)}`;
+  const delPath = `/api/v1/admin/webhooks/${encodeURIComponent(id)}/deliveries?limit=30`;
   try {
     const [subRes, delRes] = await Promise.all([
-      fetch(subUrl, { headers, cache: 'no-store' }),
-      fetch(delUrl, { headers, cache: 'no-store' }),
+      serverApiFetch(subPath),
+      serverApiFetch(delPath),
     ]);
     if (!subRes.ok) return { data: null, error: `HTTP ${subRes.status}` };
     const subscription = (await subRes.json()) as Subscription;

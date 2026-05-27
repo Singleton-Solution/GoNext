@@ -16,24 +16,13 @@
  */
 
 import type { ReactElement } from 'react';
-import { cookies } from 'next/headers';
 import { fetchThemesList } from './api';
 import { ThemesGalleryClient } from './ThemesGalleryClient';
 
 export const dynamic = 'force-dynamic';
 
 export default async function ThemesPage(): Promise<ReactElement> {
-  let cookieHeader = '';
-  try {
-    const store = await cookies();
-    cookieHeader = store
-      .getAll()
-      .map((c) => `${c.name}=${c.value}`)
-      .join('; ');
-  } catch {
-    cookieHeader = '';
-  }
-  const data = await fetchThemesList(cookieHeader);
+  const data = await fetchThemesList();
   return (
     <ThemesGalleryClient
       initialThemes={data?.themes ?? []}

@@ -19,7 +19,7 @@
  * placeholder route).
  */
 import type { ReactElement } from 'react';
-import { apiBaseUrl } from '@/lib/api-client';
+import { serverApiFetch } from '@/lib/server-api';
 import { UsersList } from './UsersList';
 import type { AdminUser, UsersListResponse } from './types';
 
@@ -49,18 +49,14 @@ interface FetchResult {
 /**
  * Server-side fetch — runs on the Next.js server, not in the browser, so we
  * can't reuse the browser-oriented `apiRequest` helper (which sends cookies
- * via `credentials: 'include'`). For server rendering the session forwarding
- * lands with the auth wiring in a follow-up issue; for the scaffold we just
- * fire an unauthenticated request and tolerate failure.
+ * via `credentials: 'include'`). `serverApiFetch` forwards the inbound
+ * session cookie via `next/headers`, so the API auth middleware sees the
+ * operator instead of returning 401 to an anonymous request. Failures
+ * still degrade to the empty state rather than crashing the page.
  */
 async function fetchUsers(): Promise<FetchResult> {
-  const url = `${apiBaseUrl.replace(/\/$/, '')}/api/v1/users?limit=20`;
   try {
-    const res = await fetch(url, {
-      headers: { Accept: 'application/json' },
-      // Don't cache between requests; the list mutates on invite/suspend.
-      cache: 'no-store',
-    });
+    const res = await serverApiFetch('/api/v1/users?limit=20');
     if (!res.ok) {
       return { users: [], error: `HTTP ${res.status}` };
     }

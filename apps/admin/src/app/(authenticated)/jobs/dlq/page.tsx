@@ -13,11 +13,10 @@
  *
  * Issue #262.
  */
-import { cookies } from 'next/headers';
 import { type ReactElement, Suspense } from 'react';
 import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
-import { apiBaseUrl } from '@/lib/api-client';
+import { serverApiFetch } from '@/lib/server-api';
 import { Headline } from '@/components/ui/headline';
 import { Card } from '@/components/ui/card';
 import { DLQListClient } from './DLQListClient';
@@ -34,27 +33,10 @@ export const dynamic = 'force-dynamic';
 async function fetchInitialDLQ(
   queue: string,
 ): Promise<{ data: DLQListResponse | null; error: string | null }> {
-  let cookieHeader = '';
   try {
-    const store = await cookies();
-    cookieHeader = store
-      .getAll()
-      .map((c) => `${c.name}=${c.value}`)
-      .join('; ');
-  } catch {
-    cookieHeader = '';
-  }
-
-  const url = `${apiBaseUrl}/api/v1/admin/jobs/dlq?queue=${encodeURIComponent(queue)}&limit=30`;
-  try {
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-      },
-      cache: 'no-store',
-    });
+    const res = await serverApiFetch(
+      `/api/v1/admin/jobs/dlq?queue=${encodeURIComponent(queue)}&limit=30`,
+    );
     if (!res.ok) {
       return { data: null, error: `HTTP ${res.status}` };
     }

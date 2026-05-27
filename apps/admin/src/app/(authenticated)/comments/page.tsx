@@ -16,11 +16,10 @@
  * style table inside the CommentListClient island. The skeleton +
  * error states use the brand's paper-2 + danger-soft tokens.
  */
-import { cookies } from 'next/headers';
 import { Suspense, type ReactElement } from 'react';
 
 import { Headline } from '@/components/ui/headline';
-import { apiBaseUrl } from '@/lib/api-client';
+import { serverApiFetch } from '@/lib/server-api';
 
 import { CommentListClient } from './CommentListClient';
 import {
@@ -76,40 +75,22 @@ function FetchFailureState({ reason }: { reason: string }): ReactElement {
 }
 
 /**
- * Server-side fetch helper. Forwards the session cookie so the API
- * sees the operator. Returns `null` on any failure so the caller can
- * render a friendly state without crashing the layout.
+ * Server-side fetch helper. Forwards the session cookie via
+ * `serverApiFetch` so the API sees the operator. Returns `null` on
+ * any failure so the caller can render a friendly state without
+ * crashing the layout.
  */
 async function fetchInitialComments(
   params: { status?: string; postId?: string; userId?: string },
 ): Promise<{ data: CommentListResponse | null; error: string | null }> {
-  let cookieHeader = '';
-  try {
-    const store = await cookies();
-    cookieHeader = store
-      .getAll()
-      .map((c) => `${c.name}=${c.value}`)
-      .join('; ');
-  } catch {
-    cookieHeader = '';
-  }
-
   const qs = new URLSearchParams();
   if (params.status) qs.set('status', params.status);
   if (params.postId) qs.set('post_id', params.postId);
   if (params.userId) qs.set('user_id', params.userId);
   qs.set('limit', '30');
 
-  const url = `${apiBaseUrl}/api/v1/admin/comments?${qs.toString()}`;
   try {
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-      },
-      cache: 'no-store',
-    });
+    const res = await serverApiFetch(`/api/v1/admin/comments?${qs.toString()}`);
     if (!res.ok) {
       return { data: null, error: `HTTP ${res.status}` };
     }

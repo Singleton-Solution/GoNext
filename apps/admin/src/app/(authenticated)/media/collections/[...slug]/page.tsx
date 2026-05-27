@@ -15,10 +15,9 @@
  *
  * Issue #69.
  */
-import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import type { ReactElement } from 'react';
-import { apiBaseUrl } from '@/lib/api-client';
+import { serverApiFetch } from '@/lib/server-api';
 import { CollectionMediaClient } from './CollectionMediaClient';
 import type {
   CollectionListResponse,
@@ -34,30 +33,9 @@ interface PageProps {
   params: Promise<{ slug: string[] }>;
 }
 
-async function buildCookieHeader(): Promise<string> {
+async function fetchCollections(): Promise<CollectionListResponse | null> {
   try {
-    const store = await cookies();
-    return store
-      .getAll()
-      .map((c) => `${c.name}=${c.value}`)
-      .join('; ');
-  } catch {
-    return '';
-  }
-}
-
-async function fetchCollections(
-  cookieHeader: string,
-): Promise<CollectionListResponse | null> {
-  try {
-    const res = await fetch(`${apiBaseUrl}/api/v1/admin/media/collections`, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-      },
-      cache: 'no-store',
-    });
+    const res = await serverApiFetch('/api/v1/admin/media/collections');
     if (!res.ok) return null;
     return (await res.json()) as CollectionListResponse;
   } catch {
@@ -66,19 +44,12 @@ async function fetchCollections(
 }
 
 async function fetchMediaInFolder(
-  cookieHeader: string,
   collectionId: string,
 ): Promise<MediaListResponse | null> {
   try {
-    const url = `${apiBaseUrl}/api/v1/admin/media?limit=30&collection=${encodeURIComponent(collectionId)}`;
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-      },
-      cache: 'no-store',
-    });
+    const res = await serverApiFetch(
+      `/api/v1/admin/media?limit=30&collection=${encodeURIComponent(collectionId)}`,
+    );
     if (!res.ok) return null;
     return (await res.json()) as MediaListResponse;
   } catch {
@@ -108,9 +79,8 @@ export default async function MediaCollectionPage(
   props: PageProps,
 ): Promise<ReactElement> {
   const { slug } = await props.params;
-  const cookieHeader = await buildCookieHeader();
 
-  const collections = await fetchCollections(cookieHeader);
+  const collections = await fetchCollections();
   if (!collections) {
     notFound();
   }
@@ -119,7 +89,7 @@ export default async function MediaCollectionPage(
   if (!match) {
     notFound();
   }
-  const media = await fetchMediaInFolder(cookieHeader, match.id);
+  const media = await fetchMediaInFolder(match.id);
   return (
     <CollectionMediaClient
       collection={match}

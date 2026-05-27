@@ -6,12 +6,11 @@
  * timeline is a thin paper-2 well that reuses the rule's own
  * server-side counters — no extra fetch.
  */
-import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { ReactElement } from 'react';
 import { ArrowLeft, ActivitySquare } from 'lucide-react';
-import { apiBaseUrl } from '@/lib/api-client';
+import { serverApiFetch } from '@/lib/server-api';
 import { Headline } from '@/components/ui/headline';
 import { Badge } from '@/components/ui/badge';
 import { RedirectForm } from '../RedirectForm';
@@ -20,25 +19,9 @@ import type { Redirect } from '../types';
 export const dynamic = 'force-dynamic';
 
 async function fetchRedirect(id: string): Promise<Redirect | null> {
-  let cookieHeader = '';
-  try {
-    const store = await cookies();
-    cookieHeader = store
-      .getAll()
-      .map((c) => `${c.name}=${c.value}`)
-      .join('; ');
-  } catch {
-    cookieHeader = '';
-  }
-  const url = `${apiBaseUrl}/api/v1/admin/redirects/${encodeURIComponent(id)}`;
-  const res = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-    },
-    cache: 'no-store',
-  });
+  const res = await serverApiFetch(
+    `/api/v1/admin/redirects/${encodeURIComponent(id)}`,
+  );
   if (!res.ok) {
     return null;
   }

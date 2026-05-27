@@ -25,16 +25,16 @@
  * ====
  * Admin pages are session-protected. The session cookie lives on the
  * admin origin (`:3001` in dev, the public admin host in prod) and is
- * forwarded explicitly via `next/headers` `cookies()` — without this
- * the server-side fetch would issue an anonymous request and the API
- * would 401 every list screen. The auth middleware in front of the
- * admin guarantees `cookies()` is populated by the time we get here.
+ * forwarded by `serverApiFetch` (see `lib/server-api.ts`) — without
+ * that the server-side fetch would issue an anonymous request and the
+ * API would 401 every list screen. The auth middleware in front of
+ * the admin guarantees the cookie store is populated by the time we
+ * get here.
  */
-import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { Suspense, type ReactElement } from 'react';
 import { Download, Plus } from 'lucide-react';
-import { apiBaseUrl } from '@/lib/api-client';
+import { serverApiFetch } from '@/lib/server-api';
 import { Headline } from '@/components/ui/headline';
 import { Button } from '@/components/ui/button';
 import { PostListClient } from './PostListClient';
@@ -79,41 +79,16 @@ function FetchFailureState({ reason }: { reason: string }): ReactElement {
 }
 
 /**
- * Server-side fetch helper. Wraps the api-client's URL resolution with
- * an explicit cookie forward so the session travels with the request,
- * and a typed return type. Returns `null` on any failure so the caller
- * can render a friendly state.
+ * Server-side fetch helper. Cookie forwarding is handled by
+ * `serverApiFetch`. Returns `null` on any failure so the caller can
+ * render a friendly state.
  */
 async function fetchInitialPosts(): Promise<{
   data: PostListResponse | null;
   error: string | null;
 }> {
-  let cookieHeader = '';
   try {
-    const store = await cookies();
-    cookieHeader = store
-      .getAll()
-      .map((c) => `${c.name}=${c.value}`)
-      .join('; ');
-  } catch {
-    // `cookies()` can throw during static generation / certain build
-    // paths. We swallow and continue with an anonymous request — the
-    // API will return 401, which we treat as "no posts" below.
-    cookieHeader = '';
-  }
-
-  const url = `${apiBaseUrl}/api/v1/posts?status=any&limit=20`;
-  try {
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-      },
-      // Server-to-server call — `credentials: 'include'` is a browser-
-      // only concept; we forward auth via the Cookie header instead.
-      cache: 'no-store',
-    });
+    const res = await serverApiFetch('/api/v1/posts?status=any&limit=20');
 
     if (!res.ok) {
       return {
