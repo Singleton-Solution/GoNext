@@ -98,6 +98,31 @@ describe('FolderTree', () => {
     await waitFor(() => expect(onMediaMoved).toHaveBeenCalled());
   });
 
+  // ── Regression locks for PR #523 (data:null tolerance) ────────────
+  //
+  // listCollections used to return `{ data: null }` for an empty
+  // folder set (Postgres NULL → Go nil-slice → JSON null). The
+  // FolderTree wrapped the result with `Array.isArray(res.data) ?
+  // res.data : []` so the empty-state path doesn't blow up. Lock the
+  // band-aid here in case the API regresses on a future build.
+
+  it('TestFolderTree_TolerateListCollectionsDataNull_Issue523: renders empty tree without crash when API returns data:null', async () => {
+    mocks.listCollections.mockReset().mockResolvedValue({
+      data: null as unknown as MediaCollection[],
+    });
+
+    expect(() =>
+      render(<FolderTree selectedId={ALL_NODE_ID} onSelect={vi.fn()} />),
+    ).not.toThrow();
+
+    await waitFor(() => expect(mocks.listCollections).toHaveBeenCalled());
+    // The synthetic leaves ("All", "Unfiled") still render — they
+    // come from the component itself, not the API. Their presence
+    // proves the tree mounted and didn't crash on the null payload.
+    expect(screen.getByTestId('folder-leaf-all')).toBeInTheDocument();
+    expect(screen.getByTestId('folder-leaf-unfiled')).toBeInTheDocument();
+  });
+
   it('drops onto Unfiled with collection_id null', async () => {
     mocks.listCollections.mockResolvedValueOnce({ data: [] });
     mocks.moveMediaToCollection.mockResolvedValueOnce({ moved: 1 });

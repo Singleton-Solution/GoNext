@@ -792,6 +792,148 @@ func TestAuthenticate_RecordsFailureForKnownUserOnly(t *testing.T) {
 	}
 }
 
+// TestAuthenticate_PasswordPath_ThreadsRolesIntoSession_Issue521 is the
+// non-TOTP sibling of TestFinalizeTOTP_ThreadsRolesFromUserByID.
+//
+// PR #496 / PR #523 wired role projection into BOTH login paths: the
+// regular password Lookup (already returns a UserRecord with Roles
+// populated by the SQL adapter), and the TOTP finalize path which
+// re-fetches via UserByID. The TOTP regression test already exists;
+// this test pins the password-path side so a refactor that drops the
+// `user.Roles` argument from the s.completeLogin(...) call sites in
+// service.go fails loud, not silently as a runtime "super_admin lost
+// admin on next sign-in" report.
+func TestAuthenticate_PasswordPath_ThreadsRolesIntoSession_Issue521(t *testing.T) {
+	f := newFixture(t)
+	f.addUser(t, "u-1", "alice@example.com", "pwd", "active")
+
+	// Replace the default Lookup to project a Roles slice onto the
+	// UserRecord. We can't reach into addUser's map directly because
+	// the fixture's Lookup re-fetches by email + sets Hash, so wrap.
+	original := f.deps.Lookup
+	f.deps.Lookup = func(ctx context.Context, email string) (UserRecord, error) {
+		rec, err := original(ctx, email)
+		if err != nil {
+			return rec, err
+		}
+		rec.Roles = []string{"super_admin"}
+		return rec, nil
+	}
+	svc := f.service(t)
+
+	res, err := svc.Authenticate(context.Background(), Input{
+		Email:    "alice@example.com",
+		Password: "pwd",
+		IP:       "10.0.0.1",
+	})
+	if err != nil {
+		t.Fatalf("Authenticate: unexpected err %v", err)
+	}
+	if res.Token == "" {
+		t.Fatal("Token empty — login should have completed")
+	}
+
+	data := f.sessionCreator.lastData()
+	if data == nil {
+		t.Fatal("session data is nil; expected roles to be stamped in")
+	}
+	rolesAny, ok := data["roles"]
+	if !ok {
+		t.Fatalf("session data missing 'roles' key: %#v", data)
+	}
+	roles, ok := rolesAny.([]string)
+	if !ok {
+		t.Fatalf("roles type: got %T, want []string", rolesAny)
+	}
+	if len(roles) != 1 || roles[0] != "super_admin" {
+		t.Errorf("roles: got %v, want [super_admin]", roles)
+	}
+}
+
+// TestAuthenticate_PasswordPath_TOTPInline_ThreadsRoles_Issue521 covers
+// the "TOTP code supplied in the first call" branch. This is the
+// less-trodden combined-request path (some API clients submit the code
+// alongside the password rather than going through the intermediate
+// token round-trip). The roles must still come from the first-call
+// Lookup, not from a nil pointer.
+func TestAuthenticate_PasswordPath_TOTPInline_ThreadsRoles_Issue521(t *testing.T) {
+	f := newFixture(t)
+	f.addUser(t, "u-1", "alice@example.com", "pwd", "active")
+	sec, err := totp.Generate("GoNext", "alice@example.com")
+	if err != nil {
+		t.Fatalf("totp.Generate: %v", err)
+	}
+	f.addTOTP(t, "u-1", sec.Base32)
+
+	original := f.deps.Lookup
+	f.deps.Lookup = func(ctx context.Context, email string) (UserRecord, error) {
+		rec, lookupErr := original(ctx, email)
+		if lookupErr != nil {
+			return rec, lookupErr
+		}
+		rec.Roles = []string{"editor"}
+		return rec, nil
+	}
+	svc := f.service(t)
+
+	code, err := generateCurrentTOTP(sec.Base32)
+	if err != nil {
+		t.Fatalf("generate code: %v", err)
+	}
+	res, err := svc.Authenticate(context.Background(), Input{
+		Email:    "alice@example.com",
+		Password: "pwd",
+		TOTPCode: code,
+		IP:       "10.0.0.1",
+	})
+	if err != nil {
+		t.Fatalf("Authenticate: %v", err)
+	}
+	if res.Token == "" {
+		t.Fatal("Token empty — combined-call login should have completed")
+	}
+
+	data := f.sessionCreator.lastData()
+	if data == nil {
+		t.Fatal("session data is nil; expected roles to be stamped in")
+	}
+	roles, ok := data["roles"].([]string)
+	if !ok {
+		t.Fatalf("roles type: got %T", data["roles"])
+	}
+	if len(roles) != 1 || roles[0] != "editor" {
+		t.Errorf("roles: got %v, want [editor]", roles)
+	}
+}
+
+// TestAuthenticate_PasswordPath_EmptyRoles_NoDataKey_Issue521 documents
+// the contract for users without role grants: the session data map is
+// nil (no roles key) rather than `data = map[string]any{"roles": []}`.
+// The completeLogin code path checks `if len(rolesFromLookup) > 0`
+// before allocating the map — locking this behavior avoids accidental
+// "roles: []" map entries leaking into session storage.
+func TestAuthenticate_PasswordPath_EmptyRoles_NoDataKey_Issue521(t *testing.T) {
+	f := newFixture(t)
+	f.addUser(t, "u-1", "alice@example.com", "pwd", "active")
+	// Default Lookup returns Roles = nil for the fixture.
+	svc := f.service(t)
+
+	res, err := svc.Authenticate(context.Background(), Input{
+		Email:    "alice@example.com",
+		Password: "pwd",
+		IP:       "10.0.0.1",
+	})
+	if err != nil {
+		t.Fatalf("Authenticate: %v", err)
+	}
+	if res.Token == "" {
+		t.Fatal("Token empty")
+	}
+	if got := f.sessionCreator.lastData(); got != nil {
+		t.Errorf("session data: got %v, want nil for user with no roles", got)
+	}
+}
+
 // TestFinalizeTOTP_ThreadsRolesFromUserByID is the regression test for
 // issue #496: when a user with TOTP enabled completes the two-step
 // login, the post-2FA session MUST carry the user's roles. Before the

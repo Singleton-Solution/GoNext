@@ -12,7 +12,7 @@
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import type { Post, PostListResponse } from './columns';
+import { postEditHref, type Post, type PostListResponse } from './columns';
 
 // Hoisted router stubs so we can inspect calls from inside the
 // vi.mock factory and from each test body.
@@ -277,6 +277,40 @@ describe('PostListClient', () => {
     expect(
       screen.getByRole('link', { name: /fourth post/i }),
     ).toBeInTheDocument();
+  });
+
+  // ── Regression locks for PR #523 ──────────────────────────────────
+  //
+  // The post edit href was renamed in PR #523 from
+  // `/posts/{id}/edit` → bare `/posts/{id}` because the single-id
+  // route IS the editor (no nested /edit segment exists). The change
+  // touched both the posts list and the comments table. These tests
+  // pin the contract on the producer side so any call site that
+  // re-adopts the `/edit` suffix fails loud.
+
+  it('TestPostEditHref_OmitsEditSuffix_Issue523: returns bare /posts/{id} (no /edit segment)', () => {
+    // Locks the literal shape postEditHref returns. A regression that
+    // re-appends /edit (e.g. via a copy-paste from older code) fails
+    // here, in CommentListClient.test.tsx, AND in the row-render
+    // tests below.
+    expect(postEditHref('p1')).toBe('/posts/p1');
+    expect(postEditHref('p1')).not.toMatch(/\/edit$/);
+  });
+
+  it('TestPostEditHref_PercentEncodesSpecials_Issue523: id is URL-encoded', () => {
+    // Defensive: post ids today are UUIDs but the API contract
+    // tolerates arbitrary strings, so the helper must encode them.
+    expect(postEditHref('a/b')).toBe('/posts/a%2Fb');
+  });
+
+  it('TestPostListRow_TitleLinkOmitsEditSuffix_Issue523: rendered row href matches postEditHref output', () => {
+    // Sanity: the row in PostListClient must consume postEditHref, not
+    // build its own URL. If the row goes back to template-string
+    // concatenation a future refactor could re-introduce /edit.
+    render(<PostListClient initialData={makeInitialData(SAMPLE_POSTS)} />);
+    const link = screen.getByRole('link', { name: /hello world/i });
+    expect(link.getAttribute('href')).toBe(postEditHref('p1'));
+    expect(link.getAttribute('href')).not.toMatch(/\/edit$/);
   });
 
   it('shows an inline error when "Load more" fetcher rejects', async () => {

@@ -251,6 +251,53 @@ describe('CommentListClient', () => {
     expect(href).toContain('/posts/p1');
   });
 
+  // ── Regression locks for PR #523 ──────────────────────────────────
+  //
+  // Before #523 the comments table's "On post" column built its href
+  // via `${postId}/edit`, which 404'd because no nested editor route
+  // exists — the [id] segment IS the editor. The fix re-pointed all
+  // call sites to `postEditHref()` (which returns the bare /posts/{id}
+  // path despite the legacy name). These tests pin the contract so a
+  // future rename or copy-paste can't silently re-introduce /edit.
+
+  it('TestCommentList_PostLinkOmitsEditSuffix_Issue523: every comment-row post link omits /edit', () => {
+    // SAMPLE has rows on two distinct post ids (p1, p2). All four
+    // rows must use bare /posts/{id}.
+    render(<CommentListClient initialData={makeInitial(SAMPLE)} />);
+
+    const postLinks = [
+      ...screen.getAllByRole('link', { name: /hello world/i }),
+      ...screen.getAllByRole('link', { name: /^second$/i }),
+    ];
+    // 4 comment rows total, but we may have one link per row, so
+    // check we found at least the two distinct post titles.
+    expect(postLinks.length).toBeGreaterThanOrEqual(2);
+    for (const link of postLinks) {
+      const href = link.getAttribute('href') ?? '';
+      expect(href).not.toMatch(/\/edit($|[?#])/);
+      expect(href).toMatch(/^\/posts\/[^/]+$/);
+    }
+  });
+
+  it('TestCommentList_RowPostLinkPointsToBarePostId_Issue523: link href matches /posts/{postId} exactly', () => {
+    // Pinned constants: row "c1" is on post "p1" → expect /posts/p1.
+    // Locks down the literal route shape so a refactor to e.g.
+    // /admin/posts/{id} wouldn't pass either.
+    render(<CommentListClient initialData={makeInitial(SAMPLE)} />);
+    const link = screen.getAllByRole('link', { name: /hello world/i })[0];
+    expect(link?.getAttribute('href')).toBe('/posts/p1');
+  });
+
+  it('TestCommentList_PostLinkUsesPostIdNotCommentId_Issue523: the column links to the post, not the comment', () => {
+    // Sanity: if someone wires the link to comment.id by accident
+    // (c1, c2, …) the regression test fails loudly.
+    render(<CommentListClient initialData={makeInitial(SAMPLE)} />);
+    const link = screen.getAllByRole('link', { name: /hello world/i })[0];
+    const href = link?.getAttribute('href') ?? '';
+    expect(href).not.toMatch(/\/posts\/c\d+/);
+    expect(href).toContain('p1');
+  });
+
   it('all-rows checkbox selects every row', () => {
     render(<CommentListClient initialData={makeInitial(SAMPLE)} />);
     const selectAll = screen.getByLabelText(/select all comments/i);
