@@ -14,6 +14,7 @@ import (
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/rest/router"
 	"github.com/Singleton-Solution/GoNext/packages/go/audit"
 	"github.com/Singleton-Solution/GoNext/packages/go/policy"
+	"github.com/Singleton-Solution/GoNext/packages/go/util/queryparse"
 )
 
 // HeaderPostPassword is the request header carrying the password for
@@ -155,19 +156,18 @@ func (h *handlers) list(w http.ResponseWriter, r *http.Request, pr policy.Princi
 func parseListQuery(r *http.Request) (ListFilter, error) {
 	q := r.URL.Query()
 	var f ListFilter
-	f.Status = q.Get("status")
 	// `status=any` is a documented client convention meaning "all
 	// statuses" — the admin posts page uses it to render drafts +
-	// published in one list. Treat it as the absence of a status
-	// filter rather than a validation error. Empty string is the same.
-	if f.Status == "any" {
-		f.Status = ""
+	// published in one list. The shared queryparse helper normalises
+	// the alias and the empty string to "" so we can drop the filter
+	// downstream without a separate branch. Anything else must be in
+	// validStatuses or we 400.
+	rawStatus := q.Get("status")
+	status, err := queryparse.ParseStatus(rawStatus, validStatuses)
+	if err != nil {
+		return f, validation{Code: "invalid_status", Detail: fmt.Sprintf("unknown status %q", rawStatus)}
 	}
-	if f.Status != "" {
-		if _, ok := validStatuses[f.Status]; !ok {
-			return f, validation{Code: "invalid_status", Detail: fmt.Sprintf("unknown status %q", f.Status)}
-		}
-	}
+	f.Status = status
 	f.AuthorID = q.Get("author")
 	f.Search = q.Get("search")
 
