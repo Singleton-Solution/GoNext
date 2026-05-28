@@ -44,6 +44,7 @@ import (
 	adminmedia "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/media"
 	adminmenus "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/menus"
 	publicmenus "github.com/Singleton-Solution/GoNext/apps/api/internal/public/menus"
+	publicsettings "github.com/Singleton-Solution/GoNext/apps/api/internal/public/settings"
 	adminpluginpages "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/pluginpages"
 	adminposts "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/posts"
 	adminsettings "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/settings"
@@ -1647,6 +1648,25 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 		mux.Handle("/api/v1/settings", settingsHandler)
 		logger.Info("settings: routes mounted",
 			slog.String("base", "/api/v1/settings"),
+		)
+	}
+
+	// Public site identity surface (/api/v1/public/site, issue #508).
+	// Read-only, no policy gate — the marketing landing renders for
+	// anonymous visitors and needs the projected core.site.* fields
+	// (name, tagline, url) for <title>, og:site_name, and metadataBase.
+	// Reuses the same settingsStore the admin write surface mutates, so
+	// the read path always reflects the latest operator edits without a
+	// separate cache. Only three fields are projected — the full
+	// registry stays behind /api/v1/settings (auth-gated).
+	if err := publicsettings.Mount(mux, "/api/v1/public/site", publicsettings.Deps{
+		Store:  settingsStore,
+		Logger: logger,
+	}); err != nil {
+		logger.Warn("public/settings: failed to mount", slog.Any("err", err))
+	} else {
+		logger.Info("public/settings: routes mounted",
+			slog.String("base", "/api/v1/public/site"),
 		)
 	}
 

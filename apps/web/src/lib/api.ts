@@ -824,17 +824,19 @@ const DEFAULT_SITE_OPTIONS: SiteOptions = {
 };
 
 /**
- * Defensive parse of the `/api/v1/settings?group=core.site` envelope.
- * The endpoint returns a flat `{ "core.site.name": ..., ... }` map; we
- * project that down to the typed `SiteOptions` shape, falling back to
- * the documented defaults for any missing / wrongly-typed key.
+ * Defensive parse of the `/api/v1/public/site` envelope. The endpoint
+ * returns a flat `{ "name": ..., "tagline": ..., "url": ... }` object —
+ * three strings, always present, never null. We still narrow each
+ * field defensively so a contract drift on the API surfaces as the
+ * documented defaults rather than a runtime crash in
+ * `generateMetadata`.
  */
 function asSiteOptions(raw: unknown): SiteOptions {
   if (!raw || typeof raw !== 'object') return DEFAULT_SITE_OPTIONS;
   const r = raw as Record<string, unknown>;
-  const name = r['core.site.name'];
-  const tagline = r['core.site.tagline'];
-  const url = r['core.site.url'];
+  const name = r.name;
+  const tagline = r.tagline;
+  const url = r.url;
   return {
     name:
       typeof name === 'string' && name.trim() !== ''
@@ -850,27 +852,34 @@ function asSiteOptions(raw: unknown): SiteOptions {
 
 /**
  * Fetch the public-facing site identity (name, tagline, url) from the
- * settings registry. Server-only — the layout / nav / footer call this
- * from Server Components, never from the browser.
+ * dedicated public endpoint `/api/v1/public/site`. The endpoint is
+ * anonymous-readable so no cookie is forwarded — the layout / nav /
+ * footer can call this from any Server Component context (including
+ * routes the visitor isn't signed in for).
  *
- * Failure mode is "return defaults, never throw". A 5xx from the
- * settings endpoint, a network blip, or a malformed payload would
- * otherwise crash every public page; the safer behaviour is to render
- * the stock "GoNext" envelope and let the next revalidation pick up
- * the real values.
+ * Why the dedicated public endpoint (issue #508 / PR #527) instead of
+ * the auth-gated `/api/v1/settings?group=core.site` we used in the
+ * first cut: the marketing layout runs without a session cookie on the
+ * very first request, so a gated read returned 401 and the layout
+ * fell back to defaults on every cold render. The public endpoint
+ * projects only the safe subset (name, tagline, url) and reuses the
+ * same registry store, so operator edits in /settings/general surface
+ * immediately.
+ *
+ * Failure mode is "return defaults, never throw". A 5xx from the API,
+ * a network blip, or a malformed payload would otherwise crash every
+ * public page; the safer behaviour is to render the stock "GoNext"
+ * envelope and let the next revalidation pick up the real values.
  */
 export async function fetchSiteOptions(
-  opts: { revalidate?: number; cookie?: string } = {},
+  opts: { revalidate?: number } = {},
 ): Promise<SiteOptions> {
   try {
-    const raw = await getJson<unknown>(
-      '/api/v1/settings?group=core.site',
-      opts,
-    );
+    const raw = await getJson<unknown>('/api/v1/public/site', opts);
     if (raw === null) return DEFAULT_SITE_OPTIONS;
     return asSiteOptions(raw);
   } catch {
-    // Includes ApiError on 5xx and network failure. The settings
+    // Includes ApiError on 5xx and network failure. The public site
     // endpoint is not load-bearing for rendering a page — defaults
     // keep the site alive.
     return DEFAULT_SITE_OPTIONS;
