@@ -39,6 +39,7 @@ import {
 } from '@gonext/blocks-editor';
 import { BlockRegistry } from '@gonext/blocks-sdk';
 import type { BlockTree } from '@gonext/blocks-sdk';
+import type { components } from '@gonext/api-types';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -47,14 +48,31 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api-client';
 
-type PostStatus = 'draft' | 'publish' | 'future' | 'private';
+/**
+ * Status alphabet — sourced from the OpenAPI spec (issue #514 follow-up).
+ * The editor UI only exposes the four user-facing values; `pending` and
+ * `trash` are valid server states but flow in through the list screen
+ * (bulk actions) rather than this dropdown.
+ */
+type PostStatus = components['schemas']['Post']['status'];
 
-interface UpdatePostBody {
-  title?: string;
-  slug?: string;
+/**
+ * Body for `PATCH /api/v1/posts/{id}`.
+ *
+ * Issue #514 follow-up: based on the spec's `PostUpdate` schema. The
+ * spec types `status` as `string`; we tighten it here to the strict
+ * enum so the dropdown handler can't smuggle in a bogus value. The
+ * spec types `content_blocks` as an opaque `Record<string, never>`
+ * placeholder; the editor needs the typed `BlockTree`, so we override
+ * that field.
+ */
+type UpdatePostBody = Omit<
+  components['schemas']['PostUpdate'],
+  'status' | 'content_blocks'
+> & {
   status?: PostStatus;
   content_blocks?: BlockTree;
-}
+};
 
 export default function PostDetailPage(): ReactElement {
   const params = useParams<{ id: string }>();

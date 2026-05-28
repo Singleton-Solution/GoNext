@@ -69,3 +69,8 @@ jobs:
           path: apps/docs/.next
           retention-days: 14
           if-no-files-found: error
+          # Next.js writes its build output to `.next/` — a dot-prefixed
+          # directory which actions/upload-artifact@v4 treats as hidden
+          # and skips by default. Without this flag the upload step
+          # reports "No files were found" even when the build succeeded.
+          include-hidden-files: true

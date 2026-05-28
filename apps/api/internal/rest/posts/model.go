@@ -61,6 +61,17 @@ func (p *Post) Hash() []byte { return p.hash }
 // content_blocks, meta, and status which all carry defaults at the
 // DB level.
 type CreateInput struct {
+	// PostType, when non-nil and non-empty, OVERRIDES the mount's
+	// hardcoded post type discriminator for this single create. Empty
+	// or omitted means "use the mount default".
+	//
+	// This exists so the admin Pages screens (issue #506) can POST to
+	// /api/v1/posts with body {post_type: "page", ...} rather than
+	// depending on a separate /api/v1/pages mount. The handler
+	// validates the value against the closed {"post","page"} set
+	// before forwarding it to the store, so a malicious request can't
+	// land a row as a CPT it shouldn't.
+	PostType      *string         `json:"post_type,omitempty"`
 	ParentID      *string         `json:"parent_id"`
 	Status        *string         `json:"status"`
 	Title         *string         `json:"title"`

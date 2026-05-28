@@ -1,4 +1,4 @@
--- 000035_custom_fields.down.sql
+-- 000045_custom_fields.down.sql
 
 DROP INDEX IF EXISTS idx_post_meta_values_group;
 DROP INDEX IF EXISTS idx_field_groups_post_types;

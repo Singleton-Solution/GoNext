@@ -1,4 +1,4 @@
--- 000033_gdpr_anonymization.down.sql
+-- 000041_gdpr_anonymization.down.sql
 --
 -- Reverse of the GDPR anonymization columns. We drop the index first
 -- because it depends on the column; Postgres would refuse to drop the

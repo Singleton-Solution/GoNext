@@ -299,6 +299,21 @@ func (h *handlers) create(w http.ResponseWriter, r *http.Request, pr policy.Prin
 		return
 	}
 
+	// post_type body override mirrors the LIST behavior: the admin
+	// Pages screens POST to /api/v1/posts with body post_type="page"
+	// rather than depending on a separate /api/v1/pages mount that
+	// isn't wired yet. Validate against the closed {"post","page"}
+	// set; anything else is a 400 so a caller can't smuggle a row
+	// into an unsupported CPT.
+	postType := h.postType
+	if in.PostType != nil && *in.PostType != "" {
+		if *in.PostType != PostTypePost && *in.PostType != PostTypePage {
+			router.WriteError(w, http.StatusBadRequest, "invalid_post_type", fmt.Sprintf("unknown post_type %q", *in.PostType))
+			return
+		}
+		postType = *in.PostType
+	}
+
 	// Publishing a post requires the publish_* cap. We do this here
 	// rather than inside the store so a denial doesn't side-effect.
 	if in.Status != nil && *in.Status == "published" {
@@ -313,7 +328,7 @@ func (h *handlers) create(w http.ResponseWriter, r *http.Request, pr policy.Prin
 		return
 	}
 
-	post, err := h.store.Create(r.Context(), h.postType, pr.UserID, in)
+	post, err := h.store.Create(r.Context(), postType, pr.UserID, in)
 	if err != nil {
 		h.writeStoreError(w, r, err, "posts.create")
 		return

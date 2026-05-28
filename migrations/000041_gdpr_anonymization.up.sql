@@ -1,4 +1,4 @@
--- 000033_gdpr_anonymization.up.sql
+-- 000041_gdpr_anonymization.up.sql
 --
 -- GDPR "right to erasure" support (issue #216).
 --

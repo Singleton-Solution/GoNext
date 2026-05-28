@@ -1,11 +1,13 @@
 go 1.25.0
 
+toolchain go1.25.10
+
 use (
 	./apps/api
 	./apps/worker
 	./cli/gonext
-	./examples/plugins/seo
 	./examples/plugins/sdk-go-hello
+	./examples/plugins/seo
 	./packages/go
 	./packages/go/sdk
 )

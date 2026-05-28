@@ -1,4 +1,4 @@
--- 000035_media_collections.up.sql
+-- 000044_media_collections.up.sql
 --
 -- Media collections — hierarchical folders that group media assets.
 -- The hierarchy is stored two ways: a parent_id self-reference (so a

@@ -1,6 +1,6 @@
 /**
  * On-wire shapes for /me/tokens. These mirror the Go IssuedTokenView /
- * TokenView structs (apps/api/internal/admin/tokens/handler.go). Keep them
+ * TokenView structs (apps/api/internal/auth/pat/handler.go). Keep them
  * in lock-step — a mismatched field is a runtime decode failure, not a
  * type error.
  */

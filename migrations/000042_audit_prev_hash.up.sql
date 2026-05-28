@@ -1,4 +1,4 @@
--- 000033_audit_prev_hash.up.sql
+-- 000042_audit_prev_hash.up.sql
 --
 -- Activate the tamper-evidence chain on audit_log. The `prev_hash`
 -- column already exists (created by 000029_audit_log.up.sql as a

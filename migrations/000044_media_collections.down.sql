@@ -1,6 +1,6 @@
--- 000035_media_collections.down.sql
+-- 000044_media_collections.down.sql
 --
--- Reverts 000035_media_collections.up.sql. Drops the FK column from
+-- Reverts 000044_media_collections.up.sql. Drops the FK column from
 -- media first (so the collections table can be dropped without
 -- breaking the reference), then the table itself. We do NOT drop
 -- the ltree / citext extensions — other future tables may want
