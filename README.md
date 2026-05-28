@@ -58,6 +58,20 @@ To stop everything (volumes preserved): `make down`. To wipe state and start ove
 
 ---
 
+## Local dev setup
+
+Before `make up`, copy the personal Compose override into place. It pins the admin build args, remaps Postgres to `5433` to dodge native-Postgres clashes, and aligns the `GONEXT_AUTH_*` secrets across `api` / `worker` / `migrate` so sessions and password hashes line up.
+
+```bash
+cp docker-compose.override.example.yml docker-compose.override.yml
+# Optionally edit the auth secrets — defaults are dev-only and safe to keep
+docker compose up -d
+```
+
+The live `docker-compose.override.yml` is gitignored so each contributor keeps their own. See [Port conflicts](#port-conflicts-the-docker-composeoverrideyml-pattern) below for the full rationale.
+
+---
+
 ## Local development tips
 
 A few things that bit us when we ran this for the first time — fix them up front and the stack just works.
