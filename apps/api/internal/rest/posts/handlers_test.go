@@ -195,6 +195,123 @@ func TestCreate_PublishRequiresPublishCap(t *testing.T) {
 	}
 }
 
+// TestCreate_DefaultsToMountPostType is the regression baseline for the
+// /pages/new flow (issue #506 follow-up): when the body omits post_type,
+// the create must fall back to the mount's hardcoded discriminator. This
+// is what every pre-fix caller expected to happen.
+func TestCreate_DefaultsToMountPostType(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t, PostTypePost)
+	pr := authorPrincipal("u1")
+
+	title := "Hello"
+	req := httptest.NewRequest("POST", h.base, jsonBody(t, CreateInput{Title: &title}))
+	rec := h.do(req, &pr)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var got Post
+	decodeJSON(t, rec, &got)
+	if got.PostType != PostTypePost {
+		t.Errorf("post_type = %q, want %q (mount default)", got.PostType, PostTypePost)
+	}
+}
+
+// TestCreate_BodyPostTypeOverrideToPage is the regression test for the
+// admin /pages/new flow (issue #506 follow-up). The admin Pages create
+// screen POSTs to /api/v1/posts with body {post_type:"page", ...}; the
+// handler must honor that override so the row lands as a page and shows
+// up in subsequent ?post_type=page list queries.
+func TestCreate_BodyPostTypeOverrideToPage(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t, PostTypePost)
+	pr := editorPrincipal("u1")
+
+	title := "About"
+	slug := "about"
+	pageType := PostTypePage
+	body := CreateInput{
+		Title:    &title,
+		Slug:     &slug,
+		PostType: &pageType,
+	}
+	req := httptest.NewRequest("POST", h.base, jsonBody(t, body))
+	rec := h.do(req, &pr)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var got Post
+	decodeJSON(t, rec, &got)
+	if got.PostType != PostTypePage {
+		t.Errorf("post_type = %q, want %q (body override)", got.PostType, PostTypePage)
+	}
+
+	// Round-trip: the row must be retrievable via ?post_type=page on
+	// the same /api/v1/posts mount (this is the path the admin Pages
+	// list actually uses).
+	listReq := httptest.NewRequest("GET", h.base+"?post_type=page", nil)
+	listRec := h.do(listReq, &pr)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("list status = %d, body = %s", listRec.Code, listRec.Body.String())
+	}
+	var page router.Page[Post]
+	decodeJSON(t, listRec, &page)
+	var found bool
+	for _, p := range page.Data {
+		if p.ID == got.ID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("created page id %q not present in ?post_type=page list: %+v", got.ID, page.Data)
+	}
+}
+
+// TestCreate_BodyPostTypeInvalidRejected guards the closed-set
+// validation on the create path: an unknown post_type is a 400, not a
+// silent fall-through to the mount default. Matches the LIST behavior.
+func TestCreate_BodyPostTypeInvalidRejected(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t, PostTypePost)
+	pr := authorPrincipal("u1")
+
+	bogus := "attachment"
+	body := CreateInput{PostType: &bogus}
+	req := httptest.NewRequest("POST", h.base, jsonBody(t, body))
+	rec := h.do(req, &pr)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
+	}
+	var pd router.ProblemDetails
+	decodeJSON(t, rec, &pd)
+	if pd.Code != "invalid_post_type" {
+		t.Errorf("code = %q, want invalid_post_type", pd.Code)
+	}
+}
+
+// TestCreate_PagesMount_BodyPostTypeOmitted confirms the mount default
+// still wins when the body omits post_type, even on a /api/v1/pages
+// mount. This is the symmetric case: a Page mount with no body override
+// must still produce a page row.
+func TestCreate_PagesMount_BodyPostTypeOmitted(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t, PostTypePage)
+	pr := editorPrincipal("u1") // editor has edit_pages
+
+	title := "Mount Default Page"
+	req := httptest.NewRequest("POST", h.base, jsonBody(t, CreateInput{Title: &title}))
+	rec := h.do(req, &pr)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var got Post
+	decodeJSON(t, rec, &got)
+	if got.PostType != PostTypePage {
+		t.Errorf("post_type = %q, want %q (mount default wins when body omits)", got.PostType, PostTypePage)
+	}
+}
+
 // -----------------------------------------------------------------------------
 // GET ONE
 // -----------------------------------------------------------------------------
