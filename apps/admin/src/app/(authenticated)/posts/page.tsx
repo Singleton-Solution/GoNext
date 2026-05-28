@@ -44,6 +44,66 @@ import styles from './posts.module.css';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Last 8 chars of a UUID — enough to disambiguate authors in the list
+ * table without occupying half the column. Mirrors the helper of the
+ * same name in `posts/[id]/revisions/page.tsx` (issue #515 fixes the
+ * blank-Author-cell bug by routing through this fallback when the list
+ * API doesn't include an author display name).
+ */
+function shortAuthorId(id: string): string {
+  if (id.length <= 8) return id;
+  return id.slice(-8);
+}
+
+/** Wire shape we expect from `GET /api/v1/posts`. */
+export type ApiPost = {
+  id: string;
+  title: string;
+  status: string;
+  published_at?: string | null;
+  updated_at?: string;
+  created_at?: string;
+  author_id?: string;
+  author?: { id?: string; display_name?: string; displayName?: string } | null;
+};
+
+/**
+ * Adapt an API post to the flatter `Post` shape the list UI expects.
+ *
+ * Pulled out of `fetchInitialPosts` so it can be unit tested without
+ * spinning up the whole server component (issue #515).
+ *
+ * Author display name: the list endpoint doesn't currently JOIN
+ * `users`, so `author.display_name` is usually absent. We fall back
+ * to the last 8 chars of the author UUID rather than rendering a
+ * blank Author cell — matches the pattern used on the revisions page
+ * (`shortId` helper).
+ *
+ * Comments count: a separate aggregate the list endpoint doesn't
+ * compute. Left at 0 until the API gains the column / sub-select
+ * (tracked as a follow-up in #515).
+ */
+export function adaptApiPost(p: ApiPost): PostListResponse['posts'][number] {
+  const apiName =
+    p.author?.display_name ?? p.author?.displayName ?? '';
+  const authorId = p.author?.id ?? p.author_id ?? '';
+  return {
+    id: p.id,
+    title: p.title ?? '(untitled)',
+    status:
+      (p.status as PostListResponse['posts'][number]['status']) ?? 'draft',
+    date: p.published_at ?? p.updated_at ?? p.created_at ?? '',
+    author: {
+      id: authorId,
+      displayName: apiName || (authorId ? shortAuthorId(authorId) : ''),
+    },
+    // Comments aggregate isn't part of the list payload — would
+    // require a SELECT COUNT(*) join we don't run yet. See #515.
+    commentsCount: 0,
+  };
+}
+
 /** Loading skeleton for the Suspense fallback. */
 function PostsSkeleton(): ReactElement {
   return (
@@ -101,15 +161,6 @@ async function fetchInitialPosts(): Promise<{
     // `{posts, nextCursor, total}` form with a flatter Post shape, so
     // adapt here. Be defensive: a missing field shouldn't crash the
     // page (issue #76 — contract still evolving).
-    type ApiPost = {
-      id: string;
-      title: string;
-      status: string;
-      published_at?: string | null;
-      updated_at?: string;
-      created_at?: string;
-      author_id?: string;
-    };
     type ApiEnvelope = {
       data?: ApiPost[];
       posts?: ApiPost[];
@@ -129,14 +180,7 @@ async function fetchInitialPosts(): Promise<{
       json.nextCursor ??
       null;
     // Map ApiPost → the flatter Post shape the UI expects.
-    const posts = rows.map((p) => ({
-      id: p.id,
-      title: p.title ?? '(untitled)',
-      status: (p.status as PostListResponse['posts'][number]['status']) ?? 'draft',
-      date: p.published_at ?? p.updated_at ?? p.created_at ?? '',
-      author: { id: p.author_id ?? '', displayName: '' },
-      commentsCount: 0,
-    }));
+    const posts = rows.map(adaptApiPost);
     return {
       data: {
         posts: posts as PostListResponse['posts'],

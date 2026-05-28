@@ -120,3 +120,29 @@ func TestList_AnonymousDenied(t *testing.T) {
 		t.Fatalf("expected 401, got %d", rec.Code)
 	}
 }
+
+// Clean install: no plugins are installed yet, so the underlying
+// lifecycle.List call returns an empty slice. The sidebar polls this
+// endpoint on every authenticated layout render; it must respond 200
+// with {"pages":[]} rather than failing the layout. Regression for
+// issue #503.
+func TestList_EmptyOnCleanInstall(t *testing.T) {
+	mux := newHarness(t, nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/plugin-pages", nil)
+	req = req.WithContext(policy.WithPrincipal(req.Context(), policy.Principal{UserID: "u:1"}))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp listResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Pages == nil {
+		t.Fatal("Pages should be a non-nil empty slice so JSON encodes as [], not null")
+	}
+	if len(resp.Pages) != 0 {
+		t.Fatalf("expected zero pages, got %d: %+v", len(resp.Pages), resp.Pages)
+	}
+}

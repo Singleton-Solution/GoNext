@@ -82,6 +82,20 @@ services:
       <<: *go-env
       GONEXT_MIGRATION_DIR: /migrations
       GONEXT_THEME_DIR: /themes
+      # The file-seed step copies image-bundled themes (baked into the
+      # cli image at /themes by cli/gonext/Dockerfile) into the named
+      # api-themes volume mounted below. The api container mounts the
+      # same volume at /themes, so anything seeded here becomes visible
+      # to it on next boot. Idempotent: skipped when the volume already
+      # has theme directories.
+      GONEXT_BUNDLED_THEMES_DIR: /themes
+      GONEXT_VOLUME_THEMES_DIR: /var/lib/gonext-themes
+    volumes:
+      # api-themes is the shared volume the api consumes at /themes.
+      # Mounting it here at a distinct path lets the seeder copy
+      # /themes (image-baked) into the volume without the mount
+      # shadowing the source directory.
+      - api-themes:/var/lib/gonext-themes
     command: ["migrate", "up"]
 
   # -------------------------------------------------------------------------

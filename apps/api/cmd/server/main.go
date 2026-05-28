@@ -792,18 +792,28 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 	// A read error is logged and surfaced as "no active theme" — the
 	// handler turns that into a 404 rather than a 500 because a
 	// transient DB hiccup should not bring down public CSS.
+	//
+	// The raw resolver hits Postgres on every call. Public CSS traffic
+	// scales with page views, so we wrap it in a 60s TTL cache (issue
+	// #526). The cache is best-effort: theme switches will lag by up
+	// to one TTL until a follow-up wires Invalidate() through the
+	// admin activate handler. Sixty seconds is short enough that an
+	// operator never waits long for a theme swap to propagate and long
+	// enough that bursty traffic doesn't punch through to the DB.
+	rawThemeActiveResolver := func() string {
+		slug, err := themeActiveStore.Get(context.Background())
+		if err != nil {
+			logger.Debug("themes/static: active resolver failed",
+				slog.Any("err", err))
+			return ""
+		}
+		return slug
+	}
+	cachedThemeActiveResolver := themesstatic.NewCachedResolver(rawThemeActiveResolver, 60*time.Second)
 	if err := themesstatic.Mount(mux, "/themes", themesstatic.Deps{
-		ThemeDir: themeDir,
-		ActiveResolver: func() string {
-			slug, err := themeActiveStore.Get(context.Background())
-			if err != nil {
-				logger.Debug("themes/static: active resolver failed",
-					slog.Any("err", err))
-				return ""
-			}
-			return slug
-		},
-		Logger: logger,
+		ThemeDir:       themeDir,
+		ActiveResolver: cachedThemeActiveResolver.Get,
+		Logger:         logger,
 	}); err != nil {
 		logger.Warn("themes/static: failed to mount", slog.Any("err", err))
 	} else {
@@ -1497,17 +1507,35 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 	}
 	if jobsInspector == nil {
 		logger.Warn("admin/jobs: skipping mount; asynq inspector unavailable")
-	} else if err := adminjobs.Mount(mux, "/api/v1/admin/jobs", adminjobs.Deps{
-		Inspector:  jobsInspectorAdapter{insp: jobsInspector},
-		Redactions: adminjobs.NewMemoryRedactionStore(),
-		Policy:     adminPolicy,
-		Logger:     logger,
-	}); err != nil {
-		logger.Warn("admin/jobs: failed to mount", slog.Any("err", err))
 	} else {
-		logger.Info("admin/jobs: routes mounted",
-			slog.String("base", "/api/v1/admin/jobs"),
-		)
+		// Mount on a sub-mux and wrap with RequireSession so the handler's
+		// gate() sees a principal on context. The global middleware chain
+		// no longer carries OptionalSession (the regression fixed in #31),
+		// so admin endpoints have to do their own session validation —
+		// mirroring how /api/v1/settings and /api/v1/auth/sessions wire
+		// themselves. Without this wrap, every admin/jobs request landed
+		// at the gate with no principal and returned 401, hiding the
+		// inspector behind a permanent auth wall (issue #502).
+		jobsMux := http.NewServeMux()
+		if err := adminjobs.Mount(jobsMux, "/api/v1/admin/jobs", adminjobs.Deps{
+			Inspector:  jobsInspectorAdapter{insp: jobsInspector},
+			Redactions: adminjobs.NewMemoryRedactionStore(),
+			Policy:     adminPolicy,
+			Logger:     logger,
+		}); err != nil {
+			logger.Warn("admin/jobs: failed to mount", slog.Any("err", err))
+		} else {
+			var jobsHandler http.Handler = jobsMux
+			if sessions != nil {
+				jobsHandler = authmw.RequireSession(sessions)(jobsMux)
+			} else {
+				logger.Warn("admin/jobs: session manager nil; mounting without RequireSession")
+			}
+			mux.Handle("/api/v1/admin/jobs/", jobsHandler)
+			logger.Info("admin/jobs: routes mounted",
+				slog.String("base", "/api/v1/admin/jobs"),
+			)
+		}
 	}
 
 	// Admin marketplace surface (/api/v1/admin/marketplace). The

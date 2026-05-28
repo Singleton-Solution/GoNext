@@ -6,7 +6,20 @@ import (
 
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/rest/router"
 	"github.com/Singleton-Solution/GoNext/packages/go/policy"
+	"github.com/Singleton-Solution/GoNext/packages/go/util/queryparse"
 )
+
+// validCommentStatuses is the lookup table queryparse.ParseStatus
+// uses to validate the ?status= query parameter on the list endpoint.
+// Built once at package load from AllStatuses so the source of truth
+// for the moderation enum stays in model.go.
+var validCommentStatuses = func() map[string]struct{} {
+	m := make(map[string]struct{}, len(AllStatuses))
+	for _, s := range AllStatuses {
+		m[string(s)] = struct{}{}
+	}
+	return m
+}()
 
 // listResponse is the envelope returned by GET /api/v1/admin/comments.
 // We reuse router.Page so the shape matches the rest of the admin
@@ -35,15 +48,16 @@ func (h *handlers) list(w http.ResponseWriter, r *http.Request, _ policy.Princip
 	// Status filter. Empty string and the literal "any" both mean
 	// "no filter"; any other value must be in AllStatuses or we 400
 	// so the client doesn't accidentally typo "approve" (the bulk
-	// verb) instead of "approved" (the state).
-	if s := q.Get("status"); s != "" && s != "any" {
-		st := Status(s)
-		if !IsValidStatus(st) {
-			router.WriteError(w, http.StatusBadRequest, "invalid_status",
-				"status must be one of pending, approved, spam, trash")
-			return
-		}
-		filter.Status = st
+	// verb) instead of "approved" (the state). queryparse.ParseStatus
+	// owns the alias rule so the three list endpoints can't drift.
+	parsedStatus, err := queryparse.ParseStatus(q.Get("status"), validCommentStatuses)
+	if err != nil {
+		router.WriteError(w, http.StatusBadRequest, "invalid_status",
+			"status must be one of pending, approved, spam, trash")
+		return
+	}
+	if parsedStatus != "" {
+		filter.Status = Status(parsedStatus)
 	}
 
 	if pid := q.Get("post_id"); pid != "" {

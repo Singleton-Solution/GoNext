@@ -9,9 +9,25 @@ import (
 	"strings"
 
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/rest/router"
-	pkgsearch "github.com/Singleton-Solution/GoNext/packages/go/search"
 	"github.com/Singleton-Solution/GoNext/packages/go/policy"
+	pkgsearch "github.com/Singleton-Solution/GoNext/packages/go/search"
+	"github.com/Singleton-Solution/GoNext/packages/go/util/queryparse"
 )
+
+// validSearchStatuses is the closed set the admin search endpoint
+// accepts for ?status=. Matches the post_status enum in
+// 000001_init.up.sql — searchable rows live in the posts table, so
+// the valid filter values are the same ones REST /api/v1/posts
+// accepts. queryparse.ParseStatus also recognises "" and "any" as
+// "no filter" before consulting this set.
+var validSearchStatuses = map[string]struct{}{
+	"draft":     {},
+	"pending":   {},
+	"published": {},
+	"scheduled": {},
+	"private":   {},
+	"trash":     {},
+}
 
 // Searcher is the read-only contract the handler needs. The
 // concrete *pkgsearch.Store satisfies it. Keeping the interface
@@ -66,7 +82,19 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	opts := parseOpts(r)
+	opts, err := parseOpts(r)
+	if err != nil {
+		// parseOpts only fails on invalid_status today; route everything
+		// through a single branch so future validations can extend
+		// parseOpts without growing the handler.
+		if errors.Is(err, queryparse.ErrInvalidStatus) {
+			router.WriteError(w, http.StatusBadRequest, "invalid_status",
+				"status must be one of draft, pending, published, scheduled, private, trash (or omitted / 'any')")
+			return
+		}
+		router.WriteError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
 
 	res, err := h.search.Search(r.Context(), q, opts)
 	if err != nil {
@@ -88,10 +116,18 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // parseOpts maps URL query params onto a SearchOpts. The admin
 // surface deliberately does NOT default-filter by status; callers
 // who want only published rows pass &status=published explicitly.
-func parseOpts(r *http.Request) pkgsearch.SearchOpts {
+// The "any" alias and the empty string both mean "no filter"; an
+// unknown status returns queryparse.ErrInvalidStatus so the handler
+// surfaces a 400 instead of slipping it into the SQL parameter and
+// returning empty results.
+func parseOpts(r *http.Request) (pkgsearch.SearchOpts, error) {
 	q := r.URL.Query()
+	status, err := queryparse.ParseStatus(q.Get("status"), validSearchStatuses)
+	if err != nil {
+		return pkgsearch.SearchOpts{}, err
+	}
 	opts := pkgsearch.SearchOpts{
-		Status: q.Get("status"),
+		Status: status,
 	}
 	if t := q.Get("types"); t != "" {
 		// Split on comma so the typical "?types=post,page" works.
@@ -114,7 +150,7 @@ func parseOpts(r *http.Request) pkgsearch.SearchOpts {
 			opts.Offset = n
 		}
 	}
-	return opts
+	return opts, nil
 }
 
 // Mount registers the handler at base + "/search" behind the

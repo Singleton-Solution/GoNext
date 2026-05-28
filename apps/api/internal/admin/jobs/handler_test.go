@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -310,6 +311,41 @@ func TestList_InspectorError(t *testing.T) {
 	rec := h.do(req, ptr(adminPrincipal()))
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status: got %d, want 500; body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestList_QueueNotFoundIsEmpty pins the fix for issue #502: a clean
+// install has never enqueued anything to the "default" queue, so Asynq's
+// ListArchivedTasks returns an error wrapping ErrQueueNotFound. The
+// handler must translate that into an empty page (200), not a 500.
+// Otherwise the admin Jobs page renders its FailureState UI for every
+// fresh deployment.
+func TestList_QueueNotFoundIsEmpty(t *testing.T) {
+	h := newTestHarness(t)
+	// Asynq wraps ErrQueueNotFound with fmt.Errorf, so mirror that here
+	// — errors.Is must still report a match.
+	h.inspector.listErr = fmt.Errorf("asynq: %w", asynq.ErrQueueNotFound)
+
+	req := httptest.NewRequest("GET", "/api/v1/admin/jobs/dlq?queue=default", nil)
+	rec := h.do(req, ptr(adminPrincipal()))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: got %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+	var page router.Page[ArchivedTask]
+	if err := json.Unmarshal(rec.Body.Bytes(), &page); err != nil {
+		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
+	}
+	if len(page.Data) != 0 {
+		t.Errorf("data: got %d, want 0", len(page.Data))
+	}
+	// Empty page must serialise as [] (not null) so the UI can render it
+	// without a nil-check; router.Page already guarantees this, but pin
+	// the wire shape here too.
+	if !strings.Contains(rec.Body.String(), `"data":[]`) {
+		t.Errorf("body: want data:[] in body, got %s", rec.Body.String())
+	}
+	if page.Pagination.NextCursor != "" {
+		t.Errorf("next_cursor: got %q, want empty", page.Pagination.NextCursor)
 	}
 }
 

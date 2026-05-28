@@ -36,6 +36,10 @@ Subcommands:
                      --seed-default-theme=BOOL  Install the bundled default
                                                 theme (gn-hello) on first
                                                 boot. Default: true.
+                     --seed-themes=BOOL         Copy image-bundled themes
+                                                into the runtime themes
+                                                volume on first boot.
+                                                Default: true.
   down [N]         Roll back N migrations (default 1). Pass 0 to roll back ALL.
   to <version>     Migrate up or down to reach the given version (positive
                    integer matching the migration filename prefix).
@@ -46,10 +50,15 @@ Subcommands:
                    See 'migrate replacements --help'.
 
 Environment:
-  DATABASE_URL              Required. Postgres DSN.
-  GONEXT_MIGRATION_DIR      Migration directory. Default: ./migrations.
-  GONEXT_THEME_DIR          Runtime theme directory used by the seeder.
-                            Default: ./themes.
+  DATABASE_URL                Required. Postgres DSN.
+  GONEXT_MIGRATION_DIR        Migration directory. Default: ./migrations.
+  GONEXT_THEME_DIR            Runtime theme directory used by the DB
+                              seeder (gn-hello). Default: ./themes.
+  GONEXT_BUNDLED_THEMES_DIR   Source directory for the file seeder
+                              (image-baked themes). Default: /themes.
+  GONEXT_VOLUME_THEMES_DIR    Destination directory for the file seeder
+                              (named-volume mount on the migrate
+                              service). Default: /var/lib/gonext-themes.
 
 Exit codes:
   0   success
@@ -107,6 +116,8 @@ func runUp(args []string, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	seedDefaultTheme := fs.Bool("seed-default-theme", true,
 		"install the bundled default theme (gn-hello) on first boot")
+	seedThemesFlag := fs.Bool("seed-themes", true,
+		"copy image-bundled themes into the runtime themes volume on first boot")
 	if err := fs.Parse(args); err != nil {
 		// flag.ContinueOnError already prints the error; emit usage so
 		// the operator sees the surrounding command help too.
@@ -128,6 +139,24 @@ func runUp(args []string, stdout, stderr io.Writer) int {
 		return ExitFail
 	}
 	fmt.Fprintln(stdout, "migrate: up OK")
+
+	// File seed first: copy image-bundled themes into the named volume
+	// before the DB seeder runs so the gn-hello directory exists on
+	// disk by the time the renderer wakes up and resolves the
+	// active_theme slug. The two seeders are deliberately separate —
+	// the file seed is operator-facing (what the renderer reads), the
+	// DB seed is product-facing (which theme is active).
+	if *seedThemesFlag {
+		src := resolveBundledThemesDir()
+		dst := resolveVolumeThemesDir()
+		if err := seedThemes(src, dst, logger); err != nil {
+			fmt.Fprintf(stderr, "gonext migrate up: seed themes: %v\n", err)
+			return ExitFail
+		}
+		fmt.Fprintln(stdout, "migrate: themes seed OK")
+	} else {
+		logger.Info("themes file seed skipped via --seed-themes=false")
+	}
 
 	if !*seedDefaultTheme {
 		logger.Info("theme seed skipped via --seed-default-theme=false")
