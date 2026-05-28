@@ -35,6 +35,7 @@
  *     drop into a `<style>` element.
  */
 import type { ReactElement, ReactNode } from 'react';
+import { Suspense } from 'react';
 
 import { MarketingFooter } from '@/components/marketing/Footer';
 import { MarketingNav } from '@/components/marketing/Nav';
@@ -96,9 +97,20 @@ export function PublicShell({
       />
       {withChrome ? (
         <div className="min-h-screen bg-paper text-ink">
-          <MarketingNav />
+          {/* MarketingNav + MarketingFooter are async Server Components
+              that pull site identity (issue #508) and nav menus
+              (issue #509) from the API. Next's RSC renderer awaits
+              them transparently in production. The Suspense boundary
+              keeps a hydration-pending chrome from blanking the themed
+              body underneath it — and lets RTL render the rest of the
+              shell when the chrome's data fetches haven't resolved. */}
+          <Suspense fallback={null}>
+            <MarketingNav />
+          </Suspense>
           <main>{site}</main>
-          <MarketingFooter />
+          <Suspense fallback={null}>
+            <MarketingFooter />
+          </Suspense>
         </div>
       ) : (
         site

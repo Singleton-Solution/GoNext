@@ -50,7 +50,7 @@ describe('PublicShell', () => {
     expect(site?.getAttribute('data-gn-template')).toBe('archive-book.tsx');
   });
 
-  it('renders the brand chrome (nav + footer) by default', () => {
+  it('renders the brand chrome wrapper by default', () => {
     const { container } = render(
       <PublicShell
         bodyHtml="<p>themed body</p>"
@@ -58,15 +58,13 @@ describe('PublicShell', () => {
         templateBasename="single.html"
       />,
     );
-    // The marketing nav uses a sticky pill on the forest surface;
-    // checking for the aria-label keeps the assertion forward-
-    // compatible with class-name changes.
-    expect(
-      container.querySelector('nav[aria-label="Primary"]'),
-    ).not.toBeNull();
-    // The footer is a real <footer> with the brand wordmark.
-    expect(container.querySelector('footer')).not.toBeNull();
-    // The themed body is still injected verbatim within the chrome.
+    // MarketingNav + MarketingFooter are async Server Components,
+    // wrapped in a Suspense boundary in the shell. RTL renders the
+    // fallback (null) so we assert on the chrome wrapper + themed
+    // body instead. The chrome's internal contract is exercised in
+    // Nav.test.tsx / Footer.test.tsx.
+    expect(container.querySelector('main')).not.toBeNull();
+    expect(container.querySelector('main .gn-site')).not.toBeNull();
     expect(container.querySelector('.gn-site')?.textContent).toContain(
       'themed body',
     );

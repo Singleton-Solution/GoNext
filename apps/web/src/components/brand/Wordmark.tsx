@@ -25,6 +25,31 @@ export interface WordmarkProps {
    */
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
+  /**
+   * Optional site name override. The wordmark splits on the FIRST
+   * space — the leading half renders in display-bold ("Go"-style), the
+   * trailing half renders in italic serif ("Next"-style). If only one
+   * word is supplied the whole name renders in display-bold and the
+   * italic half is omitted. Defaults to the brand mark ("Go" + "Next").
+   */
+  name?: string;
+}
+
+/**
+ * Split a site name into the "head" + "italic tail" the wordmark paints.
+ * The first space is the seam — anything before is the bold display
+ * half, anything after is the italic serif half. A single-word name
+ * leaves the tail empty so the renderer paints just one span.
+ */
+function splitName(name: string): { head: string; tail: string } {
+  const trimmed = name.trim();
+  if (trimmed === '') return { head: 'Go', tail: 'Next' };
+  const firstSpace = trimmed.indexOf(' ');
+  if (firstSpace === -1) return { head: trimmed, tail: '' };
+  return {
+    head: trimmed.slice(0, firstSpace),
+    tail: trimmed.slice(firstSpace + 1).trim(),
+  };
 }
 
 const sizes: Record<NonNullable<WordmarkProps['size']>, string> = {
@@ -39,7 +64,13 @@ export function Wordmark({
   surface = 'cream',
   size = 'md',
   className,
+  name,
 }: WordmarkProps): React.ReactElement {
+  const { head, tail } = splitName(name ?? 'Go Next');
+  // The aria-label collapses to the configured site name so screen
+  // readers get the same string the visual mark renders, rather than
+  // the brand-default "GoNext".
+  const ariaLabel = tail === '' ? head : `${head}${tail}`;
   return (
     <Tag
       className={cn(
@@ -47,7 +78,7 @@ export function Wordmark({
         sizes[size],
         className,
       )}
-      aria-label="GoNext"
+      aria-label={ariaLabel}
     >
       <span
         className={cn(
@@ -55,16 +86,18 @@ export function Wordmark({
           surface === 'forest' ? 'text-fg-on-forest' : 'text-ink',
         )}
       >
-        Go
+        {head}
       </span>
-      <span
-        className={cn(
-          'wm-next font-serif italic font-normal',
-          surface === 'forest' ? 'text-emerald-bright' : 'text-ink',
-        )}
-      >
-        Next
-      </span>
+      {tail !== '' ? (
+        <span
+          className={cn(
+            'wm-next font-serif italic font-normal',
+            surface === 'forest' ? 'text-emerald-bright' : 'text-ink',
+          )}
+        >
+          {tail}
+        </span>
+      ) : null}
     </Tag>
   );
 }
