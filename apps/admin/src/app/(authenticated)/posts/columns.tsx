@@ -12,16 +12,17 @@
  * deferred to the edit screen.
  */
 import type { ReactElement } from 'react';
+import type { components } from '@gonext/api-types';
 import styles from './posts.module.css';
 
-/** Canonical post status set used across the admin. */
-export type PostStatus =
-  | 'publish'
-  | 'draft'
-  | 'pending'
-  | 'private'
-  | 'future'
-  | 'trash';
+/**
+ * Canonical post status set used across the admin.
+ *
+ * Issue #514 follow-up: derived from the OpenAPI spec instead of
+ * hand-typed so a status alphabet change in `openapi.yaml` shows up
+ * here as a type error rather than as silent UI drift.
+ */
+export type PostStatus = components['schemas']['Post']['status'];
 
 /** Shape of a single post row as returned by `/api/v1/posts`. */
 export interface Post {

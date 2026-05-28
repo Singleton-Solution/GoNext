@@ -5,10 +5,18 @@
  * (`apps/api/internal/admin/comments`). Keeping them in one place
  * means the list, detail, status badge, and bulk-action components
  * compile against a single contract.
+ *
+ * The admin endpoint (`/api/v1/admin/comments`) emits a richer row
+ * shape than the public spec's `Comment` schema (it joins the post
+ * title, threads, etc.), so the row interfaces below are NOT derived
+ * from the spec wholesale. The status enum, however, IS shared with
+ * the public API and is sourced from there — issue #514 follow-up so
+ * an enum value change shows up as a type error here.
  */
+import type { components } from '@gonext/api-types';
 
 /** Canonical moderation states. Mirrors the API's Status type. */
-export type CommentStatus = 'pending' | 'approved' | 'spam' | 'trash';
+export type CommentStatus = components['schemas']['Comment']['status'];
 
 /** Bulk action verbs accepted by `/api/v1/admin/comments/bulk`. */
 export type BulkAction = 'approve' | 'spam' | 'trash';

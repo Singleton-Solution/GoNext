@@ -27,6 +27,7 @@
 import Link from 'next/link';
 import { Suspense, type ReactElement } from 'react';
 import { Plus } from 'lucide-react';
+import type { components } from '@gonext/api-types';
 import { serverApiFetch } from '@/lib/server-api';
 import { Headline } from '@/components/ui/headline';
 import { Button } from '@/components/ui/button';
@@ -35,10 +36,11 @@ import { Badge } from '@/components/ui/badge';
 export const dynamic = 'force-dynamic';
 
 /** Status values the page list surfaces. Mirrors the WP-compat set
- * the API speaks. The API uses `publish`/`scheduled`/`draft`; we
- * normalise scheduled to `future` so the badge logic stays aligned
- * with the post detail surface. */
-export type PageStatus = 'publish' | 'draft' | 'future' | 'private' | 'trash';
+ * the API speaks. The spec's `Post.status` (Page is a Post alias)
+ * carries the canonical enum — we source it from there so a status
+ * alphabet change in `openapi.yaml` shows up as a type error rather
+ * than as silent UI drift (issue #514 follow-up). */
+export type PageStatus = components['schemas']['Page']['status'];
 
 /** Flatter shape the list UI renders. Pulled out of the adapter so
  * the tests can exercise the field-mapping rules without spinning up
@@ -52,15 +54,23 @@ export interface SitePage {
   updatedAt: string;
 }
 
-/** Wire shape we expect from `GET /api/v1/posts?post_type=page`. */
-export type ApiPagePost = {
+/**
+ * Wire shape we expect from `GET /api/v1/posts?post_type=page`.
+ *
+ * Issue #514 follow-up: derived from the OpenAPI spec's `Page` schema
+ * (which aliases `Post`). The list endpoint emits a sparse projection
+ * — most fields the spec marks required are absent on a list row — so
+ * we treat every field as optional via `Partial<>` and guarantee `id`
+ * explicitly (the row key MUST be present). `status` is explicitly
+ * widened back to `string` because the API sometimes returns the
+ * past-tense `published` / `scheduled` variants which the adapter
+ * normalises to the canonical enum (and the tests exercise that
+ * branch with fixture values like `"bogus"`).
+ */
+export type ApiPagePost = Omit<Partial<components['schemas']['Page']>, 'status'> & {
   id: string;
-  title?: string;
-  slug?: string;
   status?: string;
   published_at?: string | null;
-  updated_at?: string;
-  created_at?: string;
 };
 
 /**

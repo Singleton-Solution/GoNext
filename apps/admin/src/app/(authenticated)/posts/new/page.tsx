@@ -29,6 +29,7 @@ import {
   type ReactElement,
 } from 'react';
 import { ChevronLeft, Loader2, Plus } from 'lucide-react';
+import type { components } from '@gonext/api-types';
 
 import { ApiError, api } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
@@ -36,18 +37,44 @@ import { Headline } from '@/components/ui/headline';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-type PostStatus = 'draft' | 'publish' | 'private' | 'future';
+/**
+ * Status alphabet — sourced from the spec (issue #514 follow-up). The
+ * form only exposes the four operator-facing states; `pending` and
+ * `trash` (also in the spec enum) are workflow transitions that flow
+ * through other surfaces (review queue, list bulk actions).
+ */
+type PostStatus = components['schemas']['Post']['status'];
 
-interface CreatePostBody {
+/**
+ * Body posted to `/api/v1/posts`.
+ *
+ * Issue #514 follow-up: derived from the spec's `PostCreate` schema.
+ * Two local overrides:
+ *   • `title`/`slug`/`status` are required by the form (the spec
+ *     marks them optional because the server fills sensible defaults
+ *     when omitted, but the UI always sends them).
+ *   • `content_blocks` is typed as a `Record<string, never>` placeholder
+ *     in the spec (the spec models block-tree JSON as opaque). The
+ *     create form sends an empty array to seed the post; the spec will
+ *     gain a typed block-tree schema later (issue #514 follow-up).
+ */
+type CreatePostBody = Omit<
+  components['schemas']['PostCreate'],
+  'title' | 'slug' | 'status' | 'content_blocks'
+> & {
   title: string;
   slug: string;
   status: PostStatus;
   content_blocks: never[];
-}
+};
 
-interface CreatePostResponse {
-  id: string;
-}
+/**
+ * Server response on success. The create endpoint returns the full
+ * `Post` projection per the spec; the form only reads the `id` to
+ * route to the editor, so we narrow with `Pick` to avoid coupling to
+ * fields the form doesn't care about.
+ */
+type CreatePostResponse = Pick<components['schemas']['Post'], 'id'>;
 
 /**
  * Derive a URL-safe slug from a free-form title. Mirrors the server's
