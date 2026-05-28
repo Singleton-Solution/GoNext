@@ -364,3 +364,119 @@ func TestDeleteActive_Idempotent(t *testing.T) {
 		t.Fatalf("status = %d; want 204", w.Code)
 	}
 }
+
+// TestPostPreview_NoOverridesReturnsBaseCSS verifies the empty-payload
+// path produces the unmodified theme's CSS. The admin "Reset preview"
+// button posts {} to land here.
+func TestPostPreview_NoOverridesReturnsBaseCSS(t *testing.T) {
+	store := NewMemoryStore("gn-hello")
+	router := newRouter(t, store, loaderReturning("gn-hello", baseTheme()), adminPrincipal())
+
+	req := httptest.NewRequest(http.MethodPost, testBase+"/preview", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d (body %s); want 200", w.Code, w.Body.String())
+	}
+	var got PreviewResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.ThemeSlug != "gn-hello" {
+		t.Fatalf("ThemeSlug = %q; want gn-hello", got.ThemeSlug)
+	}
+	// Base palette declares 'paper' (#ffffff); the emitted CSS must
+	// reflect that.
+	if !strings.Contains(got.CSSCustomProperties, "--wp-preset--color--paper: #ffffff") {
+		t.Fatalf("base CSS missing paper entry; got %s", got.CSSCustomProperties)
+	}
+}
+
+// TestPostPreview_AppliesOverrides verifies that posted overrides
+// reshape the emitted CSS. The admin form posts the in-flight palette
+// edit through this path on every keystroke.
+func TestPostPreview_AppliesOverrides(t *testing.T) {
+	store := NewMemoryStore("gn-hello")
+	router := newRouter(t, store, loaderReturning("gn-hello", baseTheme()), adminPrincipal())
+
+	body := `{"settings":{"color":{"palette":[{"slug":"paper","name":"Paper","color":"#abcdef"}]}}}`
+	req := httptest.NewRequest(http.MethodPost, testBase+"/preview", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d (body %s); want 200", w.Code, w.Body.String())
+	}
+	var got PreviewResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !strings.Contains(got.CSSCustomProperties, "--wp-preset--color--paper: #abcdef") {
+		t.Fatalf("preview CSS missing override; got %s", got.CSSCustomProperties)
+	}
+}
+
+// TestPostPreview_AcceptsOverridesEnvelope verifies the {"overrides":
+// {...}} wrapper shape works too — the older admin form generation
+// posts this envelope.
+func TestPostPreview_AcceptsOverridesEnvelope(t *testing.T) {
+	store := NewMemoryStore("gn-hello")
+	router := newRouter(t, store, loaderReturning("gn-hello", baseTheme()), adminPrincipal())
+
+	body := `{"overrides":{"settings":{"color":{"palette":[{"slug":"paper","name":"Paper","color":"#112233"}]}}}}`
+	req := httptest.NewRequest(http.MethodPost, testBase+"/preview", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d (body %s); want 200", w.Code, w.Body.String())
+	}
+	var got PreviewResponse
+	_ = json.Unmarshal(w.Body.Bytes(), &got)
+	if !strings.Contains(got.CSSCustomProperties, "--wp-preset--color--paper: #112233") {
+		t.Fatalf("envelope override not applied; got %s", got.CSSCustomProperties)
+	}
+}
+
+// TestPostPreview_Forbidden ensures the preview surface is gated by the
+// same capability as the rest of customizer.
+func TestPostPreview_Forbidden(t *testing.T) {
+	store := NewMemoryStore("gn-hello")
+	router := newRouter(t, store, loaderReturning("gn-hello", baseTheme()), subscriberPrincipal())
+
+	req := httptest.NewRequest(http.MethodPost, testBase+"/preview", strings.NewReader("{}"))
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status = %d; want 403", w.Code)
+	}
+}
+
+// TestPostPreview_Unauthenticated guards the 401 path.
+func TestPostPreview_Unauthenticated(t *testing.T) {
+	store := NewMemoryStore("gn-hello")
+	router := newRouter(t, store, loaderReturning("gn-hello", baseTheme()), nil)
+
+	req := httptest.NewRequest(http.MethodPost, testBase+"/preview", strings.NewReader("{}"))
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d; want 401", w.Code)
+	}
+}
+
+// TestPostPreview_InvalidJSON rejects malformed bodies with 400.
+func TestPostPreview_InvalidJSON(t *testing.T) {
+	store := NewMemoryStore("gn-hello")
+	router := newRouter(t, store, loaderReturning("gn-hello", baseTheme()), adminPrincipal())
+
+	req := httptest.NewRequest(http.MethodPost, testBase+"/preview", strings.NewReader(`{"settings":`))
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d; want 400", w.Code)
+	}
+}

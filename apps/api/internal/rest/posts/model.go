@@ -103,6 +103,18 @@ type ListFilter struct {
 	Search   string // free-text against title (ILIKE)
 	After    string // cursor: posts.id strictly greater than this UUID
 	Limit    int    // page size; clamped to [1, MaxListLimit] by the handler
+
+	// PostType, when non-empty, OVERRIDES the mount's hardcoded post
+	// type discriminator for this single request. Empty means "use the
+	// mount default" (the typical case).
+	//
+	// This exists so a single mount (today, /api/v1/posts) can serve
+	// both posts and pages — admin Pages screens query
+	// /api/v1/posts?post_type=page rather than depending on a separate
+	// /api/v1/pages mount that isn't wired yet. The handler validates
+	// the value against the closed {"post","page"} set before stuffing
+	// it here, so a malicious request can't read a CPT it shouldn't.
+	PostType string
 }
 
 // MaxListLimit is the hard upper bound on a single page of results.
