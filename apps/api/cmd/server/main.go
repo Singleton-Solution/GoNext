@@ -45,6 +45,7 @@ import (
 	adminmenus "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/menus"
 	adminpluginpages "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/pluginpages"
 	adminposts "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/posts"
+	adminsettings "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/settings"
 	adminstatus "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/status"
 	adminthemes "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/themes"
 	adminwebhooks "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/webhooks"
@@ -100,6 +101,7 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/revisions"
 	pkgsearch "github.com/Singleton-Solution/GoNext/packages/go/search"
 	"github.com/Singleton-Solution/GoNext/packages/go/session"
+	pkgsettings "github.com/Singleton-Solution/GoNext/packages/go/settings"
 	"github.com/Singleton-Solution/GoNext/packages/go/shutdown"
 	"github.com/Singleton-Solution/GoNext/packages/go/theme/seed"
 	"github.com/Singleton-Solution/GoNext/packages/go/tracing"
@@ -1510,6 +1512,60 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 				slog.String("base", "/api/v1/admin/marketplace"),
 			)
 		}
+	}
+
+	// Site settings registry (/api/v1/settings, issue #499). Every
+	// admin Settings sub-page (general, permalinks, reading, writing,
+	// privacy) reads + writes through this endpoint. The package-level
+	// settings registry holds the schema; the Postgres store persists
+	// values into the options table from migration 000008.
+	//
+	// We seed a fresh per-process registry with the core + privacy
+	// settings here rather than relying on the packages/go/settings
+	// global so the boot path stays explicit — a future change that
+	// registers plugin settings would extend this block, not reach into
+	// a singleton at import time. The Postgres store needs a non-nil
+	// pool; in pool-less test contexts we fall back to the MemoryStore
+	// so the route table still mounts and the admin form's "API
+	// available" probe succeeds.
+	//
+	// The routes are wrapped with authmw.RequireSession because the
+	// global middleware chain does not include OptionalSession (the
+	// regression fixed in #31). Wrapping per-Mount mirrors how
+	// /api/v1/auth/sessions and /api/v1/account/data wire themselves.
+	settingsReg := pkgsettings.NewRegistry()
+	if err := pkgsettings.RegisterCore(settingsReg); err != nil {
+		logger.Warn("settings: failed to register core settings", slog.Any("err", err))
+	}
+	if err := pkgsettings.RegisterPrivacy(settingsReg); err != nil {
+		logger.Warn("settings: failed to register privacy settings", slog.Any("err", err))
+	}
+	var settingsStore pkgsettings.Store
+	if pool != nil {
+		settingsStore = pkgsettings.NewPostgresStore(pool, settingsReg)
+	} else {
+		settingsStore = pkgsettings.NewMemoryStore(settingsReg)
+		logger.Warn("settings: pool nil; using in-memory store")
+	}
+	settingsMux := http.NewServeMux()
+	if err := adminsettings.Mount(settingsMux, "/api/v1/settings", adminsettings.Deps{
+		Store:    settingsStore,
+		Registry: settingsReg,
+		Policy:   adminPolicy,
+		Logger:   logger,
+	}); err != nil {
+		logger.Warn("settings: failed to mount routes", slog.Any("err", err))
+	} else {
+		var settingsHandler http.Handler = settingsMux
+		if sessions != nil {
+			settingsHandler = authmw.RequireSession(sessions)(settingsMux)
+		} else {
+			logger.Warn("settings: session manager nil; mounting without RequireSession")
+		}
+		mux.Handle("/api/v1/settings", settingsHandler)
+		logger.Info("settings: routes mounted",
+			slog.String("base", "/api/v1/settings"),
+		)
 	}
 
 	// Admin plugin pages surface (/api/v1/admin/plugin-pages). Walks
