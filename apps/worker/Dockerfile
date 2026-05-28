@@ -18,7 +18,11 @@
 # root so go.work, packages/go, and apps/worker are all visible in /src.
 
 # ---------- Stage 1: build ----------
-FROM golang:1.25-alpine AS build
+# Pinned to a specific patch so govulncheck's stdlib coverage is reproducible
+# across runs. Bumped from 1.25 → 1.25.10 to clear the stdlib CVEs that the
+# `security-scan` CI job flagged (net/mail, html/template, net, crypto/x509,
+# crypto/tls, net/http, os, net/url all have fixes in 1.25.8–1.25.10).
+FROM golang:1.25.10-alpine AS build
 
 RUN apk add --no-cache git ca-certificates tzdata
 
