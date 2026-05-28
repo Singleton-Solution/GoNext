@@ -119,7 +119,16 @@ func (h *handlers) list(w http.ResponseWriter, r *http.Request, pr policy.Princi
 		}
 	}
 
-	rows, err := h.store.List(r.Context(), h.postType, filter)
+	// post_type discriminator: client may override the mount default
+	// via ?post_type= so a single /api/v1/posts mount can serve both
+	// posts and pages (the /api/v1/pages mount isn't wired yet — see
+	// the PostType field doc on ListFilter).
+	postType := h.postType
+	if filter.PostType != "" {
+		postType = filter.PostType
+	}
+
+	rows, err := h.store.List(r.Context(), postType, filter)
 	if err != nil {
 		h.logger.ErrorContext(r.Context(), "posts.list: store error", slog.Any("err", err))
 		router.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list posts")
@@ -170,6 +179,18 @@ func parseListQuery(r *http.Request) (ListFilter, error) {
 	f.Status = status
 	f.AuthorID = q.Get("author")
 	f.Search = q.Get("search")
+
+	// Optional post_type override. Closed set ("post", "page") matches
+	// the two built-in types from migration 000003 — refusing anything
+	// else means a caller can't pivot the list onto a CPT it shouldn't
+	// see by guessing a slug. Empty falls back to the mount default in
+	// the handler.
+	if pt := q.Get("post_type"); pt != "" {
+		if pt != PostTypePost && pt != PostTypePage {
+			return f, validation{Code: "invalid_post_type", Detail: fmt.Sprintf("unknown post_type %q", pt)}
+		}
+		f.PostType = pt
+	}
 
 	after := q.Get("after")
 	if after != "" {

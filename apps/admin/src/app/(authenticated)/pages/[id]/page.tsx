@@ -1,31 +1,38 @@
 /**
- * Page detail / edit-metadata — sibling of posts/[id].
+ * Page detail / edit-metadata — sibling of posts/[id] (issue #506).
  *
  * Pages share the post-type infrastructure (docs/05-admin-api.md §3.1)
  * but the metadata surface trims the bits that don't apply to
- * evergreen content (no scheduling-as-publication, no category
- * taxonomy by default). The brand surface stays identical so the IA
- * is predictable.
+ * evergreen content (no scheduling-as-publication by default, no
+ * category taxonomy).
  *
- * The block editor for pages opens via the same per-resource route
- * (/pages/[id]/edit); this page is intentionally the metadata-only
- * view so editors can quickly toggle visibility, change the URL, or
- * tweak SEO without entering edit mode.
+ * Save path: PATCH /api/v1/posts/{id} with `title`, `slug`, `status`.
+ * Pages are stored as posts with post_type='page' in the same table,
+ * so the canonical CRUD endpoint is `/api/v1/posts/{id}` — there is
+ * no separate `/api/v1/pages/{id}` mount yet.
+ *
+ * The block editor is the next iteration (the "Block editor — coming
+ * soon" button stays disabled until the dedicated edit route ships).
+ * This screen owns the title/slug/status/excerpt write — enough to
+ * make the Pages module functional for operators.
  */
 'use client';
 
 import type { ReactElement } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
   Calendar,
   ChevronLeft,
+  Check,
   Eye,
   Globe,
+  Loader2,
   Save,
   User,
 } from 'lucide-react';
+import { ApiError, api } from '@/lib/api-client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Headline } from '@/components/ui/headline';
@@ -34,6 +41,27 @@ import { Label } from '@/components/ui/label';
 
 type PageStatus = 'draft' | 'publish' | 'private';
 
+/**
+ * Wire body for the PATCH. The API speaks `published` (past tense)
+ * not `publish` — we normalise at the boundary so the UI keeps the
+ * WP-classic label set the rest of the admin uses. The field set is
+ * the minimum the metadata surface owns; content_blocks lives on the
+ * dedicated editor route (not built yet).
+ */
+interface UpdatePageBody {
+  title?: string;
+  slug?: string;
+  status?: 'draft' | 'published' | 'private';
+  excerpt?: string;
+}
+
+/** Map the local UI status onto the API's published/draft/private. */
+function toApiStatus(s: PageStatus): UpdatePageBody['status'] {
+  if (s === 'publish') return 'published';
+  if (s === 'private') return 'private';
+  return 'draft';
+}
+
 export default function PageDetailPage(): ReactElement {
   const params = useParams<{ id: string }>();
   const pageId = params?.id ?? 'new';
@@ -41,6 +69,46 @@ export default function PageDetailPage(): ReactElement {
   const [title, setTitle] = useState('Untitled page');
   const [slug, setSlug] = useState('/untitled-page');
   const [status, setStatus] = useState<PageStatus>('draft');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  // The "Saved" pip auto-clears after a few seconds so it doesn't
+  // shout at the user forever. A timer ref isn't necessary because
+  // re-saves replace `savedAt` and the effect cleanup cancels the
+  // pending timeout cleanly.
+  useEffect(() => {
+    if (savedAt === null) return;
+    const handle = setTimeout(() => setSavedAt(null), 3000);
+    return () => clearTimeout(handle);
+  }, [savedAt]);
+
+  const onSave = async (): Promise<void> => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const body: UpdatePageBody = {
+        title,
+        slug,
+        status: toApiStatus(status),
+      };
+      await api.patch<unknown>(
+        `/api/v1/posts/${encodeURIComponent(pageId)}`,
+        body,
+      );
+      setSavedAt(Date.now());
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setSaveError(
+          `Couldn't save (HTTP ${err.status} ${err.statusText}).`,
+        );
+      } else {
+        setSaveError(err instanceof Error ? err.message : 'Save failed.');
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <section data-testid="page-detail" className="flex flex-col gap-6">
@@ -62,22 +130,44 @@ export default function PageDetailPage(): ReactElement {
               <span className="font-mono text-xs">#{pageId}</span>
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-3">
+            {savedAt !== null ? (
+              <span
+                role="status"
+                data-testid="page-saved"
+                className="inline-flex items-center gap-1 text-xs font-medium text-emerald-deep"
+              >
+                <Check aria-hidden="true" width={13} height={13} />
+                Saved
+              </span>
+            ) : null}
             <Button variant="default" asChild>
               <Link href="/pages">Cancel</Link>
             </Button>
             <Button
               variant="emerald"
-              onClick={() => {
-                // eslint-disable-next-line no-console
-                console.log('[page-detail] save', { pageId, title, slug, status });
-              }}
+              onClick={() => void onSave()}
+              disabled={saving}
+              data-testid="page-save"
             >
-              <Save aria-hidden="true" width={14} height={14} />
-              Save changes
+              {saving ? (
+                <Loader2 aria-hidden="true" width={14} height={14} className="animate-spin" />
+              ) : (
+                <Save aria-hidden="true" width={14} height={14} />
+              )}
+              {saving ? 'Saving…' : 'Save changes'}
             </Button>
           </div>
         </div>
+        {saveError ? (
+          <p
+            role="alert"
+            data-testid="page-save-error"
+            className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+          >
+            {saveError}
+          </p>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
@@ -185,7 +275,7 @@ export default function PageDetailPage(): ReactElement {
                   Created
                 </span>
                 <span className="font-mono text-xs text-ink-soft">
-                  2026-04-02 11:30
+                  —
                 </span>
               </li>
               <li className="flex items-center justify-between">
@@ -194,7 +284,7 @@ export default function PageDetailPage(): ReactElement {
                   Updated
                 </span>
                 <span className="font-mono text-xs text-ink-soft">
-                  3 days ago
+                  —
                 </span>
               </li>
               <li className="flex items-center justify-between">
@@ -209,7 +299,7 @@ export default function PageDetailPage(): ReactElement {
                   <User aria-hidden="true" width={13} height={13} />
                   Author
                 </span>
-                <span className="text-xs text-ink-soft">Mara Wills</span>
+                <span className="text-xs text-ink-soft">—</span>
               </li>
             </ul>
           </div>

@@ -446,6 +446,47 @@ func TestList_SearchByTitle(t *testing.T) {
 	}
 }
 
+// TestList_FilterByPostType is the regression test for the admin Pages
+// list (issue #506). The /api/v1/posts mount is hard-coded to
+// PostTypePost, but admin/pages queries /api/v1/posts?post_type=page —
+// the handler must honor that override and return only page rows.
+func TestList_FilterByPostType(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t, PostTypePost)
+	pr := authorPrincipal("u1")
+
+	postTitle := "A Post"
+	pageTitle := "About Us"
+	h.store.Create(context.Background(), PostTypePost, "u1", CreateInput{Title: &postTitle})
+	h.store.Create(context.Background(), PostTypePage, "u1", CreateInput{Title: &pageTitle})
+
+	req := httptest.NewRequest("GET", h.base+"?post_type=page", nil)
+	rec := h.do(req, &pr)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var page router.Page[Post]
+	decodeJSON(t, rec, &page)
+	if len(page.Data) != 1 || page.Data[0].Title != "About Us" || page.Data[0].PostType != PostTypePage {
+		t.Errorf("data = %+v; want a single page row", page.Data)
+	}
+}
+
+// TestList_FilterByPostType_InvalidRejected guards the closed-set
+// validation: an unknown post_type is a 400, not a silent fall-through
+// to the mount default.
+func TestList_FilterByPostType_InvalidRejected(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t, PostTypePost)
+	pr := authorPrincipal("u1")
+
+	req := httptest.NewRequest("GET", h.base+"?post_type=attachment", nil)
+	rec := h.do(req, &pr)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
 // -----------------------------------------------------------------------------
 // UPDATE
 // -----------------------------------------------------------------------------
