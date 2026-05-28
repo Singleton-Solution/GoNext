@@ -34,6 +34,7 @@
 import Link from 'next/link';
 import { Suspense, type ReactElement } from 'react';
 import { Download, Plus } from 'lucide-react';
+import type { paths } from '@gonext/api-types';
 import { serverApiFetch } from '@/lib/server-api';
 import { Headline } from '@/components/ui/headline';
 import { Button } from '@/components/ui/button';
@@ -56,15 +57,25 @@ function shortAuthorId(id: string): string {
   return id.slice(-8);
 }
 
-/** Wire shape we expect from `GET /api/v1/posts`. */
-export type ApiPost = {
+/**
+ * Wire shape we expect from `GET /api/v1/posts`.
+ *
+ * Pilot migration (issue #514): the base shape is derived from the
+ * OpenAPI spec via `@gonext/api-types` instead of hand-typed. We treat
+ * every field as optional (`Partial<>`) because the list endpoint
+ * doesn't currently emit the full single-post projection — and the
+ * admin must not crash when a field the spec marks required is missing
+ * (the adapter below already falls back defensively).
+ *
+ * The `author` extension is admin-side only — the server returns an
+ * `author_id` and the admin attempts to enrich with a display name
+ * when available. That field isn't modelled in the OpenAPI spec yet
+ * (tracked under issue #515), so it stays as a local intersection.
+ */
+type PostSchema =
+  paths['/api/v1/posts']['get']['responses']['200']['content']['application/json']['data'][number];
+export type ApiPost = Partial<PostSchema> & {
   id: string;
-  title: string;
-  status: string;
-  published_at?: string | null;
-  updated_at?: string;
-  created_at?: string;
-  author_id?: string;
   author?: { id?: string; display_name?: string; displayName?: string } | null;
 };
 

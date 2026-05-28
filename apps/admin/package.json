@@ -14,6 +14,7 @@
     "test:ci": "vitest run --coverage"
   },
   "dependencies": {
+    "@gonext/api-types": "workspace:*",
     "@gonext/blocks-editor": "workspace:*",
     "@gonext/blocks-sdk": "workspace:*",
     "@radix-ui/react-avatar": "^1.1.2",
