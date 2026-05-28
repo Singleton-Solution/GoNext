@@ -46,12 +46,17 @@ const readActiveSQL = `SELECT value #>> '{}' FROM options WHERE key = $1`
 // literal ("gn-hello" → JSON value "gn-hello"). autoload is TRUE
 // because every renderer wakeup needs this key — keeping it in the
 // autoload set avoids one cache miss per cold boot.
+//
+// `namespace` and explicit `updated_at` are omitted: the options
+// table from migration 000008 has neither (`updated_at` defaults to
+// now() and is bumped by the options_touch trigger). An earlier
+// draft referenced both columns; live INSERTs against this SQL were
+// returning "column namespace does not exist" before the fix.
 const writeActiveSQL = `
-INSERT INTO options (key, value, autoload, namespace, updated_at)
-VALUES ($1, to_jsonb($2::text), TRUE, 'core', now())
+INSERT INTO options (key, value, autoload)
+VALUES ($1, to_jsonb($2::text), TRUE)
 ON CONFLICT (key) DO UPDATE
-    SET value = EXCLUDED.value,
-        updated_at = now()
+    SET value = EXCLUDED.value
 `
 
 // PgxActiveStore is the production ActiveStore backed by pgx.

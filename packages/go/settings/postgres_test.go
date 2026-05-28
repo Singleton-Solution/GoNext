@@ -320,6 +320,13 @@ func TestPostgresStore_WriteValidatesAndUpserts(t *testing.T) {
 		t.Fatalf("expected 1 INSERT, got %d", len(upserts))
 	}
 	args := upserts[0].args
+	// Three positional args: key, value (JSON-encoded), autoload.
+	// An earlier version of upsertSQL had a 4th `namespace` arg and a
+	// 5th explicit `updated_at = now()`; both were dropped when the
+	// non-existent `namespace` column made live writes 500.
+	if got := len(args); got != 3 {
+		t.Fatalf("upsert arg count: got %d want 3 (key, value, autoload)", got)
+	}
 	if args[0].(string) != "core.site.name" {
 		t.Errorf("upsert key arg: got %v", args[0])
 	}
@@ -329,8 +336,11 @@ func TestPostgresStore_WriteValidatesAndUpserts(t *testing.T) {
 	if args[2].(bool) != true {
 		t.Errorf("upsert autoload arg: got %v want true", args[2])
 	}
-	if args[3].(string) != "core" {
-		t.Errorf("upsert namespace arg: got %v want core", args[3])
+	// Regression guard: the SQL string itself must not reference the
+	// non-existent `namespace` column. Catches a re-introduction
+	// before it hits Postgres.
+	if strings.Contains(upserts[0].sql, "namespace") {
+		t.Errorf("upsert SQL must not reference `namespace` column: %s", upserts[0].sql)
 	}
 }
 
