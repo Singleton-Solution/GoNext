@@ -1,6 +1,7 @@
 package customizer
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -77,9 +78,10 @@ type handlers struct {
 //
 // The route tree:
 //
-//	GET    {base}/active   — theme + current overrides
-//	PUT    {base}/active   — validate + save overrides
-//	DELETE {base}/active   — clear overrides (Reset)
+//	GET    {base}/active    — theme + current overrides
+//	PUT    {base}/active    — validate + save overrides
+//	DELETE {base}/active    — clear overrides (Reset)
+//	POST   {base}/preview   — preview merged CSS without persisting
 //
 // All routes are gated by the theme.customize capability.
 func Mount(mux *http.ServeMux, base string, deps Deps) error {
@@ -100,6 +102,7 @@ func Mount(mux *http.ServeMux, base string, deps Deps) error {
 	mux.Handle("GET "+base+"/active", h.gate(h.getActive))
 	mux.Handle("PUT "+base+"/active", h.gate(h.putActive))
 	mux.Handle("DELETE "+base+"/active", h.gate(h.deleteActive))
+	mux.Handle("POST "+base+"/preview", h.gate(h.postPreview))
 	return nil
 }
 
@@ -276,6 +279,122 @@ func (h *handlers) deleteActive(w http.ResponseWriter, r *http.Request, pr polic
 		slog.String("by", pr.UserID),
 	)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// PreviewRequest is the POST /preview body. The admin React form posts
+// the in-flight override state straight through; we accept either the
+// override object directly OR a wrapper {"overrides": <ThemeOverrides>}
+// because two generations of the admin form sit in production today and
+// re-shipping the API while the UI still uses the old wrapper would
+// strand operators on a 400.
+type PreviewRequest struct {
+	Overrides json.RawMessage `json:"overrides,omitempty"`
+}
+
+// PreviewResponse carries the rendered CSS the iframe applies. The
+// shape stays narrow on purpose — every additional field is something
+// the renderer would have to learn to read.
+type PreviewResponse struct {
+	// ThemeSlug echoes the slug the preview was computed for. The admin
+	// surface uses it to verify the preview matches the theme the form
+	// thinks it's editing (a theme switch mid-edit invalidates the
+	// preview).
+	ThemeSlug string `json:"themeSlug"`
+	// CSSCustomProperties is the ":root { … }" block produced by
+	// EmitCSSCustomProperties on the merged manifest. The empty string is
+	// a legitimate result (e.g. a theme with no tokens at all) — the
+	// renderer treats "" as "render with browser defaults".
+	CSSCustomProperties string `json:"cssCustomProperties"`
+}
+
+// postPreview handles POST /preview. The flow mirrors putActive without
+// the persistence: load the active theme, merge the overrides, run
+// validation, and return the emitted CSS. An empty body is treated as
+// "preview with no overrides" — the operator wants to see what the
+// theme looks like without any of their pending edits, which the admin
+// UI uses to drive the "Reset" preview state.
+//
+// We deliberately don't 400 on validation errors here: previews are
+// keystroke-grained and the form often passes through "partially typed"
+// values. A bad color becomes an empty entry in the merged manifest,
+// not a 400 — the operator's next keystroke usually fixes it. Strict
+// validation lives on PUT, which is the operator's explicit "commit"
+// gesture.
+func (h *handlers) postPreview(w http.ResponseWriter, r *http.Request, _ policy.Principal) {
+	slug, err := h.store.ActiveThemeSlug(r.Context())
+	if err != nil {
+		if errors.Is(err, ErrNoActiveTheme) {
+			router.WriteError(w, http.StatusNotFound, "no_active_theme", "no active theme is configured")
+			return
+		}
+		h.logger.ErrorContext(r.Context(), "admin/customizer: active slug lookup failed", slog.Any("err", err))
+		router.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to load active theme")
+		return
+	}
+
+	manifest, err := h.loader(r.Context(), slug)
+	if err != nil {
+		h.logger.ErrorContext(r.Context(), "admin/customizer: theme load failed",
+			slog.String("slug", slug),
+			slog.Any("err", err),
+		)
+		router.WriteError(w, http.StatusInternalServerError, "theme_load_failed",
+			fmt.Sprintf("failed to load theme %q", slug))
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+	raw, err := io.ReadAll(r.Body)
+	if err != nil {
+		router.WriteError(w, http.StatusRequestEntityTooLarge, "body_too_large",
+			fmt.Sprintf("override payload must not exceed %d bytes", maxBodyBytes))
+		return
+	}
+
+	// extractOverrides unwraps an optional `{"overrides": {...}}` envelope
+	// so the admin client can post either the override or the wrapper.
+	overrideBytes := extractOverridesPayload(raw)
+
+	merged := cloneTheme(manifest)
+	// Empty body or empty overrides → preview the unmodified theme.
+	if len(bytes.TrimSpace(overrideBytes)) > 0 && !bytes.Equal(bytes.TrimSpace(overrideBytes), []byte("{}")) && !bytes.Equal(bytes.TrimSpace(overrideBytes), []byte("null")) {
+		// Decode loosely (without DisallowUnknownFields): preview is
+		// best-effort. Unknown keys come from a draft schema in the UI;
+		// dropping them quietly is friendlier than 400'ing on every
+		// keystroke that touches a future field.
+		override := &theme.ThemeJSON{Version: theme.CurrentVersion}
+		if jerr := json.Unmarshal(overrideBytes, override); jerr != nil {
+			router.WriteError(w, http.StatusBadRequest, "invalid_json",
+				"preview overrides are not valid JSON")
+			return
+		}
+		mergeTheme(merged, override)
+	}
+
+	css := merged.EmitCSSCustomProperties()
+	router.WriteJSON(w, http.StatusOK, PreviewResponse{
+		ThemeSlug:           slug,
+		CSSCustomProperties: css,
+	})
+}
+
+// extractOverridesPayload unwraps `{"overrides": <body>}` if present,
+// otherwise treats the whole body as the override directly. Returns the
+// raw body unchanged when it can't be parsed as JSON — the caller's
+// strict decode will surface the syntax error with a useful message.
+func extractOverridesPayload(raw []byte) []byte {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 {
+		return trimmed
+	}
+	var envelope PreviewRequest
+	if err := json.Unmarshal(trimmed, &envelope); err != nil {
+		return trimmed
+	}
+	if len(envelope.Overrides) > 0 {
+		return envelope.Overrides
+	}
+	return trimmed
 }
 
 // writeValidationProblem emits a 400 with the per-path validation
