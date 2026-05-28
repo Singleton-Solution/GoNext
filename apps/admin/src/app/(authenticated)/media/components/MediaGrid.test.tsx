@@ -142,4 +142,62 @@ describe('MediaGrid', () => {
     expect(screen.getByTestId('tile-edit-a')).toBeInTheDocument();
     expect(screen.getByTestId('tile-delete-a')).toBeInTheDocument();
   });
+
+  // ── Regression locks for PR #523 (data:null tolerance) ────────────
+  //
+  // Postgres' nil-slice + Go's omitempty quirk meant the admin list
+  // endpoints would emit `data: null` instead of `data: []` for an
+  // empty result set. PR #523 added a router-level coerce, but the
+  // client-side defensive band-aid (Array.isArray(...) ? ... : [])
+  // must stay so the grid keeps rendering against older API builds.
+
+  it('TestMediaGrid_TolerateInitialDataNull_Issue523: renders without crash when initialData.data is null', async () => {
+    // Cast through unknown to bypass the static `data: MediaAsset[]`
+    // type — at runtime the API used to actually emit null, and the
+    // band-aid in MediaGrid is what saves us when it does.
+    const initialWithNullData = {
+      data: null as unknown as never,
+      pagination: { next_cursor: '' },
+    } as unknown as MediaListResponse;
+
+    mocks.listMedia.mockResolvedValue({
+      data: [] as MediaAsset[],
+      pagination: { next_cursor: '' },
+    });
+
+    expect(() =>
+      render(<MediaGrid initialData={initialWithNullData} />),
+    ).not.toThrow();
+
+    // After the post-mount refetch settles, the empty-state surface
+    // appears — proves the grid recovered without crashing.
+    await waitFor(() => {
+      expect(screen.getByTestId('empty-state')).toBeInTheDocument();
+    });
+  });
+
+  it('TestMediaGrid_TolerateFetchDataNull_Issue523: refetch returning data:null does not crash', async () => {
+    // The first refetch (issued on mount when filter changes /
+    // hydrated flag flips) used to throw "Cannot read properties of
+    // null (reading 'length')" if the API emitted null. The
+    // band-aid coerces null → [].
+    mocks.listMedia.mockResolvedValue({
+      data: null as unknown as MediaAsset[],
+      pagination: { next_cursor: '' },
+    });
+
+    render(
+      <MediaGrid initialData={{ data: [], pagination: { next_cursor: '' } }} />,
+    );
+
+    fireEvent.click(screen.getByTestId('filter-chip-image'));
+
+    // The grid is still mounted, no crash banner appears, and the
+    // empty-state survives the null payload.
+    await waitFor(() => {
+      const lastCall = mocks.listMedia.mock.calls.at(-1);
+      expect(lastCall?.[0]).toMatchObject({ type: 'image' });
+    });
+    expect(screen.getByTestId('empty-state')).toBeInTheDocument();
+  });
 });
