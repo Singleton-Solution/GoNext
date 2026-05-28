@@ -234,7 +234,7 @@ export default function PostDetailPage(): ReactElement {
             </Headline>
             <p className="mt-2 text-sm text-fg-muted">
               Compose your post by adding blocks below. Changes are
-              autosaved every 30 seconds; "Save changes" promotes the
+              autosaved every 30 seconds; &ldquo;Save changes&rdquo; promotes the
               autosave to the canonical row.
             </p>
             <div className="mt-5 border-t border-border pt-5">

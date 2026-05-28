@@ -23,6 +23,7 @@ import { Headline } from '@/components/ui/headline';
 import { serverApiFetch } from '@/lib/server-api';
 import { cn } from '@/lib/utils';
 
+import { postEditHref } from '../../posts/columns';
 import { StatusBadge } from '../components/StatusBadge';
 import {
   toComment,
@@ -175,7 +176,7 @@ export default async function CommentDetailPage(
               <span className="text-fg-muted">
                 on{' '}
                 <Link
-                  href={{ pathname: `/posts/${target.postId}/edit` }}
+                  href={postEditHref(target.postId)}
                   className="text-emerald-deep hover:underline"
                 >
                   {target.postTitle || '(untitled)'}

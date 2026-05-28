@@ -93,13 +93,13 @@ describe('PostListClient', () => {
     // Title links are the user-facing handle to each row.
     expect(
       screen.getByRole('link', { name: /hello world/i }),
-    ).toHaveAttribute('href', '/posts/p1/edit');
+    ).toHaveAttribute('href', '/posts/p1');
     expect(
       screen.getByRole('link', { name: /draft notes/i }),
-    ).toHaveAttribute('href', '/posts/p2/edit');
+    ).toHaveAttribute('href', '/posts/p2');
     expect(
       screen.getByRole('link', { name: /trashed item/i }),
-    ).toHaveAttribute('href', '/posts/p3/edit');
+    ).toHaveAttribute('href', '/posts/p3');
 
     // Status badges round-trip from the post.status field.
     expect(screen.getByLabelText('Status: Published')).toBeInTheDocument();

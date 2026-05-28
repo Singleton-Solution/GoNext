@@ -240,6 +240,17 @@ describe('CommentListClient', () => {
     expect(screen.getByText(/thanks for sharing/i)).toBeInTheDocument();
   });
 
+  it('links to the canonical post route without /edit suffix', () => {
+    render(<CommentListClient initialData={makeInitial(SAMPLE)} />);
+    // The post-title link in the "On post" column should point to
+    // `/posts/<id>` — never `/posts/<id>/edit` (the old route 404s).
+    const postLink = screen.getAllByRole('link', { name: /hello world/i })[0];
+    expect(postLink).toBeDefined();
+    const href = postLink!.getAttribute('href') ?? '';
+    expect(href).not.toMatch(/\/edit($|[?#])/);
+    expect(href).toContain('/posts/p1');
+  });
+
   it('all-rows checkbox selects every row', () => {
     render(<CommentListClient initialData={makeInitial(SAMPLE)} />);
     const selectAll = screen.getByLabelText(/select all comments/i);

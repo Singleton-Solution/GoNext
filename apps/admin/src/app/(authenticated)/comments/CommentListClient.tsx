@@ -39,6 +39,7 @@ import { Button } from '@/components/ui/button';
 import { api, ApiError } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 
+import { postEditHref } from '../posts/columns';
 import { BulkActionBar } from './components/BulkActionBar';
 import { StatusBadge } from './components/StatusBadge';
 import {
@@ -449,7 +450,7 @@ export function CommentListClient({
                 </td>
                 <td className="px-3 py-3 align-top">
                   <Link
-                    href={{ pathname: `/posts/${c.postId}/edit` }}
+                    href={postEditHref(c.postId)}
                     className="font-sans text-xs text-emerald-deep hover:underline"
                   >
                     {c.postTitle || '(untitled)'}

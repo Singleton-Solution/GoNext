@@ -134,11 +134,13 @@ export function formatDate(iso: string): string {
 }
 
 /**
- * Build the `/posts/{id}/edit` href used by the title cell. Centralised so
- * a route move only touches one file.
+ * Build the `/posts/{id}` href used by the title cell. The single-id
+ * route IS the editor — the [id]/page.tsx renders the block editor
+ * directly. A previous version of this file appended `/edit` to the
+ * path; that path 404s because no nested route exists.
  */
 export function postEditHref(id: string): string {
-  return `/posts/${encodeURIComponent(id)}/edit`;
+  return `/posts/${encodeURIComponent(id)}`;
 }
 
 /** Column id, header label, and whether it's sortable. */
