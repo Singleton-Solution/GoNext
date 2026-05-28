@@ -91,7 +91,7 @@ export function RunStep({
     onError(null);
     try {
       const form = buildDryRunForm(source, options);
-      const res = await fetcher(`${apiBaseUrl}/api/v1/admin/migrate/start`, {
+      const res = await fetcher(`${apiBaseUrl()}/api/v1/admin/migrate/start`, {
         method: 'POST',
         body: form,
         credentials: 'include',
@@ -110,7 +110,7 @@ export function RunStep({
       pollHandle.current = setInterval(async () => {
         try {
           const sres = await fetcher(
-            `${apiBaseUrl}/api/v1/admin/migrate/status?jobId=${encodeURIComponent(jobId)}`,
+            `${apiBaseUrl()}/api/v1/admin/migrate/status?jobId=${encodeURIComponent(jobId)}`,
             { credentials: 'include' },
           );
           if (!sres.ok) throw new Error(`HTTP ${sres.status}`);

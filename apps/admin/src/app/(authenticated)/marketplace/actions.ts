@@ -39,7 +39,7 @@ async function cookieHeader(): Promise<string> {
 }
 
 async function call(path: string, init: RequestInit = {}): Promise<Response> {
-  const url = `${apiBaseUrl.replace(/\/$/, '')}${path}`;
+  const url = `${apiBaseUrl().replace(/\/$/, '')}${path}`;
   const cookie = await cookieHeader();
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');

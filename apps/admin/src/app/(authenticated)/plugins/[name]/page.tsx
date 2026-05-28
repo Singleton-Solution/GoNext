@@ -37,7 +37,7 @@ async function fetchPlugin(name: string): Promise<FetchOne> {
   } catch {
     cookieHeader = '';
   }
-  const url = `${apiBaseUrl.replace(/\/$/, '')}/api/v1/plugins/${encodeURIComponent(name)}`;
+  const url = `${apiBaseUrl().replace(/\/$/, '')}/api/v1/plugins/${encodeURIComponent(name)}`;
   try {
     const res = await fetch(url, {
       method: 'GET',

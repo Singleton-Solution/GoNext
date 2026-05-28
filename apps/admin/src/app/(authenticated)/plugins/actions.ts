@@ -51,7 +51,7 @@ async function callHost(
   path: string,
   init: RequestInit,
 ): Promise<ActionResult> {
-  const url = `${apiBaseUrl.replace(/\/$/, '')}${path}`;
+  const url = `${apiBaseUrl().replace(/\/$/, '')}${path}`;
   const cookie = await cookieHeader();
   const headers = new Headers(init.headers);
   if (cookie && !headers.has('Cookie')) headers.set('Cookie', cookie);
