@@ -17,14 +17,14 @@
  * API outage would be a worse experience than a degraded form.
  */
 import type { ReactElement } from 'react';
-import { fetchActive } from './api';
+import { fetchActiveServer } from './api-server';
 import { CustomizerClient } from './CustomizerClient';
 import './customizer.css';
 
 const DEFAULT_PUBLIC_SITE_URL = 'http://localhost:3000';
 
 export default async function CustomizerPage(): Promise<ReactElement> {
-  const result = await fetchActive();
+  const result = await fetchActiveServer();
   const publicSiteUrl =
     (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_SITE_URL) ||
     DEFAULT_PUBLIC_SITE_URL;
