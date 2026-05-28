@@ -1,4 +1,4 @@
--- 000036_menus.up.sql
+-- 000046_menus.up.sql
 --
 -- Navigation menus — issue #54. Two tables, modelled after the
 -- WordPress nav-menus surface but with an ltree-style path column so

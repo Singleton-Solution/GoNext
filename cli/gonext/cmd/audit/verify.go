@@ -39,7 +39,10 @@ func runVerify(args []string, stdout, stderr io.Writer) int {
 		return ExitUsage
 	}
 
-	cfg, err := config.Load()
+	// Use LoadMinimal: this CLI subcommand only needs DATABASE_URL and
+	// GONEXT_AUDIT_HMAC_KEY. Forcing the operator to set the full auth
+	// secret surface to run an audit-chain verify would be a regression.
+	cfg, err := config.LoadMinimal()
 	if err != nil {
 		fmt.Fprintf(stderr, "audit verify: load config: %v\n", err)
 		return ExitFail

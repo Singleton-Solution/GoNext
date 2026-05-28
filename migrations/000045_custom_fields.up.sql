@@ -1,4 +1,4 @@
--- 000035_custom_fields.up.sql
+-- 000045_custom_fields.up.sql
 --
 -- Custom-fields field groups + per-post meta values (issue #162). One
 -- group describes "what extra fields does this post type gain"; one

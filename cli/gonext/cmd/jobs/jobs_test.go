@@ -52,8 +52,12 @@ func withStub(t *testing.T, stub *stubInspector) func() {
 	return func() { inspectorFactory = prev }
 }
 
+// Tests that swap `inspectorFactory` or `cronRegistryFactory` must NOT
+// run in parallel — those vars are package-level globals and the race
+// detector (CI runs with -race) flags concurrent reads/writes. The
+// suite is fast enough that serialization costs nothing material.
+
 func TestQueue_Table(t *testing.T) {
-	t.Parallel()
 	stub := newStub()
 	stub.infos["default"] = &asynq.QueueInfo{Queue: "default", Size: 7, Pending: 5}
 	cleanup := withStub(t, stub)
@@ -70,7 +74,6 @@ func TestQueue_Table(t *testing.T) {
 }
 
 func TestFailed_FiltersByQueue(t *testing.T) {
-	t.Parallel()
 	stub := newStub()
 	stub.archived["default"] = []*asynq.TaskInfo{
 		{ID: "t1", Type: "post.publish", LastErr: "boom", Retried: 3, LastFailedAt: time.Now()},
@@ -89,7 +92,6 @@ func TestFailed_FiltersByQueue(t *testing.T) {
 }
 
 func TestDrain_RequiresConfirmation(t *testing.T) {
-	t.Parallel()
 	stub := newStub()
 	stub.archived["default"] = []*asynq.TaskInfo{{ID: "t1"}}
 	cleanup := withStub(t, stub)
@@ -107,7 +109,6 @@ func TestDrain_RequiresConfirmation(t *testing.T) {
 }
 
 func TestDrain_HappyPath(t *testing.T) {
-	t.Parallel()
 	stub := newStub()
 	stub.archived["default"] = []*asynq.TaskInfo{{ID: "t1"}, {ID: "t2"}}
 	cleanup := withStub(t, stub)
@@ -125,7 +126,6 @@ func TestDrain_HappyPath(t *testing.T) {
 }
 
 func TestCron_EmptySnapshot(t *testing.T) {
-	t.Parallel()
 	prev := cronRegistryFactory
 	cronRegistryFactory = func() (CronRegistry, error) {
 		return &staticCronRegistry{entries: []CronEntry{
