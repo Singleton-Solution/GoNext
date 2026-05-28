@@ -205,6 +205,19 @@ func (h *handlers) list(w http.ResponseWriter, r *http.Request, _ policy.Princip
 	// its list response; the overshoot is the standard trick.
 	tasks, err := h.inspector.ListArchivedTasks(queue, asynq.PageSize(limit+1), asynq.Page(page))
 	if err != nil {
+		// On a freshly-booted system the queue's Redis keys don't exist
+		// yet because no task has ever been enqueued to it. Asynq treats
+		// that as ErrQueueNotFound, but for the admin DLQ surface it's
+		// semantically "no archived tasks" — return an empty page rather
+		// than a 500. Without this, the admin Jobs page renders its
+		// FailureState UI on a clean install (issue #502).
+		if errors.Is(err, asynq.ErrQueueNotFound) {
+			router.WriteJSON(w, http.StatusOK, router.Page[ArchivedTask]{
+				Data:       []ArchivedTask{},
+				Pagination: router.PageInfo{},
+			})
+			return
+		}
 		h.logger.ErrorContext(r.Context(), "admin/jobs: list failed",
 			slog.String("queue", queue),
 			slog.Any("err", err),
