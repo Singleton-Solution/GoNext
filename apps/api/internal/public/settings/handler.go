@@ -6,15 +6,24 @@
 //
 // Routes (mounted under base, typically /api/v1/public/site):
 //
-//	GET {base}    — flat JSON: {"name", "tagline", "url"}.
+//	GET {base}    — flat JSON: {"name", "tagline", "url", "reading"}.
+//
+// The "reading" object nests core.reading.homepage_type and
+// core.reading.homepage_page_id (issue #510). The public homepage
+// handler in apps/web reads these to decide whether to dispatch to a
+// static page (homepage_type=static_page) or paint the marketing
+// landing (homepage_type=latest_posts, the default). The same fetch
+// already pays for name/tagline/url so co-locating "reading" avoids a
+// second round trip on every public render.
 //
 // Why a separate package from internal/admin/settings: the admin surface
 // is auth-gated, exposes the full registry, and persists changes. The
 // public reader is the surface anonymous visitors hit, so it (1) must
 // answer without a session and (2) must only surface fields that are
-// publicly safe to disclose — name, tagline, url. The rest of the
-// registry (default_role, timezone, post-by-email address, …) stays
-// behind the admin gate.
+// publicly safe to disclose — name, tagline, url, and the two reading
+// keys the homepage dispatcher needs. The rest of the registry
+// (default_role, timezone, post-by-email address, …) stays behind the
+// admin gate.
 //
 // Failure mode is "return defaults, never 5xx". A store error or
 // missing keys both return the documented defaults with a 200; the
@@ -51,13 +60,26 @@ const (
 	defaultURL     = ""
 )
 
-// The three registry keys that make up the publicly safe projection of
-// the core.site group. Kept in a slice so the BulkRead call site stays
-// driven by the single source of truth at the top of the file.
+// Public defaults for the reading projection. These mirror the registry
+// defaults declared in packages/go/settings/core.go for the two
+// `core.reading.*` keys the dispatcher consults. Defined separately so
+// a renderer that fails-closed (store error path) still paints the
+// "latest_posts" marketing landing rather than guessing.
 const (
-	keySiteName    = "core.site.name"
-	keySiteTagline = "core.site.tagline"
-	keySiteURL     = "core.site.url"
+	defaultHomepageType   = "latest_posts"
+	defaultHomepagePageID = ""
+)
+
+// The five registry keys that make up the publicly safe projection of
+// the core.site group plus the two core.reading keys the homepage
+// dispatcher consults. Kept in constants so the BulkRead call site
+// stays driven by the single source of truth at the top of the file.
+const (
+	keySiteName       = "core.site.name"
+	keySiteTagline    = "core.site.tagline"
+	keySiteURL        = "core.site.url"
+	keyHomepageType   = "core.reading.homepage_type"
+	keyHomepagePageID = "core.reading.homepage_page_id"
 )
 
 // Deps is the dependency bag for [Mount].
@@ -109,15 +131,29 @@ func Mount(mux *http.ServeMux, base string, deps Deps) error {
 	return nil
 }
 
-// siteIdentity is the wire shape returned by getSite. Keeping the
-// public surface area small — three string fields — means we can
-// add registry keys to core.site.* without worrying about leaking them
-// to anonymous visitors. New publicly-visible fields require an
-// explicit addition here.
+// readingProjection is the nested "reading" object surfaced inside
+// siteIdentity. Two fields — homepage_type and homepage_page_id — that
+// the public homepage dispatcher consumes to decide between the
+// latest_posts marketing landing and a pinned static page. Nested
+// rather than flat so the existing {name,tagline,url} top-level shape
+// keeps its meaning ("site identity, the basic envelope strings")
+// while reading concerns stay grouped.
+type readingProjection struct {
+	HomepageType   string `json:"homepage_type"`
+	HomepagePageID string `json:"homepage_page_id"`
+}
+
+// siteIdentity is the wire shape returned by getSite. The top-level
+// fields are the basic envelope strings; the nested `reading` object
+// carries the homepage dispatch hints (issue #510). Adding a new
+// publicly-visible field still requires an explicit addition here —
+// the surface stays narrow by design so we don't accidentally leak
+// auth-gated keys.
 type siteIdentity struct {
-	Name    string `json:"name"`
-	Tagline string `json:"tagline"`
-	URL     string `json:"url"`
+	Name    string            `json:"name"`
+	Tagline string            `json:"tagline"`
+	URL     string            `json:"url"`
+	Reading readingProjection `json:"reading"`
 }
 
 // defaultSiteIdentity is the canonical "we couldn't read anything"
@@ -128,6 +164,10 @@ func defaultSiteIdentity() siteIdentity {
 		Name:    defaultName,
 		Tagline: defaultTagline,
 		URL:     defaultURL,
+		Reading: readingProjection{
+			HomepageType:   defaultHomepageType,
+			HomepagePageID: defaultHomepagePageID,
+		},
 	}
 }
 
@@ -148,7 +188,13 @@ func defaultSiteIdentity() siteIdentity {
 func (h *handlers) getSite(w http.ResponseWriter, r *http.Request) {
 	out := defaultSiteIdentity()
 
-	keys := []string{keySiteName, keySiteTagline, keySiteURL}
+	keys := []string{
+		keySiteName,
+		keySiteTagline,
+		keySiteURL,
+		keyHomepageType,
+		keyHomepagePageID,
+	}
 	values, err := h.store.BulkRead(r.Context(), keys)
 	if err != nil {
 		// A store error is a server problem, not a client one, but the
@@ -173,6 +219,21 @@ func (h *handlers) getSite(w http.ResponseWriter, r *http.Request) {
 		// valid "no canonical origin configured" signal. Only the type
 		// guard runs here, not the empty-string fallback.
 		out.URL = s
+	}
+	// Reading projection. homepage_type only overrides the default
+	// when the stored value is one of the registered enum members so
+	// a contract violation (e.g. someone wrote "blog") doesn't break
+	// the dispatcher — it falls back to "latest_posts" and the
+	// marketing landing renders. homepage_page_id passes through any
+	// non-empty string; the renderer treats an empty string as
+	// "no page pinned" regardless.
+	if s, ok := stringValue(values[keyHomepageType]); ok {
+		if s == "latest_posts" || s == "static_page" {
+			out.Reading.HomepageType = s
+		}
+	}
+	if s, ok := stringValue(values[keyHomepagePageID]); ok {
+		out.Reading.HomepagePageID = s
 	}
 
 	router.WriteJSON(w, http.StatusOK, out)

@@ -793,17 +793,52 @@ export async function fetchMenu(
 // ── Site identity options (issue #508) ──
 
 /**
- * Public site identity surfaced through Admin → Settings → General.
+ * Reading options the public site needs at render time. Mirrors the
+ * nested `reading` object on the public `/api/v1/public/site` payload
+ * (handler in `apps/api/internal/public/settings`). These map onto the
+ * `core.reading.*` registry keys the admin form persists:
  *
- * These map 1:1 onto the `core.site.*` options group in the registry:
+ *   - `homepageType`    ← `core.reading.homepage_type`
+ *   - `homepagePageId`  ← `core.reading.homepage_page_id`
  *
- *   - `name`    ← `core.site.name`
- *   - `tagline` ← `core.site.tagline`
- *   - `url`     ← `core.site.url`
+ * The defaults match the registry defaults so a freshly-installed site
+ * lands on the marketing-landing branch of the dispatcher.
+ */
+export interface ReadingOptions {
+  /**
+   * Either `'latest_posts'` (the marketing landing) or `'static_page'`
+   * (the dispatcher renders the page identified by `homepagePageId`).
+   * Any other string clamps to `'latest_posts'` so a corrupt registry
+   * value never breaks the homepage.
+   */
+  homepageType: 'latest_posts' | 'static_page';
+  /**
+   * Slug or id of the static page used as the homepage when
+   * `homepageType === 'static_page'`. Empty otherwise. The dispatcher
+   * falls back to the marketing landing when this is empty even if
+   * `homepageType === 'static_page'` — a half-configured admin form
+   * should not 404 the front door.
+   */
+  homepagePageId: string;
+}
+
+/**
+ * Public site identity surfaced through Admin → Settings → General +
+ * Admin → Settings → Reading.
+ *
+ * These map 1:1 onto the `core.site.*` and the public subset of
+ * `core.reading.*` options groups in the registry:
+ *
+ *   - `name`              ← `core.site.name`
+ *   - `tagline`           ← `core.site.tagline`
+ *   - `url`               ← `core.site.url`
+ *   - `reading.homepageType`   ← `core.reading.homepage_type`
+ *   - `reading.homepagePageId` ← `core.reading.homepage_page_id`
  *
  * Defaults mirror the strings the public site used to hardcode, so
  * a renderer that can't reach the API or hits a 5xx still paints a
- * sensible "GoNext" envelope rather than crashing the route.
+ * sensible "GoNext" envelope and the marketing landing rather than
+ * crashing the route.
  */
 export interface SiteOptions {
   /** Site name — used in <title>, og:site_name, wordmarks. */
@@ -815,21 +850,52 @@ export interface SiteOptions {
    * — the layout treats an empty string as "skip metadataBase".
    */
   url: string;
+  /**
+   * Reading-related options the homepage dispatcher consults. Always
+   * present (with documented defaults) so callers can read it
+   * unconditionally without a null check.
+   */
+  reading: ReadingOptions;
 }
+
+const DEFAULT_READING_OPTIONS: ReadingOptions = {
+  homepageType: 'latest_posts',
+  homepagePageId: '',
+};
 
 const DEFAULT_SITE_OPTIONS: SiteOptions = {
   name: 'GoNext',
   tagline: 'A site powered by GoNext.',
   url: '',
+  reading: DEFAULT_READING_OPTIONS,
 };
 
 /**
+ * Defensive parse of the nested `reading` object on the public-site
+ * payload. The Go-side handler clamps an invalid homepage_type to
+ * 'latest_posts' before serialising, but we re-validate here so a
+ * contract drift (or a hand-rolled API mock in tests) still resolves
+ * to one of the two enum members the renderer's switch handles.
+ */
+function asReadingOptions(raw: unknown): ReadingOptions {
+  if (!raw || typeof raw !== 'object') return DEFAULT_READING_OPTIONS;
+  const r = raw as Record<string, unknown>;
+  const rawType = r.homepage_type;
+  const rawPageId = r.homepage_page_id;
+  const homepageType: ReadingOptions['homepageType'] =
+    rawType === 'static_page' ? 'static_page' : 'latest_posts';
+  const homepagePageId =
+    typeof rawPageId === 'string' ? rawPageId : DEFAULT_READING_OPTIONS.homepagePageId;
+  return { homepageType, homepagePageId };
+}
+
+/**
  * Defensive parse of the `/api/v1/public/site` envelope. The endpoint
- * returns a flat `{ "name": ..., "tagline": ..., "url": ... }` object —
- * three strings, always present, never null. We still narrow each
- * field defensively so a contract drift on the API surfaces as the
- * documented defaults rather than a runtime crash in
- * `generateMetadata`.
+ * returns `{ "name", "tagline", "url", "reading": { ... } }` — three
+ * top-level strings plus a nested two-field object, always present,
+ * never null. We still narrow each field defensively so a contract
+ * drift on the API surfaces as the documented defaults rather than a
+ * runtime crash in `generateMetadata` or the homepage dispatcher.
  */
 function asSiteOptions(raw: unknown): SiteOptions {
   if (!raw || typeof raw !== 'object') return DEFAULT_SITE_OPTIONS;
@@ -847,6 +913,7 @@ function asSiteOptions(raw: unknown): SiteOptions {
         ? tagline
         : DEFAULT_SITE_OPTIONS.tagline,
     url: typeof url === 'string' ? url : DEFAULT_SITE_OPTIONS.url,
+    reading: asReadingOptions(r.reading),
   };
 }
 

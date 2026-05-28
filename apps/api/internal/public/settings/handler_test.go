@@ -95,6 +95,17 @@ func TestEmptyStoreReturnsDefaults(t *testing.T) {
 	if got.URL != "http://localhost:8080" {
 		t.Fatalf("url: want registry default, got %q", got.URL)
 	}
+	// The reading projection's registry defaults: latest_posts +
+	// empty homepage_page_id. These are also the public defaults for
+	// the reading group, so the overlay is a no-op here.
+	if got.Reading.HomepageType != "latest_posts" {
+		t.Fatalf("reading.homepage_type: want %q, got %q",
+			"latest_posts", got.Reading.HomepageType)
+	}
+	if got.Reading.HomepagePageID != "" {
+		t.Fatalf("reading.homepage_page_id: want empty, got %q",
+			got.Reading.HomepagePageID)
+	}
 }
 
 // TestSomeKeysSetSurfacesThem verifies the happy path: the operator
@@ -174,6 +185,17 @@ func TestStoreErrorReturnsDefaults(t *testing.T) {
 	if got.URL != defaultURL {
 		t.Fatalf("url: want public default %q, got %q", defaultURL, got.URL)
 	}
+	// Reading projection falls back to its public defaults too —
+	// store error means we never reached the registry, so we paint
+	// the "safe latest_posts" landing rather than guessing.
+	if got.Reading.HomepageType != defaultHomepageType {
+		t.Fatalf("reading.homepage_type: want public default %q, got %q",
+			defaultHomepageType, got.Reading.HomepageType)
+	}
+	if got.Reading.HomepagePageID != defaultHomepagePageID {
+		t.Fatalf("reading.homepage_page_id: want public default %q, got %q",
+			defaultHomepagePageID, got.Reading.HomepagePageID)
+	}
 }
 
 // TestNoAuthRequired is the load-bearing test for the public surface.
@@ -194,9 +216,10 @@ func TestNoAuthRequired(t *testing.T) {
 }
 
 // TestResponseShapeIsFlat verifies the wire contract — three string
-// fields, no envelope, no extra keys. The apps/web fetchSiteOptions
-// parser decodes against exactly this shape, so a contract drift here
-// would silently break the public site's <title>.
+// fields plus the nested "reading" object, no envelope, no extra keys.
+// The apps/web fetchSiteOptions parser decodes against exactly this
+// shape, so a contract drift here would silently break the public
+// site's <title> or the homepage dispatcher.
 func TestResponseShapeIsFlat(t *testing.T) {
 	h := newHarness(t)
 	if err := h.store.Write(context.Background(), keySiteName, "Shape Test"); err != nil {
@@ -213,8 +236,8 @@ func TestResponseShapeIsFlat(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &raw); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if len(raw) != 3 {
-		t.Fatalf("response should have exactly 3 keys, got %d (%v)", len(raw), raw)
+	if len(raw) != 4 {
+		t.Fatalf("response should have exactly 4 keys, got %d (%v)", len(raw), raw)
 	}
 	for _, key := range []string{"name", "tagline", "url"} {
 		if _, ok := raw[key]; !ok {
@@ -223,6 +246,115 @@ func TestResponseShapeIsFlat(t *testing.T) {
 		if _, ok := raw[key].(string); !ok {
 			t.Fatalf("key %q must be a string, got %T", key, raw[key])
 		}
+	}
+	reading, ok := raw["reading"].(map[string]any)
+	if !ok {
+		t.Fatalf("response missing nested reading object: %v", raw)
+	}
+	if len(reading) != 2 {
+		t.Fatalf("reading should have exactly 2 keys, got %d (%v)", len(reading), reading)
+	}
+	for _, key := range []string{"homepage_type", "homepage_page_id"} {
+		if _, ok := reading[key]; !ok {
+			t.Fatalf("reading missing key %q: %v", key, reading)
+		}
+		if _, ok := reading[key].(string); !ok {
+			t.Fatalf("reading.%s must be a string, got %T", key, reading[key])
+		}
+	}
+}
+
+// TestReadingProjectionSurfacesStoredValues verifies the homepage
+// dispatcher path: with both reading keys written through the admin
+// API, the public reader surfaces them inside the nested "reading"
+// object so apps/web's fetchSiteOptions can branch on them.
+func TestReadingProjectionSurfacesStoredValues(t *testing.T) {
+	h := newHarness(t)
+	if err := h.store.Write(context.Background(), keyHomepageType, "static_page"); err != nil {
+		t.Fatalf("Write homepage_type: %v", err)
+	}
+	if err := h.store.Write(context.Background(), keyHomepagePageID, "about"); err != nil {
+		t.Fatalf("Write homepage_page_id: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, testBase, nil)
+	rec := h.do(t, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: want 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	got := decodeIdentity(t, rec.Body.Bytes())
+	if got.Reading.HomepageType != "static_page" {
+		t.Fatalf("reading.homepage_type: want %q, got %q",
+			"static_page", got.Reading.HomepageType)
+	}
+	if got.Reading.HomepagePageID != "about" {
+		t.Fatalf("reading.homepage_page_id: want %q, got %q",
+			"about", got.Reading.HomepagePageID)
+	}
+}
+
+// fixedStore is a Store stub returning a caller-controlled map from
+// BulkRead. Used by tests that need to feed values that bypass the
+// registry's schema validation (e.g. an invalid enum member that
+// might be present in a corrupted production store).
+type fixedStore struct {
+	values map[string]any
+}
+
+func (s fixedStore) Read(_ context.Context, key string) (any, error) {
+	return s.values[key], nil
+}
+func (s fixedStore) Write(context.Context, string, any) error { return nil }
+func (s fixedStore) BulkRead(_ context.Context, keys []string) (map[string]any, error) {
+	out := make(map[string]any, len(keys))
+	for _, k := range keys {
+		out[k] = s.values[k]
+	}
+	return out, nil
+}
+func (s fixedStore) LoadAutoload(context.Context) (map[string]any, error) {
+	out := make(map[string]any, len(s.values))
+	for k, v := range s.values {
+		out[k] = v
+	}
+	return out, nil
+}
+
+// TestInvalidHomepageTypeFallsBackToDefault pins the enum-guard. A
+// contract violation (e.g. a corrupted database row that bypassed the
+// registry's schema validator on write) must NOT crash the dispatcher
+// — the handler clamps to the default "latest_posts" so the marketing
+// landing keeps rendering. Uses a fixedStore stub because MemoryStore
+// (correctly) refuses to write a non-enum value through its happy
+// path.
+func TestInvalidHomepageTypeFallsBackToDefault(t *testing.T) {
+	mux := http.NewServeMux()
+	store := fixedStore{values: map[string]any{
+		keySiteName:       "OK",
+		keySiteTagline:    "OK",
+		keySiteURL:        "https://ok.example",
+		keyHomepageType:   "blog", // invalid enum member
+		keyHomepagePageID: "",
+	}}
+	if err := Mount(mux, testBase, Deps{
+		Store:  store,
+		Logger: slog.New(slog.NewJSONHandler(io.Discard, nil)),
+	}); err != nil {
+		t.Fatalf("Mount: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, testBase, nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: want 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	got := decodeIdentity(t, rec.Body.Bytes())
+	if got.Reading.HomepageType != "latest_posts" {
+		t.Fatalf("reading.homepage_type: want clamped default %q, got %q",
+			"latest_posts", got.Reading.HomepageType)
 	}
 }
 
