@@ -35,6 +35,7 @@ import {
   Instrument_Serif,
 } from 'next/font/google';
 import './globals.css';
+import { fetchSiteOptions } from '@/lib/api';
 
 // Public-site API base — same env var the typed client in src/lib/api.ts
 // reads. We resolve it at module init (the value is baked into the
@@ -76,21 +77,44 @@ const instrumentSerif = Instrument_Serif({
   display: 'swap',
 });
 
-export const metadata: Metadata = {
-  title: {
-    default: 'GoNext — sites that live and grow',
-    template: '%s · GoNext',
-  },
-  description:
-    'An all-in-one alternative to WordPress — content, hosting, and commerce in one product. Built on Go and Next.js.',
-  icons: {
-    icon: '/favicon.svg',
-  },
-  robots: {
-    index: true,
-    follow: true,
-  },
-};
+/**
+ * Resolve the site identity from the settings registry at render time
+ * so Admin → Settings → General edits to name/tagline/url surface on
+ * the public site without a redeploy. ISR revalidate of 60s keeps the
+ * lookup cheap; `fetchSiteOptions` returns documented defaults on any
+ * failure path so a settings hiccup never crashes the layout.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const opts = await fetchSiteOptions({ revalidate: 60 });
+  let metadataBase: URL | undefined;
+  if (opts.url) {
+    try {
+      metadataBase = new URL(opts.url);
+    } catch {
+      // Bad URL in settings — leave undefined so Next falls back to
+      // request-host resolution rather than crashing the render.
+      metadataBase = undefined;
+    }
+  }
+  return {
+    title: {
+      default: opts.name,
+      template: `%s — ${opts.name}`,
+    },
+    description: opts.tagline,
+    metadataBase,
+    openGraph: {
+      siteName: opts.name,
+    },
+    icons: {
+      icon: '/favicon.svg',
+    },
+    robots: {
+      index: true,
+      follow: true,
+    },
+  };
+}
 
 export default function RootLayout({
   children,

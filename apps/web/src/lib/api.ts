@@ -97,6 +97,25 @@ export interface Term {
 }
 
 /**
+ * Single navigation menu item as exposed by the public reader at
+ * `/api/v1/menus/by-location/{location}`. Trimmed shape:
+ * `label` + `href` + an `external` hint the renderer uses to decide
+ * whether to wrap the link in a next/link or a plain anchor.
+ */
+export interface MenuItem {
+  /** Human-readable label, painted as the link text. */
+  label: string;
+  /** Destination URL — internal (`/pricing`) or absolute. */
+  href: string;
+  /**
+   * True when `href` points off this origin (absolute URL with scheme,
+   * scheme-relative `//`, or `mailto:` / `tel:`). The Go side
+   * computes this so client+server agree on what's external.
+   */
+  external: boolean;
+}
+
+/**
  * Active-theme summary. We deliberately keep this narrow: the Go side
  * already resolved which theme is active and emitted the CSS custom
  * properties; we only need the bits the renderer mixes into the HTML.
@@ -716,4 +735,220 @@ export interface PublicSiteConfig {
   baseUrl: string;
   /** Whether crawlers may index this deployment. */
   allowIndex: boolean;
+}
+
+// ── Navigation menus (from PR #509 admin-menus → public site wiring) ──
+
+/**
+ * Defensive parse of a single public menu item. Drops malformed rows
+ * rather than rejecting the whole response — a broken row in the
+ * admin's reorder shouldn't blank the marketing nav.
+ */
+function asMenuItem(raw: unknown): MenuItem | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const label = typeof r.label === 'string' ? r.label.trim() : '';
+  const href = typeof r.href === 'string' ? r.href.trim() : '';
+  if (label === '' || href === '') return null;
+  return {
+    label,
+    href,
+    external: typeof r.external === 'boolean' ? r.external : false,
+  };
+}
+
+/**
+ * Fetch the items assigned to a named menu location. Locations are
+ * the slug the operator pinned in the admin (`primary`, `footer-product`,
+ * etc.); the Go side resolves slug → items in one round trip.
+ *
+ * Returns an empty array on any failure — network down, 5xx, malformed
+ * payload. The marketing landing falls back to a hardcoded default
+ * list when this returns empty, so a missing/broken endpoint never
+ * blanks the nav.
+ */
+export async function fetchMenu(
+  location: string,
+  options: { revalidate?: number } = {},
+): Promise<MenuItem[]> {
+  if (!location) return [];
+  try {
+    const raw = await getJson<unknown>(
+      `/api/v1/menus/by-location/${encodeURIComponent(location)}`,
+      options,
+    );
+    if (!raw || typeof raw !== 'object') return [];
+    const items = (raw as { items?: unknown[] }).items;
+    if (!Array.isArray(items)) return [];
+    return items
+      .map((row) => asMenuItem(row))
+      .filter((m): m is MenuItem => m !== null);
+  } catch {
+    // Graceful degrade — never throw. The marketing nav has a
+    // hardcoded fallback for the empty-array case.
+    return [];
+  }
+}
+
+// ── Site identity options (issue #508) ──
+
+/**
+ * Reading options the public site needs at render time. Mirrors the
+ * nested `reading` object on the public `/api/v1/public/site` payload
+ * (handler in `apps/api/internal/public/settings`). These map onto the
+ * `core.reading.*` registry keys the admin form persists:
+ *
+ *   - `homepageType`    ← `core.reading.homepage_type`
+ *   - `homepagePageId`  ← `core.reading.homepage_page_id`
+ *
+ * The defaults match the registry defaults so a freshly-installed site
+ * lands on the marketing-landing branch of the dispatcher.
+ */
+export interface ReadingOptions {
+  /**
+   * Either `'latest_posts'` (the marketing landing) or `'static_page'`
+   * (the dispatcher renders the page identified by `homepagePageId`).
+   * Any other string clamps to `'latest_posts'` so a corrupt registry
+   * value never breaks the homepage.
+   */
+  homepageType: 'latest_posts' | 'static_page';
+  /**
+   * Slug or id of the static page used as the homepage when
+   * `homepageType === 'static_page'`. Empty otherwise. The dispatcher
+   * falls back to the marketing landing when this is empty even if
+   * `homepageType === 'static_page'` — a half-configured admin form
+   * should not 404 the front door.
+   */
+  homepagePageId: string;
+}
+
+/**
+ * Public site identity surfaced through Admin → Settings → General +
+ * Admin → Settings → Reading.
+ *
+ * These map 1:1 onto the `core.site.*` and the public subset of
+ * `core.reading.*` options groups in the registry:
+ *
+ *   - `name`              ← `core.site.name`
+ *   - `tagline`           ← `core.site.tagline`
+ *   - `url`               ← `core.site.url`
+ *   - `reading.homepageType`   ← `core.reading.homepage_type`
+ *   - `reading.homepagePageId` ← `core.reading.homepage_page_id`
+ *
+ * Defaults mirror the strings the public site used to hardcode, so
+ * a renderer that can't reach the API or hits a 5xx still paints a
+ * sensible "GoNext" envelope and the marketing landing rather than
+ * crashing the route.
+ */
+export interface SiteOptions {
+  /** Site name — used in <title>, og:site_name, wordmarks. */
+  name: string;
+  /** Short tagline — used as the default meta description. */
+  tagline: string;
+  /**
+   * Canonical site origin (e.g. `https://example.com`). May be empty
+   * — the layout treats an empty string as "skip metadataBase".
+   */
+  url: string;
+  /**
+   * Reading-related options the homepage dispatcher consults. Always
+   * present (with documented defaults) so callers can read it
+   * unconditionally without a null check.
+   */
+  reading: ReadingOptions;
+}
+
+const DEFAULT_READING_OPTIONS: ReadingOptions = {
+  homepageType: 'latest_posts',
+  homepagePageId: '',
+};
+
+const DEFAULT_SITE_OPTIONS: SiteOptions = {
+  name: 'GoNext',
+  tagline: 'A site powered by GoNext.',
+  url: '',
+  reading: DEFAULT_READING_OPTIONS,
+};
+
+/**
+ * Defensive parse of the nested `reading` object on the public-site
+ * payload. The Go-side handler clamps an invalid homepage_type to
+ * 'latest_posts' before serialising, but we re-validate here so a
+ * contract drift (or a hand-rolled API mock in tests) still resolves
+ * to one of the two enum members the renderer's switch handles.
+ */
+function asReadingOptions(raw: unknown): ReadingOptions {
+  if (!raw || typeof raw !== 'object') return DEFAULT_READING_OPTIONS;
+  const r = raw as Record<string, unknown>;
+  const rawType = r.homepage_type;
+  const rawPageId = r.homepage_page_id;
+  const homepageType: ReadingOptions['homepageType'] =
+    rawType === 'static_page' ? 'static_page' : 'latest_posts';
+  const homepagePageId =
+    typeof rawPageId === 'string' ? rawPageId : DEFAULT_READING_OPTIONS.homepagePageId;
+  return { homepageType, homepagePageId };
+}
+
+/**
+ * Defensive parse of the `/api/v1/public/site` envelope. The endpoint
+ * returns `{ "name", "tagline", "url", "reading": { ... } }` — three
+ * top-level strings plus a nested two-field object, always present,
+ * never null. We still narrow each field defensively so a contract
+ * drift on the API surfaces as the documented defaults rather than a
+ * runtime crash in `generateMetadata` or the homepage dispatcher.
+ */
+function asSiteOptions(raw: unknown): SiteOptions {
+  if (!raw || typeof raw !== 'object') return DEFAULT_SITE_OPTIONS;
+  const r = raw as Record<string, unknown>;
+  const name = r.name;
+  const tagline = r.tagline;
+  const url = r.url;
+  return {
+    name:
+      typeof name === 'string' && name.trim() !== ''
+        ? name
+        : DEFAULT_SITE_OPTIONS.name,
+    tagline:
+      typeof tagline === 'string' && tagline.trim() !== ''
+        ? tagline
+        : DEFAULT_SITE_OPTIONS.tagline,
+    url: typeof url === 'string' ? url : DEFAULT_SITE_OPTIONS.url,
+    reading: asReadingOptions(r.reading),
+  };
+}
+
+/**
+ * Fetch the public-facing site identity (name, tagline, url) from the
+ * dedicated public endpoint `/api/v1/public/site`. The endpoint is
+ * anonymous-readable so no cookie is forwarded — the layout / nav /
+ * footer can call this from any Server Component context (including
+ * routes the visitor isn't signed in for).
+ *
+ * Why the dedicated public endpoint (issue #508 / PR #527) instead of
+ * the auth-gated `/api/v1/settings?group=core.site` we used in the
+ * first cut: the marketing layout runs without a session cookie on the
+ * very first request, so a gated read returned 401 and the layout
+ * fell back to defaults on every cold render. The public endpoint
+ * projects only the safe subset (name, tagline, url) and reuses the
+ * same registry store, so operator edits in /settings/general surface
+ * immediately.
+ *
+ * Failure mode is "return defaults, never throw". A 5xx from the API,
+ * a network blip, or a malformed payload would otherwise crash every
+ * public page; the safer behaviour is to render the stock "GoNext"
+ * envelope and let the next revalidation pick up the real values.
+ */
+export async function fetchSiteOptions(
+  opts: { revalidate?: number } = {},
+): Promise<SiteOptions> {
+  try {
+    const raw = await getJson<unknown>('/api/v1/public/site', opts);
+    if (raw === null) return DEFAULT_SITE_OPTIONS;
+    return asSiteOptions(raw);
+  } catch {
+    // Includes ApiError on 5xx and network failure. The public site
+    // endpoint is not load-bearing for rendering a page — defaults
+    // keep the site alive.
+    return DEFAULT_SITE_OPTIONS;
+  }
 }
