@@ -153,9 +153,20 @@ func (s *PostgresStorage) Get(ctx context.Context, slug string) (Plugin, error) 
 }
 
 // List returns every plugin row, ordered by slug.
+//
+// On a clean install where the plugins table hasn't been created yet
+// (SQLSTATE 42P01 — undefined_table), List returns an empty slice
+// instead of an error. Semantically "no table" and "no rows" are the
+// same thing for the lifecycle reader path: no plugins are installed.
+// This keeps read-only callers (e.g. the admin sidebar's
+// /api/v1/admin/plugin-pages endpoint) from failing with 500 on a
+// fresh database before any plugin has been installed.
 func (s *PostgresStorage) List(ctx context.Context) ([]Plugin, error) {
 	rows, err := s.db.Query(ctx, `SELECT `+selectColumns+` FROM plugins ORDER BY slug ASC`)
 	if err != nil {
+		if isUndefinedTable(err) {
+			return []Plugin{}, nil
+		}
 		return nil, fmt.Errorf("lifecycle/postgres: list: %w", err)
 	}
 	defer rows.Close()
@@ -305,6 +316,18 @@ func isUniqueViolation(err error) bool {
 	for ; err != nil; err = errors.Unwrap(err) {
 		if s, ok := err.(sqlStater); ok {
 			return s.SQLState() == "23505"
+		}
+	}
+	return false
+}
+
+// isUndefinedTable reports whether err is a Postgres undefined-table
+// (SQLSTATE 42P01). Used by List to treat a missing plugins table on a
+// clean install as an empty result rather than a 500-worthy error.
+func isUndefinedTable(err error) bool {
+	for ; err != nil; err = errors.Unwrap(err) {
+		if s, ok := err.(sqlStater); ok {
+			return s.SQLState() == "42P01"
 		}
 	}
 	return false

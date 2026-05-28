@@ -370,6 +370,27 @@ func TestPostgresStorage_List_QueryError(t *testing.T) {
 	}
 }
 
+// On a fresh database where the plugins table hasn't been created yet,
+// List should return an empty slice rather than a 500-worthy error.
+// Regression for issue #503 — the admin sidebar polls
+// /api/v1/admin/plugin-pages on every render and a missing table on
+// clean install used to surface as "failed to list plugins" 500.
+func TestPostgresStorage_List_UndefinedTableIsEmpty(t *testing.T) {
+	q := &fakeQuerier{
+		queryFn: func(_ string, _ []any) (pgx.Rows, error) {
+			return nil, &stubPgError{code: "42P01"}
+		},
+	}
+	st := NewPostgresStorageWithQuerier(q)
+	rows, err := st.List(context.Background())
+	if err != nil {
+		t.Fatalf("List: unexpected error for undefined-table: %v", err)
+	}
+	if len(rows) != 0 {
+		t.Fatalf("expected empty slice, got %d rows", len(rows))
+	}
+}
+
 func TestPostgresStorage_List_ScanError(t *testing.T) {
 	q := &fakeQuerier{
 		queryFn: func(_ string, _ []any) (pgx.Rows, error) {
