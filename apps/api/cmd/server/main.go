@@ -51,6 +51,7 @@ import (
 	adminwebhooks "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/webhooks"
 	restimg "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/img"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/customizer"
+	themesstatic "github.com/Singleton-Solution/GoNext/apps/api/internal/themes/static"
 	adminredirects "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/redirects"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/rum"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/auth/login"
@@ -763,9 +764,10 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 	// gate the routes — install_themes, manage_themes, switch_themes
 	// — so a deploy that only wants the switch surface can withhold
 	// install_themes without losing the list endpoint.
+	themeActiveStore := &adminthemes.PgxActiveStore{Pool: pool}
 	if err := adminthemes.Mount(mux, "/api/v1/admin/themes", adminthemes.Deps{
 		ThemeDir: themeDir,
-		Active:   &adminthemes.PgxActiveStore{Pool: pool},
+		Active:   themeActiveStore,
 		Policy:   policy.NewBasicPolicy(policy.DefaultRoleCapabilities()),
 		Logger:   logger,
 	}); err != nil {
@@ -773,6 +775,40 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 	} else {
 		logger.Info("admin/themes: routes mounted",
 			slog.String("base", "/api/v1/admin/themes"),
+		)
+	}
+
+	// Public theme-asset surface (issue #501). Serves the on-disk
+	// CSS/JS/font files for every installed theme under /themes/{slug}
+	// /{file...}. The virtual sentinel "active" resolves through the
+	// shared PgxActiveStore so /themes/active/style.css follows the
+	// active-theme switch automatically. Without this handler the
+	// early-hints provider above preloads a URL no one serves and the
+	// public site renders with whatever globals.css ships — no theme
+	// CSS reaches the browser.
+	//
+	// We construct an ActiveResolver closure that calls Get on the
+	// existing store (same options-row read the admin handlers use).
+	// A read error is logged and surfaced as "no active theme" — the
+	// handler turns that into a 404 rather than a 500 because a
+	// transient DB hiccup should not bring down public CSS.
+	if err := themesstatic.Mount(mux, "/themes", themesstatic.Deps{
+		ThemeDir: themeDir,
+		ActiveResolver: func() string {
+			slug, err := themeActiveStore.Get(context.Background())
+			if err != nil {
+				logger.Debug("themes/static: active resolver failed",
+					slog.Any("err", err))
+				return ""
+			}
+			return slug
+		},
+		Logger: logger,
+	}); err != nil {
+		logger.Warn("themes/static: failed to mount", slog.Any("err", err))
+	} else {
+		logger.Info("themes/static: routes mounted",
+			slog.String("base", "/themes"),
 		)
 	}
 
