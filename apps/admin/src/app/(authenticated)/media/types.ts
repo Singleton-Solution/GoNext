@@ -39,6 +39,30 @@ export interface MediaAsset {
   collection_id?: string;
   /** Lowercase, deduplicated tag list. Never null; defaults to []. Issue #71. */
   tags: string[];
+  /**
+   * HLS playlist URL for transcoded videos. Populated by the worker's
+   * video pipeline (#476). Absent for non-video assets and for videos
+   * that haven't completed transcode yet.
+   */
+  hls_url?: string;
+  /**
+   * Original source URL for proxied media (the URL the operator
+   * imported FROM, kept for attribution + re-fetch on cache miss).
+   * Absent for media uploaded directly. Issue #476 follow-up.
+   */
+  source_url?: string;
+  /**
+   * True when the binary is fetched through the GoNext proxy rather
+   * than served directly from object storage. Used by the detail UI
+   * to surface a "proxied" badge. Absent on direct uploads.
+   */
+  is_proxied?: boolean;
+  /**
+   * True when the PDF/document text-extraction pipeline (#476) has
+   * indexed this asset for search. Absent on assets that don't carry
+   * extractable text (raw images, audio).
+   */
+  has_extracted_text?: boolean;
 }
 
 /**

@@ -154,6 +154,15 @@ export function MenusClient({ initialMenus }: Props): ReactElement {
         return;
       }
       const [moved] = ordered.splice(fromIdx, 1);
+      // `splice` returns `T[]` so the destructure is typed `T |
+      // undefined` under `noUncheckedIndexedAccess`. fromIdx ≥ 0 was
+      // checked above, so moved is in practice always defined — but
+      // the type-checker doesn't know that. Guard explicitly so the
+      // re-insert doesn't push `undefined` into the array.
+      if (!moved) {
+        setDragId('');
+        return;
+      }
       ordered.splice(toIdx, 0, moved);
       // Re-stamp paths as flat root-level slots — the drag-drop surface
       // here only supports a single nesting level for now.
