@@ -1,0 +1,97 @@
+# docker-compose.override.example.yml
+#
+# Template for the personal docker-compose.override.yml that Compose
+# auto-loads alongside docker-compose.yml + docker-compose.dev.yml. The
+# live override is gitignored so each contributor can tweak ports and
+# secrets without polluting the repo.
+#
+# Usage:
+#   cp docker-compose.override.example.yml docker-compose.override.yml
+#   # (optional) edit GONEXT_AUTH_* secrets — the placeholders below are
+#   # dev-only and safe to keep as-is for a laptop stack.
+#   docker compose up -d
+#
+# What this file does:
+#   - Remaps the Postgres host port to 5433 so a native Postgres on 5432
+#     keeps working.
+#   - Builds the admin image with NEXT_PUBLIC_API_URL="" (same-origin
+#     proxy via Next.js rewrites) and bakes the docker-internal API URL
+#     into the rewrite destination at build time.
+#   - Pins matching GONEXT_AUTH_* secrets across api/worker/migrate so
+#     sessions issued by api validate in worker and migrate uses the same
+#     pepper when it bootstraps users.
+
+services:
+  # Republish Postgres on 5433 to avoid clashing with a native Postgres
+  # running on the host's 5432. Connect IDEs / `psql` to localhost:5433.
+  postgres:
+    ports:
+      - "5433:5432"
+
+  # Admin (Next.js, :3001) proxies /api/* through its own rewrite to
+  # avoid CORS. NEXT_PUBLIC_API_URL must be "" so the client uses
+  # same-origin paths; GONEXT_API_URL points the build-time rewrite at
+  # the docker-internal api service. The entrypoint override runs the
+  # standalone server.js directly (the upstream image's CMD is wrong
+  # for the standalone output layout).
+  admin:
+    build:
+      args:
+        NEXT_PUBLIC_API_URL: ""
+        # Build-time arg: rewrites() evaluates at build time and bakes
+        # this URL into routes-manifest.json. Must be the docker-internal
+        # api hostname so server-side proxy hops work.
+        GONEXT_API_URL: http://api:8080
+    environment:
+      NEXT_PUBLIC_API_URL: ""
+      GONEXT_API_URL: http://api:8080
+    entrypoint: ["node"]
+    command: ["/app/apps/admin/.next/standalone/apps/admin/server.js"]
+
+  # Public web (Next.js, :3000) runs cross-origin in dev — the browser
+  # hits the API directly on :8080, so NEXT_PUBLIC_API_URL must be the
+  # host-reachable URL. Server-side code inside the container still
+  # talks to api:8080 via GONEXT_API_URL.
+  web:
+    build:
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8080
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+      GONEXT_API_URL: http://api:8080
+
+  # api/worker/migrate share the same auth secrets so sessions issued by
+  # one service validate in the others, and migrate's `gonext init` uses
+  # the same pepper that api will use to verify passwords later.
+  #
+  # The values below are PLACEHOLDERS — they look like 32-byte base64
+  # strings but are sentinel text, NOT real entropy. Either keep them
+  # (dev-only, fine on a laptop) or replace with real 32-byte base64
+  # values, e.g.:
+  #   openssl rand -base64 32
+  # If you regenerate, you MUST update all three services to match, and
+  # wipe the Postgres volume (`docker compose down -v`) if you change
+  # GONEXT_AUTH_PEPPER on an existing DB — every previously-hashed
+  # password becomes unverifiable.
+  api:
+    environment:
+      GONEXT_AUTH_PEPPER: REPLACE_WITH_RANDOM_32_BYTES_BASE64_ENCODED___SAMPLE_DEV_ONLY_AAAA==
+      GONEXT_AUTH_SESSION_SECRET: REPLACE_WITH_RANDOM_32_BYTES_BASE64_ENCODED___SAMPLE_DEV_ONLY_BBBB==
+      GONEXT_AUTH_CSRF_SECRET: REPLACE_WITH_RANDOM_32_BYTES_BASE64_ENCODED___SAMPLE_DEV_ONLY_CCCC==
+
+  # Worker consumes Asynq jobs queued by api; if its session secret
+  # drifts from api's, signed payloads stop verifying.
+  worker:
+    environment:
+      GONEXT_AUTH_PEPPER: REPLACE_WITH_RANDOM_32_BYTES_BASE64_ENCODED___SAMPLE_DEV_ONLY_AAAA==
+      GONEXT_AUTH_SESSION_SECRET: REPLACE_WITH_RANDOM_32_BYTES_BASE64_ENCODED___SAMPLE_DEV_ONLY_BBBB==
+      GONEXT_AUTH_CSRF_SECRET: REPLACE_WITH_RANDOM_32_BYTES_BASE64_ENCODED___SAMPLE_DEV_ONLY_CCCC==
+
+  # Migrate is a one-shot that runs `gonext init` to bootstrap the first
+  # admin user. It must hash the admin password with the same pepper
+  # that api will later HMAC into login attempts.
+  migrate:
+    environment:
+      GONEXT_AUTH_PEPPER: REPLACE_WITH_RANDOM_32_BYTES_BASE64_ENCODED___SAMPLE_DEV_ONLY_AAAA==
+      GONEXT_AUTH_SESSION_SECRET: REPLACE_WITH_RANDOM_32_BYTES_BASE64_ENCODED___SAMPLE_DEV_ONLY_BBBB==
+      GONEXT_AUTH_CSRF_SECRET: REPLACE_WITH_RANDOM_32_BYTES_BASE64_ENCODED___SAMPLE_DEV_ONLY_CCCC==

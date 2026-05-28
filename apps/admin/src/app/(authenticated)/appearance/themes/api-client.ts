@@ -11,7 +11,7 @@ import type { InstallResponse, ThemesListResponse } from './types';
 
 export async function fetchThemesListClient(): Promise<ThemesListResponse | null> {
   try {
-    const res = await fetch(`${apiBaseUrl}/api/v1/admin/themes`, {
+    const res = await fetch(`${apiBaseUrl()}/api/v1/admin/themes`, {
       method: 'GET',
       credentials: 'include',
       headers: { Accept: 'application/json' },
@@ -30,7 +30,7 @@ export async function fetchThemesListClient(): Promise<ThemesListResponse | null
 export async function installTheme(file: File): Promise<InstallResponse> {
   const formData = new FormData();
   formData.append('file', file, file.name);
-  const res = await fetch(`${apiBaseUrl}/api/v1/admin/themes/install`, {
+  const res = await fetch(`${apiBaseUrl()}/api/v1/admin/themes/install`, {
     method: 'POST',
     credentials: 'include',
     body: formData,
@@ -42,7 +42,7 @@ export async function installTheme(file: File): Promise<InstallResponse> {
 }
 
 export async function activateTheme(slug: string): Promise<void> {
-  const res = await fetch(`${apiBaseUrl}/api/v1/admin/themes/activate`, {
+  const res = await fetch(`${apiBaseUrl()}/api/v1/admin/themes/activate`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },

@@ -106,7 +106,10 @@ export function FolderTree(props: FolderTreeProps): ReactElement {
     setLoading(true);
     try {
       const res = await listCollections();
-      setCollections(res.data);
+      // API returns `data: null` for an empty collections list (the
+      // pgx nil-slice JSON round-trip). Coerce to [] so downstream
+      // `collections.length` reads don't throw.
+      setCollections(Array.isArray(res.data) ? res.data : []);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'failed to load folders');

@@ -36,6 +36,17 @@ import {
 } from 'next/font/google';
 import './globals.css';
 
+// Public-site API base — same env var the typed client in src/lib/api.ts
+// reads. We resolve it at module init (the value is baked into the
+// build because NEXT_PUBLIC_* is browser-visible) so the <link> tag we
+// inject in <head> renders with the right absolute URL. The link
+// preloads the active theme's CSS so the renderer no longer paints
+// with stock globals.css defaults — the API now serves
+// /themes/active/style.css (issue #501).
+const PUBLIC_API_URL: string =
+  (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL) ||
+  'http://localhost:8080';
+
 const archivo = Archivo({
   subsets: ['latin'],
   weight: ['500', '600', '700', '800', '900'],
@@ -95,6 +106,19 @@ export default function RootLayout({
 
   return (
     <html lang="en" className={fontVariables}>
+      <head>
+        {/*
+         * Active-theme CSS preload (issue #501). The API serves the
+         * theme's static stylesheet under /themes/active/style.css —
+         * the "active" sentinel resolves through the core.active_theme
+         * options row, so switching the active theme transparently
+         * swaps the bytes returned here.
+         */}
+        <link
+          rel="stylesheet"
+          href={`${PUBLIC_API_URL}/themes/active/style.css`}
+        />
+      </head>
       <body>{children}</body>
     </html>
   );

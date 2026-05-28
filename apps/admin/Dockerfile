@@ -72,10 +72,15 @@ COPY apps/admin/ apps/admin/
 COPY packages/ts/ packages/ts/
 
 # Build-time configuration plumbing for Next.js public env vars.
+# GONEXT_API_URL is consumed by next.config.ts's `rewrites()` at build
+# time — must be the docker-internal API hostname (e.g. http://api:8080)
+# so server-side proxy hops work after the bundle is baked.
 ARG NEXT_PUBLIC_API_URL=""
 ARG NEXT_PUBLIC_VERSION="dev"
+ARG GONEXT_API_URL=""
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
     NEXT_PUBLIC_VERSION=${NEXT_PUBLIC_VERSION} \
+    GONEXT_API_URL=${GONEXT_API_URL} \
     NEXT_TELEMETRY_DISABLED=1 \
     NODE_ENV=production
 
@@ -112,6 +117,18 @@ COPY --from=builder --chown=node:node /repo/pnpm-lock.yaml* ./
 COPY --from=builder --chown=node:node /repo/node_modules ./node_modules
 COPY --from=builder --chown=node:node /repo/apps/admin ./apps/admin
 COPY --from=builder --chown=node:node /repo/packages/ts ./packages/ts
+
+# Next.js `output: 'standalone'` ships a minimal node_modules tree at
+# .next/standalone/, but DOES NOT copy .next/static or public/ into
+# that tree (the docs explicitly say the operator must do this). When
+# the entrypoint runs node .next/standalone/apps/admin/server.js, the
+# server's static handler looks for chunks at
+# .next/standalone/apps/admin/.next/static/* — which 404s without these
+# COPYs and breaks every JS/CSS chunk load on every page.
+COPY --from=builder --chown=node:node /repo/apps/admin/.next/static \
+  ./apps/admin/.next/standalone/apps/admin/.next/static
+COPY --from=builder --chown=node:node /repo/apps/admin/public \
+  ./apps/admin/.next/standalone/apps/admin/public
 
 USER node
 

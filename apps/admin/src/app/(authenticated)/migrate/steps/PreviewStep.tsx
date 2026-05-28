@@ -65,7 +65,7 @@ export function PreviewStep({
     onError(null);
     try {
       const form = buildDryRunForm(source, options);
-      const res = await fetcher(`${apiBaseUrl}/api/v1/admin/migrate/dry-run`, {
+      const res = await fetcher(`${apiBaseUrl()}/api/v1/admin/migrate/dry-run`, {
         method: 'POST',
         body: form,
         credentials: 'include',

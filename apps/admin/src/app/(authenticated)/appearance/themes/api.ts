@@ -44,7 +44,7 @@ export async function fetchThemesList(): Promise<ThemesListResponse | null> {
 export async function installTheme(file: File): Promise<InstallResponse> {
   const formData = new FormData();
   formData.append('file', file, file.name);
-  const res = await fetch(`${apiBaseUrl}${INSTALL_URL}`, {
+  const res = await fetch(`${apiBaseUrl()}${INSTALL_URL}`, {
     method: 'POST',
     credentials: 'include',
     body: formData,
@@ -63,7 +63,7 @@ export async function installTheme(file: File): Promise<InstallResponse> {
  * message preserved.
  */
 export async function activateTheme(slug: string): Promise<void> {
-  const res = await fetch(`${apiBaseUrl}${ACTIVATE_URL}`, {
+  const res = await fetch(`${apiBaseUrl()}${ACTIVATE_URL}`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },

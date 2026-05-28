@@ -70,12 +70,20 @@ func (t tagWrapper) RowsAffected() int64 { return t.rows }
 // docs/01-core-cms.md §10.11:
 //
 //	CREATE TABLE options (
-//	    key             TEXT PRIMARY KEY,
+//	    key             CITEXT PRIMARY KEY,
 //	    value           JSONB NOT NULL,
 //	    autoload        BOOLEAN NOT NULL DEFAULT FALSE,
-//	    namespace       TEXT NOT NULL DEFAULT 'core',
-//	    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+//	    is_protected    BOOLEAN NOT NULL DEFAULT FALSE,
+//	    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+//	    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+//	    version         INTEGER NOT NULL DEFAULT 1
 //	);
+//
+// The actual migration is 000008. Earlier drafts of this doc + the
+// upsertSQL referenced a `namespace` column that never made it into
+// the migration; the writer was 500'ing in production until the
+// non-existent column was stripped. See `namespaceFor` below for
+// the un-shipped per-plugin uninstall convention.
 //
 // The store maintains an L1 cache (a sync.Map keyed by setting key)
 // so the hot Read path doesn't round-trip to Postgres. Write
@@ -130,18 +138,21 @@ func NewPostgresStoreWithQuerier(q PgxQuerier, reg *Registry) *PostgresStore {
 // read path doesn't need it.
 const readSQL = `SELECT value FROM options WHERE key = $1`
 
-// upsertSQL writes a value, defaulting the namespace and autoload
-// columns from the registry. Postgres's ON CONFLICT lets us keep this
-// single statement instead of branching SELECT-then-INSERT-or-UPDATE
-// on the caller side, which also avoids the lost-update race window.
+// upsertSQL writes a value with its autoload bit from the registry.
+// Postgres's ON CONFLICT lets us keep this single statement instead
+// of branching SELECT-then-INSERT-or-UPDATE on the caller side, which
+// also avoids the lost-update race window.
+//
+// updated_at is intentionally omitted from the INSERT column list:
+// the options_touch trigger (migration 000008) sets it on every
+// UPDATE, and the column default (now()) covers the INSERT case.
+// Setting it explicitly here would still work but is dead code.
 const upsertSQL = `
-INSERT INTO options (key, value, autoload, namespace, updated_at)
-VALUES ($1, $2, $3, $4, now())
+INSERT INTO options (key, value, autoload)
+VALUES ($1, $2, $3)
 ON CONFLICT (key) DO UPDATE
     SET value = EXCLUDED.value,
-        autoload = EXCLUDED.autoload,
-        namespace = EXCLUDED.namespace,
-        updated_at = now()
+        autoload = EXCLUDED.autoload
 `
 
 // autoloadSQL fetches every key with autoload = true. The boot path
@@ -207,8 +218,7 @@ func (s *PostgresStore) Write(ctx context.Context, key string, value any) error 
 		return fmt.Errorf("settings: marshal %q: %w", key, err)
 	}
 
-	namespace := namespaceFor(key)
-	tag, err := s.db.Exec(ctx, upsertSQL, key, encoded, entry.Setting.Autoload, namespace)
+	tag, err := s.db.Exec(ctx, upsertSQL, key, encoded, entry.Setting.Autoload)
 	if err != nil {
 		// On Exec failure, the row may or may not have been written.
 		// We invalidate the cache rather than seed it — the operator
@@ -375,11 +385,19 @@ func (s *PostgresStore) cacheGet(key string) (any, bool) {
 	return v, ok
 }
 
-// namespaceFor returns the namespace column value for a setting key.
+// namespaceFor was used to populate the `options.namespace` column.
+// That column does not exist in migration 000008 (the live schema);
+// the column reference was unreviewed prose that shipped as code.
+// The helper is intentionally retained — when the per-plugin uninstall
+// sweep ships its own migration adding `namespace`, the writer can
+// pass `namespaceFor(key)` back into the upsert without reinventing
+// the convention. Keep this in lockstep with the docstring at the
+// top of this file so plugin authors can predict what column they
+// land under.
+//
 // Convention: "core.*" → "core"; "plugin:<slug>.*" or "<slug>.*" →
-// "plugin:<slug>". The function is intentionally conservative —
-// anything we can't classify gets the safe default "core" rather than
-// a guessed namespace.
+// "plugin:<slug>". Conservative — anything we can't classify becomes
+// "core" rather than a guessed namespace.
 func namespaceFor(key string) string {
 	// Core keys.
 	if len(key) >= 5 && key[:5] == "core." {

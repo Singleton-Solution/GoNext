@@ -156,6 +156,13 @@ func parseListQuery(r *http.Request) (ListFilter, error) {
 	q := r.URL.Query()
 	var f ListFilter
 	f.Status = q.Get("status")
+	// `status=any` is a documented client convention meaning "all
+	// statuses" — the admin posts page uses it to render drafts +
+	// published in one list. Treat it as the absence of a status
+	// filter rather than a validation error. Empty string is the same.
+	if f.Status == "any" {
+		f.Status = ""
+	}
 	if f.Status != "" {
 		if _, ok := validStatuses[f.Status]; !ok {
 			return f, validation{Code: "invalid_status", Detail: fmt.Sprintf("unknown status %q", f.Status)}

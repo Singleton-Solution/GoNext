@@ -116,7 +116,7 @@ export function uploadMedia(
   // touch Content-Type.
   return new Promise<MediaAsset>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${apiBaseUrl}/api/v1/admin/media`, true);
+    xhr.open('POST', `${apiBaseUrl()}/api/v1/admin/media`, true);
     xhr.withCredentials = true;
 
     if (xhr.upload && onProgress) {

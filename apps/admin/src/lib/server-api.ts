@@ -58,7 +58,7 @@ async function buildHeaders(
 }
 
 function joinUrl(path: string): string {
-  return `${apiBaseUrl}${path.startsWith('/') ? path : `/${path}`}`;
+  return `${apiBaseUrl()}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
 /**

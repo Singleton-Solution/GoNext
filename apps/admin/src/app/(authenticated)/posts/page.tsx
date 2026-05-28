@@ -96,14 +96,52 @@ async function fetchInitialPosts(): Promise<{
         error: `HTTP ${res.status}`,
       };
     }
-    const json = (await res.json()) as PostListResponse;
-    // Be defensive: the API contract is still evolving (issue #76) so
-    // missing fields shouldn't crash the page.
+    // The API returns the envelope shape `{data: [...], pagination: {...}}`
+    // — see rest/posts/handlers.go list(). The page UI works in
+    // `{posts, nextCursor, total}` form with a flatter Post shape, so
+    // adapt here. Be defensive: a missing field shouldn't crash the
+    // page (issue #76 — contract still evolving).
+    type ApiPost = {
+      id: string;
+      title: string;
+      status: string;
+      published_at?: string | null;
+      updated_at?: string;
+      created_at?: string;
+      author_id?: string;
+    };
+    type ApiEnvelope = {
+      data?: ApiPost[];
+      posts?: ApiPost[];
+      pagination?: { next_cursor?: string; nextCursor?: string };
+      nextCursor?: string;
+      total?: number;
+    };
+    const json = (await res.json()) as ApiEnvelope;
+    const rows = Array.isArray(json.data)
+      ? json.data
+      : Array.isArray(json.posts)
+        ? json.posts
+        : [];
+    const cursor =
+      json.pagination?.next_cursor ??
+      json.pagination?.nextCursor ??
+      json.nextCursor ??
+      null;
+    // Map ApiPost → the flatter Post shape the UI expects.
+    const posts = rows.map((p) => ({
+      id: p.id,
+      title: p.title ?? '(untitled)',
+      status: (p.status as PostListResponse['posts'][number]['status']) ?? 'draft',
+      date: p.published_at ?? p.updated_at ?? p.created_at ?? '',
+      author: { id: p.author_id ?? '', displayName: '' },
+      commentsCount: 0,
+    }));
     return {
       data: {
-        posts: Array.isArray(json.posts) ? json.posts : [],
-        nextCursor: json.nextCursor ?? null,
-        total: typeof json.total === 'number' ? json.total : 0,
+        posts: posts as PostListResponse['posts'],
+        nextCursor: cursor,
+        total: typeof json.total === 'number' ? json.total : posts.length,
       },
       error: null,
     };

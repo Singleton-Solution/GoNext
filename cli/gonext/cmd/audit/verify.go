@@ -1,9 +1,10 @@
-// Package audit provides the `gonext audit` CLI subcommand surface.
-// At present it exposes a single `verify` subcommand that walks the
-// audit_log HMAC chain and reports the first tampered row (if any).
+// Package audit — `verify` subcommand implementation. The shared
+// entry point (Run, RunOS, exit codes, usage banner) lives in
+// audit.go; this file contributes only the verify-specific
+// subcommand handler that the dispatcher calls into.
 //
-// Wiring: cli/gonext/main.go dispatches `audit <subcommand>` here via
-// RunOS. The package is intentionally thin — heavy lifting lives in
+// Verify walks the audit_log HMAC chain and reports the first
+// tampered row (if any). Heavy lifting lives in
 // packages/go/audit.VerifyChain.
 package audit
 
@@ -13,7 +14,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -21,57 +21,15 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/config"
 )
 
-// Exit codes shared with the rest of the CLI.
-const (
-	ExitOK    = 0
-	ExitFail  = 1
-	ExitUsage = 2
-)
-
-const usage = `gonext audit — inspect the audit log
-
-Usage:
-  gonext audit verify [--from=ID] [--to=ID]
-
-Subcommands:
-  verify   Walk the HMAC chain and report any tampered rows.
-
-Environment:
-  DATABASE_URL              Required. Postgres DSN.
-  GONEXT_AUDIT_HMAC_KEY     Required. The HMAC chain key (raw bytes or hex).
-                            See packages/go/audit/chain.go.
-
-Exit codes:
-  0  Chain verified intact.
-  1  Chain broken (a tamper was detected) or another runtime error.
-  2  Misuse: missing subcommand, malformed flags, etc.
-`
-
-// RunOS is the os.Args / os.Stdout / os.Stderr entry point dispatched
-// from cli/gonext/main.go. Returns the process exit code.
-func RunOS(args []string) int {
-	return Run(args, os.Stdout, os.Stderr)
-}
-
-// Run is the testable entry point: callers pass their own writers and
-// args so the package can be exercised without poking at os.Args.
-func Run(args []string, stdout, stderr io.Writer) int {
-	if len(args) == 0 {
-		fmt.Fprint(stderr, usage)
-		return ExitUsage
-	}
-	switch args[0] {
-	case "verify":
-		return runVerify(args[1:], stdout, stderr)
-	case "help", "--help", "-h":
-		fmt.Fprint(stdout, usage)
-		return ExitOK
-	default:
-		fmt.Fprintf(stderr, "gonext audit: unknown subcommand %q\n\n%s\n", args[0], usage)
-		return ExitUsage
-	}
-}
-
+// runVerify handles `gonext audit verify`. Returns the desired
+// process exit code (one of the Exit* constants from audit.go).
+//
+// Flag set:
+//   --from=ID  inclusive lower-bound row ID, default first row
+//   --to=ID    inclusive upper-bound row ID, default last row
+//
+// Required env: DATABASE_URL, GONEXT_AUDIT_HMAC_KEY (see
+// packages/go/audit/chain.go for the key format).
 func runVerify(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("verify", flag.ContinueOnError)
 	fs.SetOutput(stderr)

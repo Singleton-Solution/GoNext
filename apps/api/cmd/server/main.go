@@ -45,11 +45,13 @@ import (
 	adminmenus "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/menus"
 	adminpluginpages "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/pluginpages"
 	adminposts "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/posts"
+	adminsettings "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/settings"
 	adminstatus "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/status"
 	adminthemes "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/themes"
 	adminwebhooks "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/webhooks"
 	restimg "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/img"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/customizer"
+	themesstatic "github.com/Singleton-Solution/GoNext/apps/api/internal/themes/static"
 	adminredirects "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/redirects"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/rum"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/auth/login"
@@ -100,6 +102,7 @@ import (
 	"github.com/Singleton-Solution/GoNext/packages/go/revisions"
 	pkgsearch "github.com/Singleton-Solution/GoNext/packages/go/search"
 	"github.com/Singleton-Solution/GoNext/packages/go/session"
+	pkgsettings "github.com/Singleton-Solution/GoNext/packages/go/settings"
 	"github.com/Singleton-Solution/GoNext/packages/go/shutdown"
 	"github.com/Singleton-Solution/GoNext/packages/go/theme/seed"
 	"github.com/Singleton-Solution/GoNext/packages/go/tracing"
@@ -761,9 +764,10 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 	// gate the routes — install_themes, manage_themes, switch_themes
 	// — so a deploy that only wants the switch surface can withhold
 	// install_themes without losing the list endpoint.
+	themeActiveStore := &adminthemes.PgxActiveStore{Pool: pool}
 	if err := adminthemes.Mount(mux, "/api/v1/admin/themes", adminthemes.Deps{
 		ThemeDir: themeDir,
-		Active:   &adminthemes.PgxActiveStore{Pool: pool},
+		Active:   themeActiveStore,
 		Policy:   policy.NewBasicPolicy(policy.DefaultRoleCapabilities()),
 		Logger:   logger,
 	}); err != nil {
@@ -771,6 +775,40 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 	} else {
 		logger.Info("admin/themes: routes mounted",
 			slog.String("base", "/api/v1/admin/themes"),
+		)
+	}
+
+	// Public theme-asset surface (issue #501). Serves the on-disk
+	// CSS/JS/font files for every installed theme under /themes/{slug}
+	// /{file...}. The virtual sentinel "active" resolves through the
+	// shared PgxActiveStore so /themes/active/style.css follows the
+	// active-theme switch automatically. Without this handler the
+	// early-hints provider above preloads a URL no one serves and the
+	// public site renders with whatever globals.css ships — no theme
+	// CSS reaches the browser.
+	//
+	// We construct an ActiveResolver closure that calls Get on the
+	// existing store (same options-row read the admin handlers use).
+	// A read error is logged and surfaced as "no active theme" — the
+	// handler turns that into a 404 rather than a 500 because a
+	// transient DB hiccup should not bring down public CSS.
+	if err := themesstatic.Mount(mux, "/themes", themesstatic.Deps{
+		ThemeDir: themeDir,
+		ActiveResolver: func() string {
+			slug, err := themeActiveStore.Get(context.Background())
+			if err != nil {
+				logger.Debug("themes/static: active resolver failed",
+					slog.Any("err", err))
+				return ""
+			}
+			return slug
+		},
+		Logger: logger,
+	}); err != nil {
+		logger.Warn("themes/static: failed to mount", slog.Any("err", err))
+	} else {
+		logger.Info("themes/static: routes mounted",
+			slog.String("base", "/themes"),
 		)
 	}
 
@@ -886,6 +924,7 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 		} else {
 			if err := login.Mount(mux, login.Deps{
 				Lookup:             userLookupByEmail(pool),
+				UserByID:           userLookupByID(pool),
 				Sessions:           sessions,
 				Pepper:             []byte(cfg.Auth.Pepper),
 				SessionAbsoluteTTL: cfg.Auth.SessionTTL,
@@ -1509,6 +1548,60 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 				slog.String("base", "/api/v1/admin/marketplace"),
 			)
 		}
+	}
+
+	// Site settings registry (/api/v1/settings, issue #499). Every
+	// admin Settings sub-page (general, permalinks, reading, writing,
+	// privacy) reads + writes through this endpoint. The package-level
+	// settings registry holds the schema; the Postgres store persists
+	// values into the options table from migration 000008.
+	//
+	// We seed a fresh per-process registry with the core + privacy
+	// settings here rather than relying on the packages/go/settings
+	// global so the boot path stays explicit — a future change that
+	// registers plugin settings would extend this block, not reach into
+	// a singleton at import time. The Postgres store needs a non-nil
+	// pool; in pool-less test contexts we fall back to the MemoryStore
+	// so the route table still mounts and the admin form's "API
+	// available" probe succeeds.
+	//
+	// The routes are wrapped with authmw.RequireSession because the
+	// global middleware chain does not include OptionalSession (the
+	// regression fixed in #31). Wrapping per-Mount mirrors how
+	// /api/v1/auth/sessions and /api/v1/account/data wire themselves.
+	settingsReg := pkgsettings.NewRegistry()
+	if err := pkgsettings.RegisterCore(settingsReg); err != nil {
+		logger.Warn("settings: failed to register core settings", slog.Any("err", err))
+	}
+	if err := pkgsettings.RegisterPrivacy(settingsReg); err != nil {
+		logger.Warn("settings: failed to register privacy settings", slog.Any("err", err))
+	}
+	var settingsStore pkgsettings.Store
+	if pool != nil {
+		settingsStore = pkgsettings.NewPostgresStore(pool, settingsReg)
+	} else {
+		settingsStore = pkgsettings.NewMemoryStore(settingsReg)
+		logger.Warn("settings: pool nil; using in-memory store")
+	}
+	settingsMux := http.NewServeMux()
+	if err := adminsettings.Mount(settingsMux, "/api/v1/settings", adminsettings.Deps{
+		Store:    settingsStore,
+		Registry: settingsReg,
+		Policy:   adminPolicy,
+		Logger:   logger,
+	}); err != nil {
+		logger.Warn("settings: failed to mount routes", slog.Any("err", err))
+	} else {
+		var settingsHandler http.Handler = settingsMux
+		if sessions != nil {
+			settingsHandler = authmw.RequireSession(sessions)(settingsMux)
+		} else {
+			logger.Warn("settings: session manager nil; mounting without RequireSession")
+		}
+		mux.Handle("/api/v1/settings", settingsHandler)
+		logger.Info("settings: routes mounted",
+			slog.String("base", "/api/v1/settings"),
+		)
 	}
 
 	// Admin plugin pages surface (/api/v1/admin/plugin-pages). Walks

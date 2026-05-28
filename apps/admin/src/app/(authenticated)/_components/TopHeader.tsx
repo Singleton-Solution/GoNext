@@ -19,6 +19,21 @@ import type { ReactElement } from 'react';
 import Link from 'next/link';
 import { Bell, ExternalLink } from 'lucide-react';
 
+/**
+ * Resolve the public-site URL for the "View site" link. NEXT_PUBLIC_SITE_URL
+ * is the operator-set canonical front-end origin (production: the marketing
+ * site). When unset we fall back to the docker-compose web service on
+ * port 3000 — operators running the local stack expect that to open the
+ * @gonext/web preview, not the admin's own root.
+ *
+ * The constant is evaluated at module-load time so the link href is
+ * deterministic across renders.
+ */
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL && process.env.NEXT_PUBLIC_SITE_URL !== ''
+    ? process.env.NEXT_PUBLIC_SITE_URL
+    : 'http://localhost:3000';
+
 export function TopHeader(): ReactElement {
   return (
     <header className="app-shell__header" role="banner">
@@ -28,14 +43,16 @@ export function TopHeader(): ReactElement {
         <span className="app-shell__brand-tag">Admin</span>
       </Link>
       <div className="app-shell__header-actions">
-        <Link
-          href="/"
+        <a
+          href={SITE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
           className="app-shell__view-site"
-          aria-label="View site"
+          aria-label="View site (opens in new tab)"
         >
           <ExternalLink aria-hidden="true" width={13} height={13} />
           View site
-        </Link>
+        </a>
         <button
           type="button"
           className="app-shell__icon-btn"

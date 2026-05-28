@@ -19,6 +19,11 @@ import type { ActiveResponse, ThemeOverrides } from './types';
  * Fetch the active theme manifest plus current overrides. On any
  * failure (API down, registry not wired, etc.) returns `available:false`
  * so the customizer page can paint an error banner without crashing.
+ *
+ * NOTE: When called from a Server Component, use `fetchActiveServer`
+ * from `./api-server.ts` instead — that variant forwards the session
+ * cookie from `next/headers`. This client-side variant relies on
+ * `credentials: 'include'` which is a no-op in Node.js.
  */
 export async function fetchActive(): Promise<
   | { available: true; data: ActiveResponse }

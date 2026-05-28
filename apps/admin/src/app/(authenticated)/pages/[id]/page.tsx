@@ -115,11 +115,13 @@ export default function PageDetailPage(): ReactElement {
               Block <em>editor</em>.
             </Headline>
             <p className="mt-2 text-sm text-fg-muted">
-              Pages typically have layout-heavy content. Open the block editor
-              to compose hero sections, columns, and embeds.
+              Pages typically have layout-heavy content. The dedicated block
+              editor route for pages is not wired yet — use the post editor as
+              a model. Until it lands, edit the page&apos;s metadata above and
+              push block changes through the API directly.
             </p>
-            <Button variant="default" className="mt-4" asChild>
-              <Link href={`/pages/${pageId}/edit`}>Open block editor →</Link>
+            <Button variant="default" className="mt-4" disabled>
+              Block editor — coming soon
             </Button>
           </div>
         </div>

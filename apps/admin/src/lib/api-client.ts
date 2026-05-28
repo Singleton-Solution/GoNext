@@ -21,9 +21,59 @@
 
 const DEFAULT_BASE_URL = 'http://localhost:8080';
 
-export const apiBaseUrl: string =
-  (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL) ||
-  DEFAULT_BASE_URL;
+/**
+ * Resolve the API base URL. The admin app runs in two contexts:
+ *
+ *  - Browser (client): NEXT_PUBLIC_API_URL is baked into the bundle at
+ *    build time. When empty (the docker-compose default), fetches hit
+ *    the same origin and the Next.js `rewrites()` config proxies
+ *    `/api/*` to the docker-internal API hostname.
+ *  - Node (server): Server Components / Route Handlers / middleware
+ *    run inside the admin container; the Next.js rewrites do NOT apply
+ *    to outbound fetches from server code. We need an explicit
+ *    docker-internal hostname — GONEXT_API_URL=http://api:8080.
+ *
+ * Empty string is a deliberate value (it means "same origin via
+ * rewrites") and must NOT be coerced to the default. We use an
+ * explicit `undefined` check rather than `||` to preserve that.
+ *
+ * The branch selection MUST happen at request time, not at module-load
+ * time — see the docstring on `apiBaseUrl()` below for why.
+ */
+function pickNonUndefined(value: string | undefined): string | undefined {
+  return value === undefined ? undefined : value;
+}
+
+/**
+ * Resolve the API base URL at **runtime**.
+ *
+ * IMPORTANT: this MUST be called at request time, not module-load time.
+ * Next.js bundles Client Components at build time, when
+ * `typeof window === 'undefined'` evaluates to TRUE on the bundler's
+ * Node process. If we cached the result in a module-load constant the
+ * server branch would win and `http://api:8080` (the docker-internal
+ * hostname) would be baked into every Client Component bundle,
+ * producing browser-side DNS failures on every fetch. Keeping this as
+ * a function means the `typeof window` check evaluates in the actual
+ * runtime (browser → client branch, server-component render → server
+ * branch). See issue #498.
+ */
+export function apiBaseUrl(): string {
+  const isServer = typeof window === 'undefined';
+  if (isServer) {
+    // Server: prefer GONEXT_API_URL (docker-internal), fall back to the
+    // public URL, and only use the localhost default as a last resort.
+    const server = process.env.GONEXT_API_URL;
+    if (server !== undefined && server !== '') return server;
+    const pub = pickNonUndefined(process.env.NEXT_PUBLIC_API_URL);
+    if (pub !== undefined) return pub;
+    return DEFAULT_BASE_URL;
+  }
+  // Client: empty string is a legitimate "same-origin via rewrites"
+  // configuration. Only fall through to DEFAULT when the var is unset.
+  const pub = process.env.NEXT_PUBLIC_API_URL;
+  return pub === undefined ? DEFAULT_BASE_URL : pub;
+}
 
 export type ApiMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -93,7 +143,7 @@ export async function apiRequest<TResponse = unknown>(
     ...headers,
   };
 
-  const response = await fetch(joinUrl(apiBaseUrl, path), {
+  const response = await fetch(joinUrl(apiBaseUrl(), path), {
     method,
     headers: finalHeaders,
     credentials: 'include',

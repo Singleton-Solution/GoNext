@@ -1,7 +1,9 @@
 package router
 
 import (
+	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -66,5 +68,34 @@ func TestEncodeCursor_NoPadding(t *testing.T) {
 		if c == '=' {
 			t.Errorf("cursor %q contains padding char =", encoded)
 		}
+	}
+}
+
+func TestPage_MarshalJSON_NilDataBecomesEmptyArray(t *testing.T) {
+	t.Parallel()
+
+	p := Page[string]{Data: nil, Pagination: PageInfo{}}
+	out, err := json.Marshal(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out), `"data":[]`) {
+		t.Errorf("expected data:[], got: %s", string(out))
+	}
+	if strings.Contains(string(out), `"data":null`) {
+		t.Errorf("expected no null, got: %s", string(out))
+	}
+}
+
+func TestPage_MarshalJSON_NonNilDataPreserved(t *testing.T) {
+	t.Parallel()
+
+	p := Page[string]{Data: []string{"a", "b"}, Pagination: PageInfo{}}
+	out, err := json.Marshal(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out), `"data":["a","b"]`) {
+		t.Errorf("expected data:[a,b], got: %s", string(out))
 	}
 }

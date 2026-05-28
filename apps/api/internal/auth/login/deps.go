@@ -28,6 +28,13 @@ type UserRecord struct {
 	// pass; suspended / deleted return ErrInvalidCredentials so the
 	// admin-side decision isn't leaked to a stranger.
 	Status string
+
+	// Roles are the role slugs assigned to this user, projected from
+	// users.meta.roles by the SQL lookup. The service stamps these
+	// into the session's data map so RequireSession-derived principals
+	// carry the role grant. Empty slice → anonymous-equivalent
+	// authorization (login succeeds but every capability check fails).
+	Roles []string
 }
 
 // TOTPRecord describes a user's TOTP enrolment. SecretBase32 is the
@@ -65,6 +72,13 @@ var ErrTOTPNotEnabled = errors.New("login: TOTP not enabled")
 // citext, so the SQL implementation gets that for free; in-memory
 // fakes need to lower-case both sides.
 type UserLookup func(ctx context.Context, email string) (UserRecord, error)
+
+// UserByIDLookup returns the user record for an already-authenticated
+// userID. Used by the TOTP finalize path which only has the userID
+// (recovered from the intermediate token), not an email. Implementations
+// MUST be case-equivalent to UserLookup: same source of truth, same
+// role projection.
+type UserByIDLookup func(ctx context.Context, userID string) (UserRecord, error)
 
 // TOTPLookup returns the TOTP enrolment for a user, or ErrTOTPNotEnabled.
 // If the underlying user_totp table doesn't exist yet (the migration
@@ -119,6 +133,13 @@ var _ SessionCreator = (*session.Manager)(nil)
 type Deps struct {
 	// Lookup performs the email -> UserRecord query. Required.
 	Lookup UserLookup
+
+	// UserByID performs the userID -> UserRecord query. Used by the
+	// TOTP finalize path so the post-2FA session carries the same
+	// roles the no-2FA path would. May be nil — when nil, the
+	// finalize path degrades to a session with no roles (same
+	// behavior as before this field landed).
+	UserByID UserByIDLookup
 
 	// TOTPLookup performs the user -> TOTPRecord query. May be nil
 	// when 2FA isn't wired in this deployment.

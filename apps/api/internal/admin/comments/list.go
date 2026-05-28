@@ -32,11 +32,11 @@ func (h *handlers) list(w http.ResponseWriter, r *http.Request, _ policy.Princip
 
 	var filter ListFilter
 
-	// Status filter. Empty string means "no filter"; any other
-	// value must be in AllStatuses or we 400 so the client doesn't
-	// accidentally typo "approve" (the bulk verb) instead of
-	// "approved" (the state).
-	if s := q.Get("status"); s != "" {
+	// Status filter. Empty string and the literal "any" both mean
+	// "no filter"; any other value must be in AllStatuses or we 400
+	// so the client doesn't accidentally typo "approve" (the bulk
+	// verb) instead of "approved" (the state).
+	if s := q.Get("status"); s != "" && s != "any" {
 		st := Status(s)
 		if !IsValidStatus(st) {
 			router.WriteError(w, http.StatusBadRequest, "invalid_status",

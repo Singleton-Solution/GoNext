@@ -62,3 +62,9 @@ cli/gonext/gonext
 .dev/
 tmp/
 *.local
+
+# Personal Compose override. Ships as docker-compose.override.example.yml
+# in the repo — copy it locally and tweak. Compose auto-loads
+# docker-compose.override.yml without naming it on the CLI, so we must
+# keep the live file out of git.
+docker-compose.override.yml

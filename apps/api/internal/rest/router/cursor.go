@@ -2,6 +2,7 @@ package router
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 )
 
@@ -63,4 +64,24 @@ type PageInfo struct {
 type Page[T any] struct {
 	Data       []T      `json:"data"`
 	Pagination PageInfo `json:"pagination"`
+}
+
+// MarshalJSON coerces a nil Data slice to an empty slice so the wire
+// form is always `"data": []`, never `"data": null`. Admin Client
+// Components map/spread/.length over `.data` without nil guards — a
+// JSON null crashes them with "Cannot read properties of null". The
+// inner pageOut struct (rather than `type pageAlias Page[T]`) is what
+// avoids recursion: a generics-aware alias still carries the
+// MarshalJSON method through the type parameter, so json.Marshal would
+// loop forever. The inner struct has no methods and marshals via the
+// default reflection path.
+func (p Page[T]) MarshalJSON() ([]byte, error) {
+	if p.Data == nil {
+		p.Data = []T{}
+	}
+	type pageOut struct {
+		Data       []T      `json:"data"`
+		Pagination PageInfo `json:"pagination"`
+	}
+	return json.Marshal(pageOut{Data: p.Data, Pagination: p.Pagination})
 }

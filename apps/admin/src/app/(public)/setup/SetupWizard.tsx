@@ -166,7 +166,7 @@ export default function SetupWizard({ initialStatus }: SetupWizardProps): ReactE
     setSubmitting(true);
     setServerError(null);
     try {
-      const response = await fetch(`${apiBaseUrl}/api/v1/setup/install`, {
+      const response = await fetch(`${apiBaseUrl()}/api/v1/setup/install`, {
         method: 'POST',
         credentials: 'include',
         headers: {

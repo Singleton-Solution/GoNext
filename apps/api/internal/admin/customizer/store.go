@@ -65,14 +65,18 @@ const readOverridesSQL = `SELECT value FROM options WHERE key = $1`
 // writeOverridesSQL upserts the overrides row. autoload is FALSE
 // because the renderer reads via the per-request settings store cache
 // path; autoloading at boot would prime cache with values the API-only
-// replicas never need. namespace is "core" so the row is uninstall-safe
-// (plugin-namespace deletes don't sweep it).
+// replicas never need.
+//
+// `namespace` and explicit `updated_at` are omitted: the options
+// table from migration 000008 has neither (`updated_at` defaults to
+// now() and is bumped by the options_touch trigger). An earlier
+// draft of this writer referenced both; PATCH was 500'ing in
+// production before the fix.
 const writeOverridesSQL = `
-INSERT INTO options (key, value, autoload, namespace, updated_at)
-VALUES ($1, $2, FALSE, 'core', now())
+INSERT INTO options (key, value, autoload)
+VALUES ($1, $2, FALSE)
 ON CONFLICT (key) DO UPDATE
-    SET value = EXCLUDED.value,
-        updated_at = now()
+    SET value = EXCLUDED.value
 `
 
 // deleteOverridesSQL clears the overrides row for a slug. Used by the

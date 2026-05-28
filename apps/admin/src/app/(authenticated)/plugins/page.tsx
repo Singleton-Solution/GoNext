@@ -59,7 +59,7 @@ async function fetchPlugins(): Promise<FetchResult> {
     cookieHeader = '';
   }
 
-  const url = `${apiBaseUrl.replace(/\/$/, '')}/api/v1/plugins`;
+  const url = `${apiBaseUrl().replace(/\/$/, '')}/api/v1/plugins`;
   try {
     const res = await fetch(url, {
       method: 'GET',

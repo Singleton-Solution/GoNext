@@ -46,18 +46,19 @@ type fakeSession struct {
 
 type fakeSessionRecord struct {
 	userID  string
+	data    map[string]any
 	ttl     time.Duration
 	idleTTL time.Duration
 }
 
-func (f *fakeSession) Create(_ context.Context, userID string, _ map[string]any, ttl, idleTTL time.Duration) (string, error) {
+func (f *fakeSession) Create(_ context.Context, userID string, data map[string]any, ttl, idleTTL time.Duration) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.err != nil {
 		return "", f.err
 	}
 	f.nextID++
-	f.created = append(f.created, fakeSessionRecord{userID: userID, ttl: ttl, idleTTL: idleTTL})
+	f.created = append(f.created, fakeSessionRecord{userID: userID, data: data, ttl: ttl, idleTTL: idleTTL})
 	// Mint a token shaped like the real one (32 bytes base64url, 43 chars),
 	// padded with a counter for uniqueness.
 	tok := "fake-token-0000000000000000000000000000000-" + string(rune('A'+f.nextID%26))
@@ -68,6 +69,18 @@ func (f *fakeSession) creates() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return len(f.created)
+}
+
+// lastData returns the data map handed to the most recent Create call.
+// Tests use it to assert what the session was stamped with (e.g. the
+// "roles" key carried through from the user record).
+func (f *fakeSession) lastData() map[string]any {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.created) == 0 {
+		return nil
+	}
+	return f.created[len(f.created)-1].data
 }
 
 // newFixture wires a fixture with defaults that match the production
@@ -776,6 +789,134 @@ func TestAuthenticate_RecordsFailureForKnownUserOnly(t *testing.T) {
 	count, _, _ = f.failureStore.GetFailures(context.Background(), "u-1")
 	if count != 1 {
 		t.Errorf("known-email-wrong-password didn't bump: count=%d, want 1", count)
+	}
+}
+
+// TestFinalizeTOTP_ThreadsRolesFromUserByID is the regression test for
+// issue #496: when a user with TOTP enabled completes the two-step
+// login, the post-2FA session MUST carry the user's roles. Before the
+// fix, the TOTP finalize path passed nil for roles to completeLogin,
+// which meant any super_admin enrolled in TOTP lost their admin grant
+// on every subsequent sign-in.
+func TestFinalizeTOTP_ThreadsRolesFromUserByID(t *testing.T) {
+	f := newFixture(t)
+	f.addUser(t, "u-1", "alice@example.com", "pwd", "active")
+	sec, err := totp.Generate("GoNext", "alice@example.com")
+	if err != nil {
+		t.Fatalf("totp.Generate: %v", err)
+	}
+	f.addTOTP(t, "u-1", sec.Base32)
+
+	// Wire UserByID to return a record with a role grant. The fix
+	// re-fetches via this lookup at finalize time so the role slice
+	// reaches completeLogin → Sessions.Create.
+	f.deps.UserByID = func(_ context.Context, userID string) (UserRecord, error) {
+		if userID != "u-1" {
+			return UserRecord{}, ErrUserNotFound
+		}
+		return UserRecord{
+			ID:     "u-1",
+			Email:  "alice@example.com",
+			Status: "active",
+			Roles:  []string{"super_admin"},
+		}, nil
+	}
+	svc := f.service(t)
+
+	// Step 1: password OK, server returns an intermediate token.
+	first, err := svc.Authenticate(context.Background(), Input{
+		Email:    "alice@example.com",
+		Password: "pwd",
+		IP:       "10.0.0.1",
+	})
+	if err != nil {
+		t.Fatalf("first call err: %v", err)
+	}
+	if !first.RequiresTOTP {
+		t.Fatal("first call: not RequiresTOTP")
+	}
+
+	// Step 2: present TOTP code with the intermediate token.
+	code, err := generateCurrentTOTP(sec.Base32)
+	if err != nil {
+		t.Fatalf("generate code: %v", err)
+	}
+	final, err := svc.Authenticate(context.Background(), Input{
+		IntermediateToken: first.IntermediateToken,
+		TOTPCode:          code,
+		IP:                "10.0.0.1",
+	})
+	if err != nil {
+		t.Fatalf("second call err: %v", err)
+	}
+	if final.Token == "" {
+		t.Fatal("Token: empty after 2FA finalize")
+	}
+
+	// Assert: Sessions.Create was called with data["roles"] containing
+	// ["super_admin"]. Before the fix this map was nil.
+	data := f.sessionCreator.lastData()
+	if data == nil {
+		t.Fatal("session data map is nil; expected roles to be stamped in")
+	}
+	rolesAny, ok := data["roles"]
+	if !ok {
+		t.Fatalf("session data missing 'roles' key: %#v", data)
+	}
+	roles, ok := rolesAny.([]string)
+	if !ok {
+		t.Fatalf("roles type: got %T, want []string", rolesAny)
+	}
+	if len(roles) != 1 || roles[0] != "super_admin" {
+		t.Errorf("roles: got %v, want [super_admin]", roles)
+	}
+}
+
+// TestFinalizeTOTP_NilUserByIDDoesNotPanic confirms the documented
+// fallback contract: when Deps.UserByID is unwired (zero value), the
+// finalize path still completes — it just produces a session with no
+// roles, the same degradation behavior as before the fix landed. This
+// keeps existing tests that omit UserByID in their fixture from
+// panicking on a nil indirection.
+func TestFinalizeTOTP_NilUserByIDDoesNotPanic(t *testing.T) {
+	f := newFixture(t)
+	f.addUser(t, "u-1", "alice@example.com", "pwd", "active")
+	sec, err := totp.Generate("GoNext", "alice@example.com")
+	if err != nil {
+		t.Fatalf("totp.Generate: %v", err)
+	}
+	f.addTOTP(t, "u-1", sec.Base32)
+	// Leave f.deps.UserByID nil — that's the point of this test.
+	svc := f.service(t)
+
+	first, err := svc.Authenticate(context.Background(), Input{
+		Email:    "alice@example.com",
+		Password: "pwd",
+		IP:       "10.0.0.1",
+	})
+	if err != nil || !first.RequiresTOTP {
+		t.Fatalf("first call: err=%v, RequiresTOTP=%v", err, first.RequiresTOTP)
+	}
+
+	code, err := generateCurrentTOTP(sec.Base32)
+	if err != nil {
+		t.Fatalf("generate code: %v", err)
+	}
+	final, err := svc.Authenticate(context.Background(), Input{
+		IntermediateToken: first.IntermediateToken,
+		TOTPCode:          code,
+		IP:                "10.0.0.1",
+	})
+	if err != nil {
+		t.Fatalf("second call err: %v", err)
+	}
+	if final.Token == "" {
+		t.Error("Token: empty after 2FA finalize")
+	}
+	// Data map should be nil (no roles to stamp), which is the
+	// pre-fix degradation behavior — but the call must not panic.
+	if got := f.sessionCreator.lastData(); got != nil {
+		t.Errorf("session data: got %v, want nil (no UserByID → no roles)", got)
 	}
 }
 

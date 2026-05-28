@@ -259,6 +259,16 @@ func run(ctx context.Context) error {
 	// separate cron-leader goroutine (issue #258); this main wiring
 	// only declares the spec + schedule so the leader has something
 	// to fire.
+	//
+	// cronReg is declared unconditionally so that downstream
+	// registrations (content publisher + GC via SeedDefaults) can
+	// still happen even if media storage init fails. We build a fresh
+	// registry per process — the cron package deliberately does not
+	// ship a Default() singleton; ownership is the binary's. A
+	// follow-up issue mounts the scheduler against this registry once
+	// the cron-leader lease (#258) lands.
+	cronReg := cron.NewRegistry()
+
 	mediaDriver, err := storage.New(ctx, storage.Options{
 		S3: storage.S3Config{
 			Endpoint:  cfg.Storage.Endpoint,
@@ -294,16 +304,7 @@ func run(ctx context.Context) error {
 					"err", err.Error(),
 				)
 			}
-			// Dispatch onto the asynq mux so the consumer side runs
-			// the handler when the leader enqueues it.
-			taskspec.Dispatch(srv.Mux(), reg)
 			// Cron-side registration: declare WHEN the task fires.
-			// We build a fresh registry per process — the cron
-			// package deliberately does not ship a Default()
-			// singleton; ownership is the binary's. A follow-up
-			// issue mounts the scheduler against this registry once
-			// the cron-leader lease (#258) lands.
-			cronReg := cron.NewRegistry()
 			cronSpec := storage.NewAbortOrphansCron()
 			if err := cronReg.Register(cronSpec); err != nil &&
 				!errors.Is(err, cron.ErrAlreadyRegistered) {
@@ -311,40 +312,53 @@ func run(ctx context.Context) error {
 					"err", err.Error(),
 				)
 			}
-			_ = cronReg // pinned for the scheduler hookup below
 			logger.Info("storage abort-orphans cron registered",
 				"task", storage.AbortOrphansTaskName,
 				"cron", storage.AbortOrphansCronName,
 				"schedule", storage.AbortOrphansSchedule,
 			)
-
-			// Content scheduler + GC (#143). Both tasks share the
-			// worker's pgx pool. The publisher fires every minute
-			// and flips status=scheduled rows whose scheduled_for
-			// has elapsed; the GC fires daily at 03:30 UTC and
-			// hard-deletes trash older than 30 days.
-			//
-			// We register against the same cronReg as the storage
-			// sweep so the eventual cron-leader (#258) sees one
-			// merged schedule, and against taskspec.Default() so
-			// the asynq mux dispatch already in place handles the
-			// task type.
-			if err := scheduler.SeedDefaults(taskspec.Default(), cronReg, scheduler.SeedOptions{
-				Pool:   pool,
-				Logger: logger,
-			}); err != nil {
-				logger.Warn("scheduler seed failed", "err", err.Error())
-			} else {
-				taskspec.Dispatch(srv.Mux(), taskspec.Default())
-				logger.Info("content scheduler + gc registered",
-					"publisher_task", scheduler.PublisherTaskName,
-					"publisher_schedule", scheduler.PublisherSchedule,
-					"gc_task", scheduler.GCTaskName,
-					"gc_schedule", scheduler.GCSchedule,
-				)
-			}
 		}
 	}
+
+	// Content scheduler + GC (#143). Both tasks share the worker's
+	// pgx pool. The publisher fires every minute and flips
+	// status=scheduled rows whose scheduled_for has elapsed; the GC
+	// fires daily at 03:30 UTC and hard-deletes trash older than
+	// 30 days.
+	//
+	// We register against the same cronReg as the storage sweep so
+	// the eventual cron-leader (#258) sees one merged schedule, and
+	// against taskspec.Default() so the asynq mux dispatch already in
+	// place handles the task type. SeedDefaults only needs pool +
+	// cronReg, so this runs even if media storage init failed above.
+	if err := scheduler.SeedDefaults(taskspec.Default(), cronReg, scheduler.SeedOptions{
+		Pool:   pool,
+		Logger: logger,
+	}); err != nil {
+		logger.Warn("scheduler seed failed", "err", err.Error())
+	} else {
+		logger.Info("content scheduler + gc registered",
+			"publisher_task", scheduler.PublisherTaskName,
+			"publisher_schedule", scheduler.PublisherSchedule,
+			"gc_task", scheduler.GCTaskName,
+			"gc_schedule", scheduler.GCSchedule,
+		)
+	}
+
+	// Single Dispatch after every Register attempt. Whatever specs
+	// landed in taskspec.Default() — abort-orphans (if storage init
+	// succeeded), publisher + GC (if SeedDefaults succeeded), and
+	// the media tasks registered via workermedia.Register above —
+	// get wired onto the asynq mux here. Failed Register attempts
+	// already logged their warnings; their absence from the registry
+	// just means the mux has no handler for that task type and asynq
+	// will NACK it cleanly.
+	//
+	// asynq.ServeMux.Handle panics if the same task type is registered
+	// twice. There is exactly ONE Dispatch call in this binary, and it
+	// lives here — do not introduce another.
+	taskspec.Dispatch(srv.Mux(), taskspec.Default())
+	_ = cronReg // pinned for the cron-leader scheduler hookup (#258)
 
 	logger.Info("worker started",
 		"drain_budget", workerShutdownBudget,
