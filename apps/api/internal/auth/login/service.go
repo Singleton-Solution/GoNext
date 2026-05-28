@@ -235,7 +235,7 @@ func (s *Service) Authenticate(ctx context.Context, in Input) (Result, error) {
 	switch {
 	case !hasTOTP:
 		// 2FA disabled or not wired — straight to session creation.
-		return s.completeLogin(ctx, in, user.ID)
+		return s.completeLogin(ctx, in, user.ID, user.Roles)
 
 	case in.TOTPCode != "" || in.RecoveryCode != "":
 		// First-call body carried a code. Verify it inline.
@@ -248,7 +248,7 @@ func (s *Service) Authenticate(ctx context.Context, in Input) (Result, error) {
 			s.emitFailed(ctx, in, user.ID, "wrong_totp")
 			return Result{}, ErrTOTPInvalid
 		}
-		return s.completeLogin(ctx, in, user.ID)
+		return s.completeLogin(ctx, in, user.ID, user.Roles)
 
 	default:
 		// 2FA required but code not provided. Issue an intermediate
@@ -292,7 +292,13 @@ func (s *Service) finalizeTOTP(ctx context.Context, in Input) (Result, error) {
 		// now (operator disabled it mid-flow). Drop the token and
 		// finish the login — there's nothing further to verify.
 		_ = s.deps.Intermediate.Delete(ctx, in.IntermediateToken)
-		return s.completeLogin(ctx, in, userID)
+		// Re-fetch the user to recover Roles (the intermediate token
+		// carries only the userID, not the role projection). If the
+		// lookup is unwired or fails, completeLogin still proceeds
+		// with nil roles — same degradation as before this fix, but
+		// no longer the default-every-time behavior.
+		roles := s.lookupRolesByID(ctx, userID)
+		return s.completeLogin(ctx, in, userID, roles)
 	}
 
 	if !s.verifyTOTPOrRecovery(in, tot) {
@@ -313,14 +319,52 @@ func (s *Service) finalizeTOTP(ctx context.Context, in Input) (Result, error) {
 	// can't be replayed.
 	_ = s.deps.Intermediate.Delete(ctx, in.IntermediateToken)
 
-	return s.completeLogin(ctx, in, userID)
+	// Re-fetch the user record so the post-2FA session carries the
+	// same Roles the no-2FA path stamps in. Without this the user's
+	// role grants are dropped on every TOTP-gated login (issue #496).
+	// If UserByID is nil or fails, we keep going with nil roles —
+	// same fallback as the previous code, just no longer on the
+	// happy path.
+	roles := s.lookupRolesByID(ctx, userID)
+	return s.completeLogin(ctx, in, userID, roles)
+}
+
+// lookupRolesByID re-fetches the user's role projection via
+// Deps.UserByID. It exists so finalizeTOTP can recover the role grants
+// that the intermediate token doesn't carry. Errors and nil deps are
+// folded into "no roles" — completeLogin treats an empty slice the
+// same way it would before this fix, so a missing UserByID wiring
+// degrades to the pre-#496 behavior (login succeeds, capability
+// checks return 403) rather than panicking.
+func (s *Service) lookupRolesByID(ctx context.Context, userID string) []string {
+	if s.deps.UserByID == nil {
+		return nil
+	}
+	user, err := s.deps.UserByID(ctx, userID)
+	if err != nil {
+		s.deps.Log.WarnContext(ctx, "login: UserByID lookup error (finalizeTOTP)",
+			slog.String("user_id", userID),
+			slog.String("err", err.Error()))
+		return nil
+	}
+	return user.Roles
 }
 
 // completeLogin mints the session, fires the audit success event, and
 // clears the failure counter. Used by both the no-2FA branch and the
 // post-2FA finalization.
-func (s *Service) completeLogin(ctx context.Context, in Input, userID string) (Result, error) {
-	token, err := s.deps.Sessions.Create(ctx, userID, nil, s.deps.SessionAbsoluteTTL, s.deps.SessionIdleTTL)
+//
+// rolesFromLookup is the role slugs from the UserRecord. We stamp them
+// into the session's data map under the "roles" key so the auth
+// middleware's DefaultPrincipal derives a Principal with role grants
+// — without this every capability check returns 403 "principal has
+// no roles" even for the super_admin seeded by `gonext init`.
+func (s *Service) completeLogin(ctx context.Context, in Input, userID string, rolesFromLookup []string) (Result, error) {
+	var data map[string]any
+	if len(rolesFromLookup) > 0 {
+		data = map[string]any{"roles": rolesFromLookup}
+	}
+	token, err := s.deps.Sessions.Create(ctx, userID, data, s.deps.SessionAbsoluteTTL, s.deps.SessionIdleTTL)
 	if err != nil {
 		s.deps.Log.WarnContext(ctx, "login: session create failed",
 			slog.String("user_id", userID),

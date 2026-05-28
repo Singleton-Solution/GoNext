@@ -886,6 +886,7 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 		} else {
 			if err := login.Mount(mux, login.Deps{
 				Lookup:             userLookupByEmail(pool),
+				UserByID:           userLookupByID(pool),
 				Sessions:           sessions,
 				Pepper:             []byte(cfg.Auth.Pepper),
 				SessionAbsoluteTTL: cfg.Auth.SessionTTL,
