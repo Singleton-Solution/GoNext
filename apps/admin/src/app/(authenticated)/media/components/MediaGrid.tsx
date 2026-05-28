@@ -162,7 +162,11 @@ export function MediaGrid(props: MediaGridProps): ReactElement {
           cursor: opts.nextCursor || undefined,
           collection: collectionParam,
         });
-        setItems((prev) => (opts.reset ? res.data : [...prev, ...res.data]));
+        // API may return `data: null` on an empty page (pgx nil
+        // slice → JSON null round-trip). Normalize to [] so the
+        // spread + length reads downstream don't throw.
+        const safeData = Array.isArray(res.data) ? res.data : [];
+        setItems((prev) => (opts.reset ? safeData : [...prev, ...safeData]));
         setCursor(res.pagination.next_cursor);
         setHydrated(true);
       } catch (err) {

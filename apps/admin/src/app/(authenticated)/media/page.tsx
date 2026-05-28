@@ -34,7 +34,13 @@ async function fetchInitial(): Promise<MediaListResponse | null> {
 
 export default async function MediaPage(): Promise<ReactElement> {
   const initial = await fetchInitial();
-  return (
-    <MediaGrid initialData={initial ?? { data: [], pagination: { next_cursor: '' } }} />
-  );
+  // The admin API returns `data: null` for an empty media library
+  // (a Postgres NULL → Go nil-slice → JSON null round-trip). The
+  // <MediaGrid> island assumes `data` is always an array — calling
+  // `.length` on null throws "Cannot read properties of null". Coerce
+  // null → [] here so the client never sees the nullable shape.
+  const safe = initial
+    ? { ...initial, data: Array.isArray(initial.data) ? initial.data : [] }
+    : { data: [], pagination: { next_cursor: '' } };
+  return <MediaGrid initialData={safe} />;
 }
