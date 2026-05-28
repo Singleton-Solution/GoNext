@@ -45,6 +45,7 @@ import (
 	adminmenus "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/menus"
 	publicmenus "github.com/Singleton-Solution/GoNext/apps/api/internal/public/menus"
 	publicsettings "github.com/Singleton-Solution/GoNext/apps/api/internal/public/settings"
+	adminplugins "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/plugins"
 	adminpluginpages "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/pluginpages"
 	adminposts "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/posts"
 	adminsettings "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/settings"
@@ -53,11 +54,13 @@ import (
 	adminwebhooks "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/webhooks"
 	restimg "github.com/Singleton-Solution/GoNext/apps/api/internal/rest/img"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/customizer"
+	adminsiteeditor "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/siteeditor"
 	themesstatic "github.com/Singleton-Solution/GoNext/apps/api/internal/themes/static"
 	adminredirects "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/redirects"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/admin/rum"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/auth/login"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/auth/magiclink"
+	authpat "github.com/Singleton-Solution/GoNext/apps/api/internal/auth/pat"
 	"github.com/Singleton-Solution/GoNext/apps/api/internal/auth/passwordreset"
 	authsessions "github.com/Singleton-Solution/GoNext/apps/api/internal/auth/sessions"
 	authverify "github.com/Singleton-Solution/GoNext/apps/api/internal/auth/verify"
@@ -741,11 +744,19 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 
 	// Theme Customizer (issue #355). Operators GET the active theme +
 	// any persisted overrides and PUT a partial-override payload that
-	// the renderer merges at request time. The route prefix mirrors
-	// the rest of the admin REST surface so operators looking for
-	// "admin/customizer" find it next to "admin/jobs", "admin/rum",
-	// "admin/status".
-	if err := customizer.Mount(mux, "/api/v1/admin/customizer", customizer.Deps{
+	// the renderer merges at request time. POST .../preview returns
+	// the merged CSS without persisting so the admin form can drive a
+	// live iframe (issue #512). The route prefix mirrors the rest of
+	// the admin REST surface so operators looking for "admin/customizer"
+	// find it next to "admin/jobs", "admin/rum", "admin/status".
+	//
+	// Mounted on a sub-mux + RequireSession (same pattern as
+	// admin/jobs, admin/settings, admin/plugins) so the handler's gate()
+	// sees a principal on context. The global middleware chain doesn't
+	// carry OptionalSession (the regression fixed in #31), so admin
+	// endpoints must do their own session validation.
+	customizerMux := http.NewServeMux()
+	if err := customizer.Mount(customizerMux, "/api/v1/admin/customizer", customizer.Deps{
 		Store:  customizer.NewPgxStore(customizer.PoolAdapter{Pool: pool}),
 		Loader: customizer.FilesystemLoader(themeDir),
 		Policy: policy.NewBasicPolicy(policy.DefaultRoleCapabilities()),
@@ -753,6 +764,13 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 	}); err != nil {
 		logger.Warn("customizer: failed to mount routes", slog.Any("err", err))
 	} else {
+		var customizerHandler http.Handler = customizerMux
+		if sessions != nil {
+			customizerHandler = authmw.RequireSession(sessions)(customizerMux)
+		} else {
+			logger.Warn("customizer: session manager nil; mounting without RequireSession")
+		}
+		mux.Handle("/api/v1/admin/customizer/", customizerHandler)
 		logger.Info("customizer: routes mounted",
 			slog.String("base", "/api/v1/admin/customizer"),
 		)
@@ -777,6 +795,49 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 	} else {
 		logger.Info("admin/themes: routes mounted",
 			slog.String("base", "/api/v1/admin/themes"),
+		)
+	}
+
+	// Admin Site Editor — file-based variant (issue #512). Operators
+	// editing header/footer/etc. template parts in the browser list,
+	// fetch, and write the raw HTML bytes for the active theme's parts
+	// directory. This is the simpler "edit the file on disk" workflow
+	// the admin Site Editor page calls out to at
+	// /api/v1/admin/site-editor; the older block-tree variant under
+	// /api/v1/admin/site_editor (note underscore) remains for the
+	// downstream renderer.
+	//
+	// Mounted on a sub-mux + RequireSession (same pattern as
+	// admin/customizer above) so the handler's gate() sees a principal
+	// on context.
+	siteEditorMux := http.NewServeMux()
+	if _, err := adminsiteeditor.Mount(siteEditorMux, "/api/v1/admin/site-editor", adminsiteeditor.Deps{
+		ThemeDir: themeDir,
+		Active: func(ctx context.Context) (string, error) {
+			slug, gerr := themeActiveStore.Get(ctx)
+			if gerr != nil {
+				return "", gerr
+			}
+			if slug == "" {
+				return "", adminsiteeditor.ErrNoActiveTheme
+			}
+			return slug, nil
+		},
+		Loader: adminsiteeditor.ManifestLoader(customizer.FilesystemLoader(themeDir)),
+		Policy: policy.NewBasicPolicy(policy.DefaultRoleCapabilities()),
+		Logger: logger,
+	}); err != nil {
+		logger.Warn("admin/site-editor: failed to mount routes", slog.Any("err", err))
+	} else {
+		var siteEditorHandler http.Handler = siteEditorMux
+		if sessions != nil {
+			siteEditorHandler = authmw.RequireSession(sessions)(siteEditorMux)
+		} else {
+			logger.Warn("admin/site-editor: session manager nil; mounting without RequireSession")
+		}
+		mux.Handle("/api/v1/admin/site-editor/", siteEditorHandler)
+		logger.Info("admin/site-editor: routes mounted",
+			slog.String("base", "/api/v1/admin/site-editor"),
 		)
 	}
 
@@ -973,6 +1034,41 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 			slog.String("base", "/api/v1/auth/sessions"))
 	} else {
 		logger.Warn("auth/sessions: skipping mount; session manager is nil")
+	}
+
+	// Personal Access Tokens API (issue #511). Mounts list/create/revoke
+	// at /api/v1/me/tokens, gated by RequireSession because every endpoint
+	// is per-user. The handler uses policy.FromContext to scope every
+	// query by the caller's UserID; admins managing OTHER users' tokens
+	// would live at /api/v1/admin/users/{id}/tokens, out of scope here.
+	//
+	// Requires pool (Postgres-backed store), pepper (argon2id hashing),
+	// and sessions (auth gate). Skipped with a warning if any are absent
+	// so a misconfigured boot doesn't surface as a 500 on first request.
+	if pool == nil || sessions == nil {
+		logger.Warn("auth/pat: skipping mount; pool or sessions is nil",
+			slog.Bool("pool_nil", pool == nil),
+			slog.Bool("sessions_nil", sessions == nil),
+		)
+	} else if len(cfg.Auth.Pepper) == 0 {
+		logger.Warn("auth/pat: skipping mount; GONEXT_AUTH_PEPPER is empty")
+	} else {
+		patMux := http.NewServeMux()
+		if err := authpat.Mount(patMux, "/api/v1/me/tokens", authpat.Deps{
+			Pool:         pool,
+			Pepper:       []byte(cfg.Auth.Pepper),
+			AuditEmitter: auditEmitter,
+			Logger:       logger,
+		}); err != nil {
+			logger.Warn("auth/pat: failed to mount routes", slog.Any("err", err))
+		} else {
+			guarded := authmw.RequireSession(sessions)(patMux)
+			mux.Handle("/api/v1/me/tokens", guarded)
+			mux.Handle("/api/v1/me/tokens/", guarded)
+			logger.Info("auth/pat: routes mounted",
+				slog.String("base", "/api/v1/me/tokens"),
+			)
+		}
 	}
 
 	// Email verification flow (POST /api/v1/auth/verify/send, GET
@@ -1699,6 +1795,54 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 	} else {
 		logger.Info("admin/pluginpages: routes mounted",
 			slog.String("base", "/api/v1/admin/plugin-pages"),
+		)
+	}
+
+	// Plugin lifecycle CRUD surface (/api/v1/plugins, issue #500). The
+	// admin Plugins page reads + mutates installed plugins through this
+	// surface. Reuses the lifecycle.Manager wiring style from the
+	// marketplace block above — a sibling Manager constructed against
+	// the same Postgres storage so a plugin installed via the
+	// marketplace path is visible here, and vice versa.
+	//
+	// Wrapped with authmw.RequireSession because the global middleware
+	// chain no longer carries OptionalSession (the regression fixed in
+	// #31). Mounted on both "/api/v1/plugins" (the exact list path) and
+	// "/api/v1/plugins/" (the subtree carrying /{name}, /install,
+	// /{name}/activate, etc.).
+	var pluginsLifecycle adminplugins.Manager
+	if pool != nil {
+		pluginsLifecycle = lifecycle.NewManager(
+			lifecycle.NewPostgresStorage(pool),
+			auditEmitter,
+			lifecycle.WithLogger(logger),
+		)
+	} else {
+		pluginsLifecycle = lifecycle.NewManager(
+			lifecycle.NewMemoryStorage(),
+			auditEmitter,
+			lifecycle.WithLogger(logger),
+		)
+		logger.Warn("admin/plugins: pool nil; using in-memory lifecycle storage")
+	}
+	pluginsMux := http.NewServeMux()
+	if err := adminplugins.Mount(pluginsMux, "/api/v1/plugins", adminplugins.Deps{
+		Manager: pluginsLifecycle,
+		Policy:  adminPolicy,
+		Logger:  logger,
+	}); err != nil {
+		logger.Warn("admin/plugins: failed to mount", slog.Any("err", err))
+	} else {
+		var pluginsHandler http.Handler = pluginsMux
+		if sessions != nil {
+			pluginsHandler = authmw.RequireSession(sessions)(pluginsMux)
+		} else {
+			logger.Warn("admin/plugins: session manager nil; mounting without RequireSession")
+		}
+		mux.Handle("/api/v1/plugins", pluginsHandler)
+		mux.Handle("/api/v1/plugins/", pluginsHandler)
+		logger.Info("admin/plugins: routes mounted",
+			slog.String("base", "/api/v1/plugins"),
 		)
 	}
 
