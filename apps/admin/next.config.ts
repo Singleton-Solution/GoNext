@@ -21,6 +21,23 @@ const nextConfig: NextConfig = {
   // typedRoutes moved out of `experimental` in Next.js 15; opt in at the
   // top level so `<Link href>` values are checked at build time.
   typedRoutes: true,
+  /**
+   * Proxy /api/* to the GoNext API service. When the bundle ships with
+   * NEXT_PUBLIC_API_URL="" (the docker-compose default) the browser
+   * uses same-origin fetches against /api/*. This rewrite hops those
+   * requests over to the docker-internal API hostname so dev / preview
+   * environments don't need a separate reverse proxy.
+   *
+   * rewrites() evaluates at build time, so GONEXT_API_URL must be set
+   * as a build-arg (see apps/admin/Dockerfile + docker-compose.override.yml).
+   */
+  async rewrites() {
+    const apiUrl =
+      process.env.GONEXT_API_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      'http://localhost:8080';
+    return [{ source: '/api/:path*', destination: `${apiUrl}/api/:path*` }];
+  },
   async headers() {
     return [
       {
