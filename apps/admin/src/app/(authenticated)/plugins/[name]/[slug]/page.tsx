@@ -17,12 +17,12 @@ import type { ReactElement } from 'react';
 import { PluginPageBridge } from './PluginPageBridge';
 
 interface Props {
-  params: Promise<{ plugin: string; slug: string }>;
+  params: Promise<{ name: string; slug: string }>;
 }
 
 export const dynamic = 'force-dynamic';
 
 export default async function PluginAdminPage({ params }: Props): Promise<ReactElement> {
-  const { plugin, slug } = await params;
+  const { name: plugin, slug } = await params;
   return <PluginPageBridge plugin={plugin} slug={slug} />;
 }
