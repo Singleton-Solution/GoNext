@@ -43,6 +43,7 @@ import (
 	adminmarketplace "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/marketplace"
 	adminmedia "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/media"
 	adminmenus "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/menus"
+	publicmenus "github.com/Singleton-Solution/GoNext/apps/api/internal/public/menus"
 	adminpluginpages "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/pluginpages"
 	adminposts "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/posts"
 	adminsettings "github.com/Singleton-Solution/GoNext/apps/api/internal/admin/settings"
@@ -1450,6 +1451,23 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, rdb *goredis.Client, se
 	} else {
 		logger.Info("admin/menus: routes mounted",
 			slog.String("base", "/api/v1/admin/menus"),
+		)
+	}
+
+	// Public menus surface (/api/v1/menus). Read-only, no policy gate —
+	// the marketing landing renders for anonymous visitors and reads
+	// its nav + footer columns from this endpoint. Reuses the same
+	// store the admin write surface mutates, so the read path always
+	// reflects the latest operator edits without a separate cache. See
+	// issue #509.
+	if err := publicmenus.Mount(mux, "/api/v1/menus", publicmenus.Deps{
+		Store:  menusStore,
+		Logger: logger,
+	}); err != nil {
+		logger.Warn("public/menus: failed to mount", slog.Any("err", err))
+	} else {
+		logger.Info("public/menus: routes mounted",
+			slog.String("base", "/api/v1/menus"),
 		)
 	}
 

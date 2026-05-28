@@ -97,6 +97,25 @@ export interface Term {
 }
 
 /**
+ * Single navigation menu item as exposed by the public reader at
+ * `/api/v1/menus/by-location/{location}`. Trimmed shape:
+ * `label` + `href` + an `external` hint the renderer uses to decide
+ * whether to wrap the link in a next/link or a plain anchor.
+ */
+export interface MenuItem {
+  /** Human-readable label, painted as the link text. */
+  label: string;
+  /** Destination URL — internal (`/pricing`) or absolute. */
+  href: string;
+  /**
+   * True when `href` points off this origin (absolute URL with scheme,
+   * scheme-relative `//`, or `mailto:` / `tel:`). The Go side
+   * computes this so client+server agree on what's external.
+   */
+  external: boolean;
+}
+
+/**
  * Active-theme summary. We deliberately keep this narrow: the Go side
  * already resolved which theme is active and emitted the CSS custom
  * properties; we only need the bits the renderer mixes into the HTML.
@@ -716,4 +735,144 @@ export interface PublicSiteConfig {
   baseUrl: string;
   /** Whether crawlers may index this deployment. */
   allowIndex: boolean;
+}
+
+// ── Navigation menus (from PR #509 admin-menus → public site wiring) ──
+
+/**
+ * Defensive parse of a single public menu item. Drops malformed rows
+ * rather than rejecting the whole response — a broken row in the
+ * admin's reorder shouldn't blank the marketing nav.
+ */
+function asMenuItem(raw: unknown): MenuItem | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const label = typeof r.label === 'string' ? r.label.trim() : '';
+  const href = typeof r.href === 'string' ? r.href.trim() : '';
+  if (label === '' || href === '') return null;
+  return {
+    label,
+    href,
+    external: typeof r.external === 'boolean' ? r.external : false,
+  };
+}
+
+/**
+ * Fetch the items assigned to a named menu location. Locations are
+ * the slug the operator pinned in the admin (`primary`, `footer-product`,
+ * etc.); the Go side resolves slug → items in one round trip.
+ *
+ * Returns an empty array on any failure — network down, 5xx, malformed
+ * payload. The marketing landing falls back to a hardcoded default
+ * list when this returns empty, so a missing/broken endpoint never
+ * blanks the nav.
+ */
+export async function fetchMenu(
+  location: string,
+  options: { revalidate?: number } = {},
+): Promise<MenuItem[]> {
+  if (!location) return [];
+  try {
+    const raw = await getJson<unknown>(
+      `/api/v1/menus/by-location/${encodeURIComponent(location)}`,
+      options,
+    );
+    if (!raw || typeof raw !== 'object') return [];
+    const items = (raw as { items?: unknown[] }).items;
+    if (!Array.isArray(items)) return [];
+    return items
+      .map((row) => asMenuItem(row))
+      .filter((m): m is MenuItem => m !== null);
+  } catch {
+    // Graceful degrade — never throw. The marketing nav has a
+    // hardcoded fallback for the empty-array case.
+    return [];
+  }
+}
+
+// ── Site identity options (issue #508) ──
+
+/**
+ * Public site identity surfaced through Admin → Settings → General.
+ *
+ * These map 1:1 onto the `core.site.*` options group in the registry:
+ *
+ *   - `name`    ← `core.site.name`
+ *   - `tagline` ← `core.site.tagline`
+ *   - `url`     ← `core.site.url`
+ *
+ * Defaults mirror the strings the public site used to hardcode, so
+ * a renderer that can't reach the API or hits a 5xx still paints a
+ * sensible "GoNext" envelope rather than crashing the route.
+ */
+export interface SiteOptions {
+  /** Site name — used in <title>, og:site_name, wordmarks. */
+  name: string;
+  /** Short tagline — used as the default meta description. */
+  tagline: string;
+  /**
+   * Canonical site origin (e.g. `https://example.com`). May be empty
+   * — the layout treats an empty string as "skip metadataBase".
+   */
+  url: string;
+}
+
+const DEFAULT_SITE_OPTIONS: SiteOptions = {
+  name: 'GoNext',
+  tagline: 'A site powered by GoNext.',
+  url: '',
+};
+
+/**
+ * Defensive parse of the `/api/v1/settings?group=core.site` envelope.
+ * The endpoint returns a flat `{ "core.site.name": ..., ... }` map; we
+ * project that down to the typed `SiteOptions` shape, falling back to
+ * the documented defaults for any missing / wrongly-typed key.
+ */
+function asSiteOptions(raw: unknown): SiteOptions {
+  if (!raw || typeof raw !== 'object') return DEFAULT_SITE_OPTIONS;
+  const r = raw as Record<string, unknown>;
+  const name = r['core.site.name'];
+  const tagline = r['core.site.tagline'];
+  const url = r['core.site.url'];
+  return {
+    name:
+      typeof name === 'string' && name.trim() !== ''
+        ? name
+        : DEFAULT_SITE_OPTIONS.name,
+    tagline:
+      typeof tagline === 'string' && tagline.trim() !== ''
+        ? tagline
+        : DEFAULT_SITE_OPTIONS.tagline,
+    url: typeof url === 'string' ? url : DEFAULT_SITE_OPTIONS.url,
+  };
+}
+
+/**
+ * Fetch the public-facing site identity (name, tagline, url) from the
+ * settings registry. Server-only — the layout / nav / footer call this
+ * from Server Components, never from the browser.
+ *
+ * Failure mode is "return defaults, never throw". A 5xx from the
+ * settings endpoint, a network blip, or a malformed payload would
+ * otherwise crash every public page; the safer behaviour is to render
+ * the stock "GoNext" envelope and let the next revalidation pick up
+ * the real values.
+ */
+export async function fetchSiteOptions(
+  opts: { revalidate?: number; cookie?: string } = {},
+): Promise<SiteOptions> {
+  try {
+    const raw = await getJson<unknown>(
+      '/api/v1/settings?group=core.site',
+      opts,
+    );
+    if (raw === null) return DEFAULT_SITE_OPTIONS;
+    return asSiteOptions(raw);
+  } catch {
+    // Includes ApiError on 5xx and network failure. The settings
+    // endpoint is not load-bearing for rendering a page — defaults
+    // keep the site alive.
+    return DEFAULT_SITE_OPTIONS;
+  }
 }
