@@ -27,6 +27,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return ExitOK
 	case "tail":
 		return runTail(args[1:], stdout, stderr)
+	case "verify":
+		return runVerify(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "gonext audit: unknown subcommand %q\n\n%s\n", args[0], usage)
 		return ExitUsage
@@ -42,9 +44,11 @@ Usage:
   gonext audit <subcommand> [args]
 
 Subcommands:
-  tail [flags]    Print the most recent audit events. Tail by default.
+  tail [flags]              Print the most recent audit events.
+  verify [--from] [--to]    Walk the HMAC chain and report tampered rows.
 
 Run 'gonext audit tail --help' for the tail-specific flags.
 
 Environment:
-  DATABASE_URL    Required. Postgres DSN for the GoNext install.`
+  DATABASE_URL              Required. Postgres DSN for the GoNext install.
+  GONEXT_AUDIT_HMAC_KEY     Required for ` + "`verify`" + `. HMAC chain key.`
